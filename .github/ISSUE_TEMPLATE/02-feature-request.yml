@@ -1,0 +1,37 @@
+name: "Feature request"
+description: "Suggest something Ferrolua should do, such as a new check, an embedding API, or a platform."
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: "Ferrolua implements Lua 5.4. A request to change how a valid Lua 5.4 script runs is a
+        breaking change, and needs an architecture decision record before any code changes."
+  - type: textarea
+    id: problem
+    attributes:
+      label: "The problem"
+      description: "What you're trying to do, and what stops you today."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "What you propose"
+      description: "How Ferrolua could solve it, with an example of the Lua or Rust code you'd write."
+    validations:
+      required: true
+  - type: dropdown
+    id: semantics
+    attributes:
+      label: "Does it change how a valid Lua 5.4 script runs?"
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives you considered"
+      description: "Other ways to solve the problem, such as code in the host program, and why they fall short."

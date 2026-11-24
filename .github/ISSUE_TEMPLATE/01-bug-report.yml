@@ -1,0 +1,72 @@
+name: "Bug report"
+description: "Report a crash, a wrong result, or a difference from how PUC-Rio Lua 5.4 runs a script."
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "To report a security vulnerability, don't use this form: follow the
+        [security policy](https://github.com/jabbott-iii/Ferrolua/security/policy). Leave
+        passwords, tokens, and personal data out of this report."
+  - type: input
+    id: version
+    attributes:
+      label: "Version"
+      description: "The release or commit you used, such as v0.1.0 or the output of `git rev-parse --short HEAD`."
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: "Platform"
+      options:
+        - "Linux on x86-64"
+        - "Linux on AArch64"
+        - "macOS"
+        - "Windows"
+        - "Other (say which in the steps below)"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: "Execution mode"
+      description: "Whether the script ran in the interpreter or in code the JIT compiler generated."
+      options:
+        - "Interpreter"
+        - "JIT compiler"
+        - "Both"
+        - "Not sure"
+    validations:
+      required: true
+  - type: input
+    id: rustc
+    attributes:
+      label: "Rust version"
+      description: "The output of `rustc --version`, if you built Ferrolua or a program that embeds it."
+  - type: textarea
+    id: script
+    attributes:
+      label: "Lua script or host code"
+      description: "The shortest Lua script, or Rust code that embeds Ferrolua, that shows the problem."
+      render: "lua"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      description: "The commands you ran, in order."
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: "What you expected, and what happened instead"
+      description: "If PUC-Rio Lua 5.4 runs the same script differently, paste what it printed."
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Error messages or logs"
+      render: "text"

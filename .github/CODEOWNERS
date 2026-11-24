@@ -1,0 +1,3 @@
+# GitHub requests a review from the owners of each path a pull request changes.
+# The last matching pattern wins, so put the catch-all first and narrower paths after it.
+*                    @jabbott-iii

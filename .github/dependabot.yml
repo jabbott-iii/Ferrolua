@@ -1,0 +1,17 @@
+# Version updates for what Ferrolua uses. Cargo has no entry, because the dependency rule
+# (`.claude/rules/dependencies.md`) allows no third-party crates. Add a `rust-toolchain` entry once
+# `rust-toolchain.toml` exists, so toolchain updates arrive as pull requests too.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "ci"

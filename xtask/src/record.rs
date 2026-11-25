@@ -1,7 +1,7 @@
 //! `cargo xtask record`: runs PUC-Rio Lua 5.5.1 on the reference scripts, the Lua 5.5 twins of
 //! the conformance scripts in `tests/conformance/reference/`, and saves what each one prints to a
 //! `.out` file beside it, as the [quality document] describes. The conformance runner (M2.14) will
-//! compare what each Ferrolua script prints with its twin's `.out` file.
+//! compare what each Lunaferra script prints with its twin's `.out` file.
 //!
 //! The steps:
 //!
@@ -19,11 +19,11 @@
 //! 5. Only when every script ran and exited with status 0 does it save the `.out` files. A file
 //!    that already holds what the script printed is left as it is.
 //!
-//! The interpreter is the program that `FERROLUA_PUC_LUA` names, or `lua` on the `PATH`. Its
+//! The interpreter is the program that `LUNAFERRA_PUC_LUA` names, or `lua` on the `PATH`. Its
 //! standard error goes straight to the terminal, so a script's error message appears above the
 //! error that stops the task.
 //!
-//! [quality document]: https://github.com/jabbott-iii/Ferrolua/blob/main/docs/04-quality.md#xtask
+//! [quality document]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/04-quality.md#xtask
 
 use std::env;
 use std::ffi::{OsStr, OsString};
@@ -44,7 +44,8 @@ const REFERENCE: &str = "tests/conformance/reference";
 /// file, which says whether the file is new, changed, or unchanged.
 ///
 /// It runs Cargo from `CARGO`, which Cargo sets when it runs `xtask`, and Lua from
-/// `FERROLUA_PUC_LUA`, each found on the `PATH`, as `cargo` and `lua`, when the variable isn't set.
+/// `LUNAFERRA_PUC_LUA`, each found on the `PATH`, as `cargo` and `lua`, when the variable
+/// isn't set.
 ///
 /// # Errors
 ///
@@ -57,7 +58,7 @@ const REFERENCE: &str = "tests/conformance/reference";
 /// saving the ones before it.
 pub(crate) fn run(script: Option<&Path>) -> Result<String, Error> {
     let cargo = env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
-    let lua = env::var_os("FERROLUA_PUC_LUA").unwrap_or_else(|| OsString::from("lua"));
+    let lua = env::var_os("LUNAFERRA_PUC_LUA").unwrap_or_else(|| OsString::from("lua"));
     let folder = Workspace::locate(&cargo)?.root.join(REFERENCE);
     let names = select(&folder, script)?;
     check_version(&lua, &folder)?;

@@ -1,10 +1,10 @@
-# Subsystem: `ferrolua`
+# Subsystem: `lunaferra`
 
-The `ferrolua` crate is the one a host adds to embed Lua. It creates states with chosen libraries,
+The `lunaferra` crate is the one a host adds to embed Lua. It creates states with chosen libraries,
 limits, and JIT mode; loads and runs chunks; moves values between Rust and Lua; registers Rust
 functions and Rust types for scripts to use; and exposes the debugger interface. It wires the
 compiler, the VM, and the standard library together, and the JIT too when its `jit` feature is on,
-which it is not by default (ADR-0022: the JIT is an optional feature of `ferrolua`, off by
+which it is not by default (ADR-0022: the JIT is an optional feature of `lunaferra`, off by
 default). It adds no third-party crate to the host's build. Its API holds Rust's guarantees: a
 value can't outlive its state or be used with another state. A minimal API lands in M2.14, and the
 full one in M3.1.
@@ -30,7 +30,7 @@ The sketch below shows the shape; M3.1 settles the names, and the crate's docume
 becomes the reference.
 
 ```rust
-use ferrolua::{Gc, JitMode, Libraries, Limits, Lua, Options, Value};
+use lunaferra::{Gc, JitMode, Libraries, Limits, Lua, Options, Value};
 
 let lua = Lua::new(Options {
     libraries: Libraries::SAFE,
@@ -102,7 +102,7 @@ assert_eq!(result, "hello, world");
   of source for one chunk, and `Options::trusted()` gives every library and no limits, for a host
   that runs only its own scripts (ADR-0030: finite limits by default; M3.20). `Limits::none()`
   turns the limits off and leaves the libraries as they are.
-- A runtime error carries the failing expression's span and, where Ferrolua can work one out, a
+- A runtime error carries the failing expression's span and, where Lunaferra can work one out, a
   hint, beside its unchanged message (ADR-0029: runtime errors with their source line, a caret, and
   a hint; M2.20).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests
@@ -112,7 +112,7 @@ assert_eq!(result, "hello, world");
 A host function that makes a script wait, and the task that runs it, look like this:
 
 ```rust
-use ferrolua::{Api, Lua, Options, Poll, Yield};
+use lunaferra::{Api, Lua, Options, Poll, Yield};
 
 let api = Api::new()
     .function("wait", |seconds: f64| Yield((seconds,)))
@@ -136,9 +136,9 @@ assert!(matches!(task.resume(())?, Poll::Done(_)));      // the host resumed it
    memory.
 2. Using a value with a state other than its own returns an error.
 3. No API call panics on any input.
-4. A host that adds only `ferrolua` builds no third-party crate.
-5. Without the `jit` feature, a build of `ferrolua` contains no `ferrolua-jit`, and so no Ferrolua
-   code with `unsafe`.
+4. A host that adds only `lunaferra` builds no third-party crate.
+5. Without the `jit` feature, a build of `lunaferra` contains no `lunaferra-jit`, and so no
+   Lunaferra code with `unsafe`.
 
 ## Tests
 
@@ -147,5 +147,5 @@ assert!(matches!(task.resume(())?, Poll::Done(_)));      // the host resumed it
 - Invariant 2: an integration test with two states.
 - Invariant 3: the `api` fuzz target calls API functions with generated values and scripts.
 - Invariant 4: the `cargo tree` check in [`../04-quality.md`](../04-quality.md#automated-checks).
-- Invariant 5: `cargo tree -p ferrolua --edges normal --prefix none` lists no `ferrolua-jit`, a
+- Invariant 5: `cargo tree -p lunaferra --edges normal --prefix none` lists no `lunaferra-jit`, a
   check that M5.4 adds to the automated checks.

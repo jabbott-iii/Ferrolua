@@ -1,16 +1,16 @@
-# Contributing to Ferrolua
+# Contributing to Lunaferra
 
-Ferrolua welcomes bug reports, fixes, tests, and documentation. For anything beyond a small fix,
+Lunaferra welcomes bug reports, fixes, tests, and documentation. For anything beyond a small fix,
 open an issue first, so the design is agreed before you write the code.
 
-Ferrolua is at its start. The repository holds its design in `docs/`, the rules its code, tests,
+Lunaferra is at its start. The repository holds its design in `docs/`, the rules its code, tests,
 and documents follow in `.claude/rules/`, and a Cargo workspace whose crates, apart from the test
 tools, hold only their documentation so far. [`docs/00-overview.md`](docs/00-overview.md) says what
-Ferrolua is for, and [`docs/roadmap.md`](docs/roadmap.md) what comes next.
+Lunaferra is for, and [`docs/roadmap.md`](docs/roadmap.md) what comes next.
 
 ## Set up
 
-1. Install Rust with [rustup](https://rustup.rs), then install the version Ferrolua uses, with the
+1. Install Rust with [rustup](https://rustup.rs), then install the version Lunaferra uses, with the
    `llvm-tools` component that the coverage check needs:
 
    ```bash
@@ -31,10 +31,10 @@ Ferrolua is for, and [`docs/roadmap.md`](docs/roadmap.md) what comes next.
 
    It prints `tests/conformance/reference/hello.out: unchanged` when the `.out` file already holds
    what Lua printed, and `new` or `changed` when it saved the file. It runs `lua` from the `PATH`;
-   set `FERROLUA_PUC_LUA` to the interpreter's path to run another one. With no script named, it
+   set `LUNAFERRA_PUC_LUA` to the interpreter's path to run another one. With no script named, it
    records every twin.
 
-There is nothing else to install. Ferrolua uses no third-party code, including test, lint, and
+There is nothing else to install. Lunaferra uses no third-party code, including test, lint, and
 format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
 
 ## Make a change
@@ -43,7 +43,7 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
   [`rust.md`](.claude/rules/rust.md):
   - unit tests in a `#[cfg(test)] mod tests` beside the code
   - integration tests that use only the public API in each crate's `tests/`
-  - Ferrolua conformance scripts in `tests/conformance/`, each with a Lua 5.5 twin in
+  - Lunaferra conformance scripts in `tests/conformance/`, each with a Lua 5.5 twin in
     `tests/conformance/reference/` and a `.out` file beside the twin that holds the output PUC-Rio
     Lua 5.5.1 printed for it
   - scripts for behavior with no Lua 5.5 counterpart in `tests/extensions/`, each with a `.out`
@@ -78,12 +78,12 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/), as
 feat(syntax): parse goto statements and labels (M1.4)
 ```
 
-- The scope is a crate's name without any `ferrolua-` prefix, such as `syntax` or `vm`, or
+- The scope is a crate's name without any `lunaferra-` prefix, such as `syntax` or `vm`, or
   `workspace`, `docs`, `ci`, or `claude`. Leave it out when a change spans several areas.
 - End the summary line with the roadmap task's ID in parentheses when the commit finishes or
   advances one.
 - Make each commit one logical change, and keep together the changes that belong together: a task's
-  code, tests, and ticked checkbox; a change to how Ferrolua runs a script and the script that
+  code, tests, and ticked checkbox; a change to how Lunaferra runs a script and the script that
   covers it, with its Lua 5.5 twin if it has one; and an `unsafe` block, its `// SAFETY:` comment,
   and its test.
 - Mark a breaking change with a `BREAKING CHANGE:` trailer that names the decision record behind
@@ -120,13 +120,13 @@ Update them in the same change, in the shape
 ## Report a problem
 
 - Report a bug or request a feature with the forms on the
-  [new issue page](https://github.com/jabbott-iii/Ferrolua/issues/new/choose).
+  [new issue page](https://github.com/jabbott-iii/Lunaferra/issues/new/choose).
 - Report a security vulnerability privately, as [`SECURITY.md`](SECURITY.md) describes, never in
   an issue.
 
 ## Terms
 
-Ferrolua is released under the [MIT License](LICENSE). By contributing, you agree that your
+Lunaferra is released under the [MIT License](LICENSE). By contributing, you agree that your
 contribution is released under the same license.
 
 ## Coding agents

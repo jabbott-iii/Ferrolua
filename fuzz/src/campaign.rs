@@ -190,7 +190,7 @@ mod tests {
     /// An empty folder of this test's own under the system's temporary folder.
     fn folder(name: &str) -> PathBuf {
         let folder = env::temp_dir().join(format!(
-            "ferrolua-fuzz-campaign-{}-{name}",
+            "lunaferra-fuzz-campaign-{}-{name}",
             std::process::id()
         ));
         // The folder is left from an earlier run only if that run stopped early.
@@ -215,7 +215,7 @@ mod tests {
         let folder = folder("no-work");
         fs::write(folder.join("work"), "a file where the folder goes").unwrap();
         let error = run(
-            &folder.join("ferrolua-fuzz"),
+            &folder.join("lunaferra-fuzz"),
             folder.join("work").join("inner"),
             &options(&folder),
         )

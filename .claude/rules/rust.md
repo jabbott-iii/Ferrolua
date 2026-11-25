@@ -51,22 +51,22 @@ so they can fill them in.
   accepted architecture decision record (ADR) names the crate, the modules, and the invariants its
   `unsafe` code relies on. The JIT needs `unsafe` to map executable memory and to call the code it
   generates; ADR-0013, still proposed, limits it to the `jit::memory` and `jit::entry` modules of
-  `ferrolua-jit`, and the heap needs none (ADR-0011). Every `unsafe` block has a `// SAFETY:`
+  `lunaferra-jit`, and the heap needs none (ADR-0011). Every `unsafe` block has a `// SAFETY:`
   comment, and every `unsafe fn` a `# Safety` doc section. Memory that holds generated code is never
   writable and executable at the same time
-- **Untrusted input:** every Lua script Ferrolua loads, as source text or as a precompiled chunk,
+- **Untrusted input:** every Lua script Lunaferra loads, as source text or as a precompiled chunk,
   every value a script passes to the host, and the files the analysis tools read. Limits on source
   size, nesting depth, string length, memory, and instruction count go in each part's spec in
   `docs/specs/`
 - **Errors:** one error enum per library crate, implementing `Display` and `std::error::Error`. A
-  Lua runtime error carries a Lua value, as `error` allows, and for the errors Ferrolua shares with
+  Lua runtime error carries a Lua value, as `error` allows, and for the errors Lunaferra shares with
   Lua 5.5 its messages match PUC-Rio Lua 5.5.1's wording, such as `attempt to index a nil value`,
   because scripts match on them. Each analysis diagnostic carries a stable code, as
   `docs/specs/diagnostics.md` defines
 - **Logging:** none: library crates return errors and diagnostics to the host, and never print or
   log. Only a command-line binary, if one is added, writes to stdout and stderr, from its entry
   point
-- **Languages:** English only. Runtime error messages that Ferrolua shares with Lua 5.5 keep
+- **Languages:** English only. Runtime error messages that Lunaferra shares with Lua 5.5 keep
   PUC-Rio Lua 5.5.1's English wording, because scripts match on them
 - **Concurrency:** none: no crate starts a thread or an async runtime. Lua coroutines run on the
   thread that resumes them, inside one Lua state
@@ -79,7 +79,7 @@ so they can fill them in.
   `docs/04-quality.md` describes, plus the specs for contracts that span crates: `language`,
   `memory`, `sandbox`, and `diagnostics`
 - **Test layout:** unit tests in a `#[cfg(test)] mod tests` beside the code; integration tests that
-  use only the public API in each crate's `tests/`; Ferrolua scripts in `tests/conformance/`, with
+  use only the public API in each crate's `tests/`; Lunaferra scripts in `tests/conformance/`, with
   their Lua 5.5 twins in `tests/conformance/reference/`, and in `tests/extensions/`, which run once
   interpreted and once with the JIT forced on, and must print their recorded output (see
   "Conformance scripts" in `docs/04-quality.md`); benchmarks in each crate's `benches/`, timed with

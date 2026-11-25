@@ -1,4 +1,4 @@
-//! The command line of `ferrolua-fuzz`, which `cargo xtask fuzz` passes its arguments to.
+//! The command line of `lunaferra-fuzz`, which `cargo xtask fuzz` passes its arguments to.
 
 use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};

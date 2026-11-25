@@ -1,6 +1,6 @@
 # 03 — Platforms
 
-Ferrolua runs on Linux, Windows, macOS, Android, iOS, and the web (ADR-0027: six platforms, a JIT
+Lunaferra runs on Linux, Windows, macOS, Android, iOS, and the web (ADR-0027: six platforms, a JIT
 wherever one is allowed, and the same results everywhere). The interpreter is portable Rust, so
 it builds for every target the standard library supports, and the same script gives the same
 results on each. The JIT needs a backend for each processor and code for each operating system's
@@ -25,12 +25,12 @@ ADR-0028 (the targets, host services, math, and tests) sets these targets.
 | iOS | `aarch64-apple-ios`, and `aarch64-apple-ios-sim` for the simulator | M3.18 | None |
 | Web | `wasm32-unknown-unknown` | M3.18 | None |
 
-- The library, `ferrolua`, targets all of them. The `ferrolua` command, the language server, and
+- The library, `lunaferra`, targets all of them. The `lunaferra` command, the language server, and
   the debug adapter target Linux, Windows, and macOS.
 - iOS has no JIT because an iOS app can't make memory executable without an entitlement Apple
   doesn't give ordinary apps. The web has none because a browser runs WebAssembly, not machine
   code. A WebAssembly JIT is in the roadmap's backlog.
-- On iOS and the web, `ferrolua-jit` compiles to nothing, so a host can turn the `jit` feature on
+- On iOS and the web, `lunaferra-jit` compiles to nothing, so a host can turn the `jit` feature on
   for every target. There the default mode is `JitMode::Off`, and `Lua::new` refuses the other
   modes with an error that names the target ([`specs/jit.md`](specs/jit.md#modes)).
 
@@ -44,7 +44,7 @@ ADR-0028 (the targets, host services, math, and tests) sets these targets.
 - **The same results everywhere.** Hosts that replay recorded runs, or keep several machines in
   lockstep, need every target to compute the same values, collect at the same points, and print
   the same text. Integer arithmetic and IEEE 754's basic operations already agree everywhere, the
-  heap counts bytes by fixed charges (ADR-0021), and Ferrolua formats numbers itself. The rest is
+  heap counts bytes by fixed charges (ADR-0021), and Lunaferra formats numbers itself. The rest is
   below, under "The same results on every target".
 
 ## What each target needs
@@ -73,7 +73,7 @@ ADR-0028 (the targets, host services, math, and tests) sets these targets.
   in; a macOS runner. No JIT.
 - **Web:** a clock and a hash seed from the host, because the standard library has neither on
   `wasm32-unknown-unknown` (`Options::clock` and `Options::hash_seed`,
-  [`specs/ferrolua.md`](specs/ferrolua.md)); `io` and file-based `require` only through a host's
+  [`specs/lunaferra.md`](specs/lunaferra.md)); `io` and file-based `require` only through a host's
   loader; the headless browser on the CI runner for tests. No JIT.
 
 Each operating system's executable memory adds `unsafe` code to `jit::memory`, under ADR-0013
@@ -89,7 +89,7 @@ Each operating system's executable memory adds `unsafe` code to `jit::memory`, u
 - **iOS:** `xtask` builds the test programs for `aarch64-apple-ios-sim` and runs each in the
   simulator with `xcrun simctl spawn`.
 - **Web:** Rust's test harness can't run in a browser, so `xtask` builds a test module of
-  Ferrolua's own that runs scripts through `ferrolua`'s API, serves it with a small page from a
+  Lunaferra's own that runs scripts through `lunaferra`'s API, serves it with a small page from a
   local HTTP server written with the standard library, and opens the page in the runner's headless
   browser. The page runs every conformance and extension script, the saved fuzz inputs, and the
   stored collection logs, and posts each result back to the server. Rust's unit tests run
@@ -104,7 +104,7 @@ holds on each, so code that only one operating system compiles is covered on tha
 ## The same results on every target
 
 - **Math.** `math.sin`, `math.exp`, `math.log`, float `**`, and the other functions IEEE 754
-  doesn't define exactly come from `ferrolua-math`, which computes them with only the operations
+  doesn't define exactly come from `lunaferra-math`, which computes them with only the operations
   IEEE 754 does define exactly, never with fused multiply-add or a platform's math library
   (M2.19). Each result is within one unit in the last place of the exact value.
 - **NaN.** Processors give a new NaN different signs, so every NaN prints as `nan`, as Python
@@ -135,8 +135,8 @@ holds on each, so code that only one operating system compiles is covered on tha
   counted bytes included, interpreted and compiled, so every target collects at the same points
   (ADR-0021: bytes are counted by fixed charges, alike on every target;
   [`specs/memory.md`](specs/memory.md#determinism)).
-- Every function of `ferrolua-math` gives, for each input in its stored file, the bits stored for
+- Every function of `lunaferra-math` gives, for each input in its stored file, the bits stored for
   it.
 - Every saved fuzz input in `fuzz/regressions/` runs without a crash.
 - `cargo tree --workspace --edges normal,build,dev --target all --prefix none` lists only
-  Ferrolua's own crates.
+  Lunaferra's own crates.

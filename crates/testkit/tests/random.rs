@@ -6,7 +6,7 @@
 //! states each test names. The expected results of `below` come from a C version of Lemire's
 //! method run on that code's outputs, or from the outputs by hand where a test says how.
 
-use ferrolua_testkit::{SplitMix64, Xoshiro256StarStar};
+use lunaferra_testkit::{SplitMix64, Xoshiro256StarStar};
 
 /// Calls `next` `N` times and returns the results in order.
 fn outputs<const N: usize>(mut next: impl FnMut() -> u64) -> [u64; N] {

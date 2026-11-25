@@ -1,6 +1,6 @@
 # Subsystem: `language`
 
-Ferrolua's language derives from Lua 5.5. It keeps Lua's statements, values, tables, metatables,
+Lunaferra's language derives from Lua 5.5. It keeps Lua's statements, values, tables, metatables,
 closures, coroutines, and standard library, and takes these from Python instead: its operators, its
 indexes that start at 0, and its ranges that stop before their end (ADR-0023: a language of its
 own, with Python's operators and 0-based indexes); and f-strings, locals by default, lists, tuples,
@@ -19,17 +19,17 @@ The owner chose Python's operators and indexes that start at 0, for simplicity. 
 Lua 5.5 can have them: Lua already gives `^`, `..`, `~=`, and `~` meanings of their own, and a Lua
 script that reads `t[1]` expects a list's first element. A mode that each chunk turns on would keep
 old scripts running, but every table passed between the two modes would need its integer keys
-shifted. So Ferrolua gives up running Lua 5.5 scripts unchanged.
+shifted. So Lunaferra gives up running Lua 5.5 scripts unchanged.
 
 It keeps everything else from Lua 5.5, so porting a script changes its expressions and its index
 arithmetic, not its structure. That also keeps PUC-Rio Lua 5.5.1 as the reference for the shared
 part: each conformance script has a Lua 5.5 twin that PUC-Rio runs to record the expected output
 ([`04-quality.md`](../04-quality.md#conformance-scripts)). The cost is that existing Lua code and
-Lua tools, such as lua-language-server and StyLua, don't work on Ferrolua files without changes.
+Lua tools, such as lua-language-server and StyLua, don't work on Lunaferra files without changes.
 
 ## The Lua 5.5 baseline
 
-Ferrolua implements all of Lua 5.5 that this spec doesn't change, including what is new since 5.4:
+Lunaferra implements all of Lua 5.5 that this spec doesn't change, including what is new since 5.4:
 
 - `global` declarations, in every form: `global x`, `global x <const> = 1`, `global function f`,
   `global *`, and `global <const> *`, with the scoping rules that [Scoping](#scoping-adr-0025)
@@ -75,7 +75,7 @@ Ferrolua implements all of Lua 5.5 that this spec doesn't change, including what
 
 ## Operators (ADR-0023)
 
-| Operation | Lua 5.5 | Ferrolua |
+| Operation | Lua 5.5 | Lunaferra |
 | :- | :- | :- |
 | Power | `a ^ b` | `a ** b` |
 | Not equal | `a ~= b` | `a != b` |
@@ -115,7 +115,7 @@ From the loosest binding to the tightest, as in Python:
 - `not` binds more loosely than a comparison: `not a == b` is `not (a == b)`, where Lua reads
   `(not a) == b`.
 - Joining strings has the precedence of `+`, where Lua's `..` bound more loosely than `+`. Lua's
-  `"total: " .. a + b` adds first; Ferrolua writes `"total: " + tostring(a + b)`.
+  `"total: " .. a + b` adds first; Lunaferra writes `"total: " + tostring(a + b)`.
 
 ```text
 exp        ::= orexp ['if' orexp 'else' exp]
@@ -222,7 +222,7 @@ local x = f if c then g() end     -- an assignment, then an if statement
   Python's `range` and slices are. The numeric `for` follows it: `for v = start, stop, step do`
   runs for `start`, `start + step`, and so on, while `v` is below `stop` for a positive step or
   above it for a negative one. The step defaults to 1, and a step of 0 raises an error. For
-  integers, Ferrolua computes the number of iterations before the loop starts, as Lua 5.5 does, so
+  integers, Lunaferra computes the number of iterations before the loop starts, as Lua 5.5 does, so
   the control variable never overflows.
 - Library ranges stop before their end too. `string.sub(s, i, j)` returns the bytes at positions
   i to j − 1, as Python's `s[i:j]` does, and [`stdlib.md`](stdlib.md#positions-and-ranges) lists
@@ -238,14 +238,14 @@ print(#primes)                 --> 4
 for i = 0, #primes do
   print(i, primes[i])          --> 0 2, then 1 3, 2 5, and 3 7
 end
-print(("Ferrolua"):sub(0, 5))  --> Ferro
-print(("Ferrolua"):sub(-3))    --> lua
+print(("Lunaferra"):sub(0, 5))  --> Ferro
+print(("Lunaferra"):sub(-3))    --> lua
 ```
 
 ## Formatted string literals (ADR-0025)
 
 An f-string is a string literal with an `f` touching its opening quote or long bracket: `f"..."`,
-`f'...'`, or `f[[...]]`. Each field in braces holds an expression. Ferrolua evaluates the fields
+`f'...'`, or `f[[...]]`. Each field in braces holds an expression. Lunaferra evaluates the fields
 from left to right, formats each one, and joins the parts into one string.
 
 ```text
@@ -405,13 +405,13 @@ compoundop ::= '+=' | '-=' | '*=' | '/=' | '//=' | '%=' | '**=' | '&=' | '|=' | 
 ```
 
 - `v op= e` means `v = v op (e)`, except that the parts of `v` are evaluated once. For
-  `t[f()] += g()`, Ferrolua evaluates `t`, then calls `f` once, reads `t[k]`, calls `g`, adds,
+  `t[f()] += g()`, Lunaferra evaluates `t`, then calls `f` once, reads `t[k]`, calls `g`, adds,
   and stores into `t[k]`.
 - The operator and the store use the usual rules, metamethods included: `t.n += 1` may call
   `__index`, `__add`, and `__newindex`, in that order. `s += "!"` joins strings, and `x ^= 1` is
   XOR.
 - Each is a statement with one target. `a, b += 1` is a syntax error, and none is an expression,
-  so `x = (y += 1)` is a syntax error. Python has no `++`, and neither does Ferrolua.
+  so `x = (y += 1)` is a syntax error. Python has no `++`, and neither does Lunaferra.
 - Assigning to a `<const>` variable or a `for` loop's control variable is the same compile error
   plain assignment gives.
 
@@ -503,7 +503,7 @@ print(p:length())  --> 5.0, because length is Point's method and reads only x an
 
 - `class Name` assigns the class to `Name` as `function Name` would. `local class Name` declares a
   local, and `global class Name` a global.
-- Calling the class creates an instance. Ferrolua evaluates each field's default in declaration
+- Calling the class creates an instance. Lunaferra evaluates each field's default in declaration
   order, parent fields first, then calls `new` with the instance and the call's arguments, and
   returns the instance. A default is evaluated for each instance, so `items: {string} = {}` gives
   every instance its own table.
@@ -528,7 +528,7 @@ Strict mode is two checks, each off unless turned on:
 
 - A chunk turns both on with `--!strict` as its first line, or its second line when the first
   starts with `#!`.
-- A host turns either one on, or both, in `ChunkOptions` ([`ferrolua.md`](ferrolua.md)).
+- A host turns either one on, or both, in `ChunkOptions` ([`lunaferra.md`](lunaferra.md)).
 
 ### Undeclared-variable errors
 
@@ -536,7 +536,7 @@ A strict chunk compiles as if it started with a `global` declaration that lists 
 state's libraries and its host define. An assignment always declares its name, as a local or
 through `global` ([Scoping](#scoping-adr-0025)), so the check is on reads: reading a name that is
 neither a local, declared with `global`, nor one of those names is a compile-time error. PUC-Rio Lua
-5.5.1's message for an undeclared name is recorded in M4.6, and Ferrolua uses the same wording.
+5.5.1's message for an undeclared name is recorded in M4.6, and Lunaferra uses the same wording.
 
 ```lua
 --!strict
@@ -598,28 +598,28 @@ area(2, 3, 4)  -- error: bad argument count to 'area' (expected 1 to 2, got 3)
 
 ## Tests
 
-- Invariant 1: a property test in `ferrolua-syntax` generates expressions with `ferrolua-testkit`,
+- Invariant 1: a property test in `lunaferra-syntax` generates expressions with `lunaferra-testkit`,
   prints each parse fully parenthesized, and compares it with the grouping that a separate
   precedence-climbing function in the test gives (M1.5).
-- Invariant 2: a property test in `ferrolua-compiler` compiles generated typed programs with and
+- Invariant 2: a property test in `lunaferra-compiler` compiles generated typed programs with and
   without their annotations and compares the bytecode (M4.3).
 - Invariant 3: `tests/extensions/compound_assignment.lua` (M4.2) and
   `tests/extensions/operators.lua` (M2.9) count calls through metamethods and functions with side
   effects.
-- Invariant 4: a property test in `ferrolua-stdlib` compares `string.sub` with a slice function
-  written in the test from Python's rules (M3.3), and one in `ferrolua` runs generated numeric
+- Invariant 4: a property test in `lunaferra-stdlib` compares `string.sub` with a slice function
+  written in the test from Python's rules (M3.3), and one in `lunaferra` runs generated numeric
   `for` loops and compares their iterations with a `range` function written the same way (M2.14).
 - Invariant 5: the strict-mode tests run every script in `tests/extensions/strict/` in both modes
   and compare the output of those that finish (M4.6, M4.7).
-- Invariant 6: a test in `ferrolua-vm` records the heap's size, creates and drops 100,000 instances
+- Invariant 6: a test in `lunaferra-vm` records the heap's size, creates and drops 100,000 instances
   of a class with a parent, and checks the size again (M4.5).
-- Invariant 7: a property test in `ferrolua` generates f-strings and compares each with the same
+- Invariant 7: a property test in `lunaferra` generates f-strings and compares each with the same
   fields formatted by `format` and joined (M3.4).
-- Invariant 8: a property test in `ferrolua-compiler` generates functions that assign names and
+- Invariant 8: a property test in `lunaferra-compiler` generates functions that assign names and
   checks that only names under a `global` declaration compile to global writes (M2.5).
 - Invariant 9: `tests/extensions/truth.lua` tests every kind of value in each place that tests
   truth (M2.9).
-- Invariant 10: a property test in `ferrolua-vm` builds equal tuples separately and checks that a
+- Invariant 10: a property test in `lunaferra-vm` builds equal tuples separately and checks that a
   table and a set each hold one entry for them (M2.18).
 - Each grammar rule has a parser test for the accepted form and for each nearby error, with the
   exact message.

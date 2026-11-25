@@ -1,5 +1,5 @@
 //! The child side of a run: the fuzzer starts its own program again as
-//! `ferrolua-fuzz --child <target>` for each batch of inputs, so that a crash or a hang ends only
+//! `lunaferra-fuzz --child <target>` for each batch of inputs, so that a crash or a hang ends only
 //! the child, and the parent sees it and carries on.
 //!
 //! The child reads the batch from standard input, in the format of the [`batch`]

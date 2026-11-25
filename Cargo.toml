@@ -1,4 +1,4 @@
-# The Ferrolua workspace: one member for each crate in the crate map of
+# The Lunaferra workspace: one member for each crate in the crate map of
 # `docs/01-architecture.md`, in the same order.
 [workspace]
 resolver = "3"
@@ -10,7 +10,7 @@ members = [
     "crates/vm",
     "crates/jit",
     "crates/stdlib",
-    "crates/ferrolua",
+    "crates/lunaferra",
     "crates/analysis",
     "crates/types",
     "crates/lint",
@@ -29,7 +29,7 @@ members = [
 # The crates that other members depend on, declared once so that each member refers to them with
 # `workspace = true`.
 [workspace.dependencies]
-ferrolua-testkit = { path = "crates/testkit" }
+lunaferra-testkit = { path = "crates/testkit" }
 
 # No crate sets `version` yet, so Cargo gives each one 0.0.0 and refuses to publish it. The
 # release tasks of milestone M12 set the versions.

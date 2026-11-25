@@ -1,6 +1,6 @@
 //! Runs `cargo xtask record` in small workspaces that each test writes, with a stand-in for
 //! PUC-Rio Lua, and checks what it reports and which `.out` files it saves. Each workspace is in a
-//! folder of its own under the target folder, so a test never touches Ferrolua's own scripts.
+//! folder of its own under the target folder, so a test never touches Lunaferra's own scripts.
 //!
 //! The stand-in is a Rust program that the first test to need it compiles with `rustc`. It
 //! accepts only the arguments that the task passes, `-E -v` and `-E <script>`, and fails on any
@@ -54,7 +54,7 @@ fn main() {
 const LUA_5_5_1: &str = "Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio";
 
 /// How the task tells the user to fix an interpreter it can't use.
-const INSTALL_LUA: &str = "install PUC-Rio Lua 5.5.1, or set `FERROLUA_PUC_LUA` to its path";
+const INSTALL_LUA: &str = "install PUC-Rio Lua 5.5.1, or set `LUNAFERRA_PUC_LUA` to its path";
 
 /// The stand-in for PUC-Rio Lua, named `lua` in a folder of its own, compiled once for all the
 /// tests.
@@ -145,13 +145,13 @@ impl Workspace {
             .arg("record")
             .args(args)
             .current_dir(&self.dir)
-            .env("FERROLUA_PUC_LUA", fake_lua())
+            .env("LUNAFERRA_PUC_LUA", fake_lua())
             .env("FAKE_LUA_VERSION", LUA_5_5_1);
         command
     }
 }
 
-/// Two reference scripts, the Ferrolua script whose twin is `a.lua`, and a file in the reference
+/// Two reference scripts, the Lunaferra script whose twin is `a.lua`, and a file in the reference
 /// folder that isn't a script.
 const SCRIPTS: [(&str, &str); 4] = [
     ("tests/conformance/a.lua", "print(\"a\")\n"),
@@ -241,7 +241,7 @@ fn replaces_an_out_file_that_holds_other_output() {
 }
 
 #[test]
-fn finds_lua_on_the_path_when_ferrolua_puc_lua_is_not_set() {
+fn finds_lua_on_the_path_when_lunaferra_puc_lua_is_not_set() {
     let workspace = Workspace::new("lua-on-path", &SCRIPTS);
     let bin = fake_lua().parent().expect("the stand-in is in a folder");
     let path = env::var_os("PATH").unwrap_or_default();
@@ -249,7 +249,7 @@ fn finds_lua_on_the_path_when_ferrolua_puc_lua_is_not_set() {
         .expect("the folders join into a `PATH`");
     let output = run(workspace
         .record(&["tests/conformance/reference/a.lua"])
-        .env_remove("FERROLUA_PUC_LUA")
+        .env_remove("LUNAFERRA_PUC_LUA")
         .env("PATH", path));
     assert_eq!(stdout(&output), "tests/conformance/reference/a.out: new\n");
     assert_eq!(output.status.code(), Some(0));
@@ -312,7 +312,7 @@ fn fails_when_lua_cannot_start() {
     let source = Command::new(&lua)
         .output()
         .expect_err("the program doesn't exist");
-    let output = run(workspace.record(&[]).env("FERROLUA_PUC_LUA", &lua));
+    let output = run(workspace.record(&[]).env("LUNAFERRA_PUC_LUA", &lua));
     assert_eq!(stdout(&output), "");
     assert_eq!(
         stderr(&output),

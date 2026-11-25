@@ -7,7 +7,7 @@
 //! - `coverage`: builds the tests with coverage instrumentation, runs them, and prints the lines
 //!   and regions of each crate that they ran. It exits with status 1 unless they ran all of them.
 //!   The [`coverage`] module describes how.
-//! - `fuzz`: builds and runs the fuzzer, `ferrolua-fuzz` in `fuzz/`, with the arguments after
+//! - `fuzz`: builds and runs the fuzzer, `lunaferra-fuzz` in `fuzz/`, with the arguments after
 //!   `fuzz`, as the [`fuzz`] module describes.
 //! - `record`: runs PUC-Rio Lua 5.5.1 on the reference scripts in `tests/conformance/reference/`,
 //!   or on the one named after `record`, and saves what each prints to a `.out` file beside it.
@@ -24,8 +24,8 @@
 //! which case it prints its usage. `fuzz` is the exception: the fuzzer writes its own report and
 //! errors, and `cargo xtask` exits with the fuzzer's status.
 //!
-//! [quality document]: https://github.com/jabbott-iii/Ferrolua/blob/main/docs/04-quality.md#xtask
-//! [roadmap]: https://github.com/jabbott-iii/Ferrolua/blob/main/docs/roadmap.md
+//! [quality document]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/04-quality.md#xtask
+//! [roadmap]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/roadmap.md
 
 mod cargo;
 mod coverage;

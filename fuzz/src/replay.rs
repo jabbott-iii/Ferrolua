@@ -136,7 +136,7 @@ mod tests {
     /// An empty folder of this test's own under the system's temporary folder.
     fn folder(name: &str) -> PathBuf {
         let folder = env::temp_dir().join(format!(
-            "ferrolua-fuzz-replay-{}-{name}",
+            "lunaferra-fuzz-replay-{}-{name}",
             std::process::id()
         ));
         // The folder is left from an earlier run only if that run stopped early.

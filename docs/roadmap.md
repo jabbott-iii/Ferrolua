@@ -1,6 +1,6 @@
 # Roadmap
 
-This file is the plan for building Ferrolua, from an empty workspace to the first release on
+This file is the plan for building Lunaferra, from an empty workspace to the first release on
 crates.io. Each milestone ends with something a user can see or use, and each task says what to
 build, how to tell it worked, and the commands that check it. Why each choice was made is in
 [`decisions.md`](decisions.md); how each part works is in [`specs/`](specs/).
@@ -52,10 +52,10 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
       and commit `Cargo.lock`.
   - Accept:
     - `cargo build --workspace --locked` builds every crate with no warnings.
-    - The tree command lists only Ferrolua's own crates.
+    - The tree command lists only Lunaferra's own crates.
   - Verify: `cargo build --workspace --locked`;
     `cargo tree --workspace --edges normal,build,dev --target all --prefix none` (expect only
-    `ferrolua` crates and `xtask`)
+    `lunaferra` crates and `xtask`)
 
 - [x] **M0.2 — testkit: seeded generator and property tests**
   - Note: Built on 2026-11-25. The xoshiro authors publish reference C code, not a list of outputs,
@@ -76,14 +76,14 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     and all 236 of its regions.
   - Depends: M0.1
   - Do:
-    - Build `ferrolua-testkit` as [`04-quality.md`](04-quality.md#ferrolua-testkit) describes: a
+    - Build `lunaferra-testkit` as [`04-quality.md`](04-quality.md#lunaferra-testkit) describes: a
       SplitMix64 seed expander, xoshiro256**, and a property runner that shrinks a failing case and
       prints its seed.
   - Accept:
     - The same seed gives the same sequence on every run, matching the reference outputs that the
       xoshiro256** authors publish.
     - A property that fails for values above 1,000 is reported with a shrunk case of 1,001.
-  - Verify: `cargo test -p ferrolua-testkit --locked`
+  - Verify: `cargo test -p lunaferra-testkit --locked`
 
 - [x] **M0.3 — xtask: coverage command**
   - Note: Built on 2026-11-25. `cargo xtask coverage` runs `cargo test --workspace --locked --tests`
@@ -105,8 +105,8 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     tests don't run under it, because stable Rust can't instrument them. Build scripts aren't
     measured either, and no crate has one yet.
   - Note: On 2026-11-25, on this machine (x86-64 Linux, Rust 1.100.0), a run from an empty
-    `target/coverage/` took 2.1 s and covered all 1,691 lines and 1,986 regions, in `ferrolua-cli`,
-    `ferrolua-testkit`, and `xtask`. `crates/cli/tests/cli.rs` runs the `ferrolua-cli` binary, and
+    `target/coverage/` took 2.1 s and covered all 1,691 lines and 1,986 regions, in `lunaferra-cli`,
+    `lunaferra-testkit`, and `xtask`. `crates/cli/tests/cli.rs` runs the `lunaferra-cli` binary, and
     `xtask/tests/coverage.rs` runs the `xtask` binary, so each `main` runs under the tests.
   - Note (from M0.1): `crates/cli/src/main.rs` and `xtask/src/main.rs` each hold an empty
     `fn main` that no test calls, so the coverage run has to reach both, for example by running
@@ -114,7 +114,7 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - Note (from M0.2): `llvm-cov report` scores a generic function by its one instantiation that
     covers the most regions, not by the union of all its instantiations. A generic function that
     tests call with different closures can therefore show a missed region that a test does run.
-    `ferrolua-testkit` reaches 100% on that measure because its tests share named generator and
+    `lunaferra-testkit` reaches 100% on that measure because its tests share named generator and
     property functions. The coverage command should either keep that measure, or take the union of
     every instantiation's regions from `llvm-cov export`.
   - Depends: M0.1
@@ -127,11 +127,11 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - Verify: `cargo xtask coverage` (expect 100% of lines and regions); `cargo test -p xtask --locked`
 
 - [x] **M0.4 — fuzz: the fuzzer and regression replay**
-  - Note: Built on 2026-11-25. `ferrolua-fuzz` is a program, as `xtask` is, and `cargo xtask fuzz`
-    runs it with `cargo run --locked --package ferrolua-fuzz`, in Cargo's dev profile. It sends
+  - Note: Built on 2026-11-25. `lunaferra-fuzz` is a program, as `xtask` is, and `cargo xtask fuzz`
+    runs it with `cargo run --locked --package lunaferra-fuzz`, in Cargo's dev profile. It sends
     1,000 runs to each child process, and gives each input 1,000 ms unless `--time-limit` says
     otherwise. The parent hands a child its batch, and reads its progress, through two files in a
-    work folder, `ferrolua-fuzz-<process ID>` in the system's temporary folder, which it removes
+    work folder, `lunaferra-fuzz-<process ID>` in the system's temporary folder, which it removes
     when it ends. On this machine (x86-64 Linux, an Intel Core i7-11800H, Rust 1.100.0), one
     million runs of `fixture-panic` from an empty corpus take 8.3 s.
   - Note: Without coverage guidance, a fuzzer doesn't find a 4-byte prefix from nothing, so
@@ -147,19 +147,19 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     writes its coverage profile, so every line of the fixture also runs on inputs that pass.
   - Note: The saved `FUZZ` input stays in `fuzz/regressions/`, so `cargo test` replays it. Each
     target says how its saved inputs must replay: a fixture's must still fail as it is built to,
-    and the input of a target that checks Ferrolua's code must pass.
+    and the input of a target that checks Lunaferra's code must pass.
   - Depends: M0.2
   - Do:
-    - Build `ferrolua-fuzz` in `fuzz/` as [`04-quality.md`](04-quality.md#ferrolua-fuzz) describes:
-      targets, mutation, a fixed seed, child processes with a time limit, shrinking, and saving to
-      `fuzz/regressions/`.
+    - Build `lunaferra-fuzz` in `fuzz/` as [`04-quality.md`](04-quality.md#lunaferra-fuzz)
+      describes: targets, mutation, a fixed seed, child processes with a time limit, shrinking, and
+      saving to `fuzz/regressions/`.
     - Add `cargo xtask fuzz`, and a test that replays every saved input.
   - Accept:
     - A fixture target that panics on inputs starting with `FUZZ` is found from seed 0, shrunk to
       those 4 bytes, saved, and then replayed by `cargo test`.
     - A fixture target that loops forever is reported as a hang within its time limit.
   - Verify: `cargo xtask fuzz fixture-panic --seed 0 --runs 100000` (expect one saved input);
-    `cargo test -p ferrolua-fuzz --locked`
+    `cargo test -p lunaferra-fuzz --locked`
 
 - [x] **M0.5 — xtask: conformance recorder**
   - Note: Built on 2026-11-25. `cargo xtask record` finds the workspace's root with
@@ -217,9 +217,9 @@ on every pull request; the owner has made the jobs required.
 
 ---
 
-## M1 — Parse Ferrolua, with errors that point at the problem
+## M1 — Parse Lunaferra, with errors that point at the problem
 
-**Goal:** `ferrolua parse` reads any Ferrolua file, reports syntax errors in the words PUC-Rio
+**Goal:** `lunaferra parse` reads any Lunaferra file, reports syntax errors in the words PUC-Rio
 Lua 5.5.1 uses wherever the syntax is Lua's, and prints a lossless tree, which every later tool
 builds on.
 
@@ -231,7 +231,7 @@ builds on.
   - Accept:
     - Line and column are right for every line ending PUC-Rio counts, and for sources that aren't
       valid UTF-8.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.2 — syntax: the lexer**
   - Note: 2026-11-24, the owner's choice (ADR-0023): the lexer reads Python's operators instead of
@@ -250,7 +250,7 @@ builds on.
       `malformed number near '0x'`.
     - `f"a{x}b"`, `f'{x!r:>8}'`, and `f[[{x}]]` lex as f-strings with their fields, `{{` as a brace,
       and `f "x"` as a name and a string.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.3 — syntax: parser events and the lossless tree**
   - Depends: M1.2
@@ -258,7 +258,7 @@ builds on.
     - Build the event stream and the lossless tree builder, with typed views for each node kind.
   - Accept:
     - Printing the tree gives back the source, byte for byte.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.4 — syntax: statements**
   - Depends: M1.3
@@ -267,7 +267,7 @@ builds on.
       form, attributes, `goto` and labels, and named varargs.
   - Accept:
     - Each statement form parses to its node kind, and each nearby error has a test with its message.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.5 — syntax: expressions and operator precedence**
   - Note: 2026-11-24, the owner's choice (ADR-0023): expressions follow Python's operators and
@@ -293,7 +293,7 @@ builds on.
     - `x = f if c then g() end` parses as an assignment followed by an `if` statement.
     - `(x)` parses as a parenthesized expression, `(x,)` and `()` as tuples, `[ [1], [] ]` as a list
       of lists, and `f"{p:length()}"` as a method call where `f"{x:>8}"` has a spec.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.6 — syntax: error recovery and the diagnostic type**
   - Depends: M1.4, M1.5
@@ -301,12 +301,12 @@ builds on.
     - Build the `Diagnostic` type of [`specs/diagnostics.md`](specs/diagnostics.md#the-diagnostic),
       and recovery as [`specs/syntax.md`](specs/syntax.md#parser-and-events) describes.
     - Add `tests/conformance/syntax_errors.lua`, which loads chunks that are broken alike in
-      Ferrolua and Lua 5.5 and prints each message.
+      Lunaferra and Lua 5.5 and prints each message.
   - Accept:
     - A file with three separate errors gets three diagnostics, and the statements between them
       still appear in the tree.
     - `load`'s message for each broken chunk matches PUC-Rio's.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.7 — syntax: compact tree for the compiler**
   - Depends: M1.6
@@ -315,7 +315,7 @@ builds on.
       describes.
   - Accept:
     - For generated valid programs, the compact tree matches the lossless tree's structure.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.8 — syntax: size and nesting limits**
   - Depends: M1.6
@@ -326,10 +326,10 @@ builds on.
     - Nesting at PUC-Rio Lua 5.5.1's limit parses, and one level more stops with PUC-Rio's message,
       both recorded in the syntax spec.
     - A 16 MB file parses in time proportional to its size.
-  - Verify: `cargo test -p ferrolua-syntax --test hostile_syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
-  - Note (from M0.2): A generator in `ferrolua-testkit` is a function of `&mut Source` that makes
+  - Note (from M0.2): A generator in `lunaferra-testkit` is a function of `&mut Source` that makes
     each choice with `Source::below`. The program generator shrinks well if a choice of 0 gives the
     simplest program, for example when alternative 0 of each grammar rule is its shortest. Only the
     property runner can make a `Source` today, so the fuzzer needs a way to make one as well.
@@ -340,36 +340,36 @@ builds on.
     doesn't optimize; whether a million parser runs need a profile that does both is open.
   - Depends: M0.4, M1.7
   - Do:
-    - Add the Ferrolua program generator to `ferrolua-testkit`, and the `lexer` and `parser`
+    - Add the Lunaferra program generator to `lunaferra-testkit`, and the `lexer` and `parser`
       targets, which check the round trip and that nothing panics.
   - Accept:
     - One million runs of each target from seed 0 find no crash, and every input they ever crashed on
       is saved.
   - Verify: `cargo xtask fuzz parser --seed 0 --runs 1000000` (expect no new saved input)
 
-- [ ] **M1.10 — cli: `ferrolua parse`**
-  - Note (from M0.1): Naming the binary `ferrolua` makes `cargo doc --workspace` warn of an output
-    filename collision with the `ferrolua` library
+- [ ] **M1.10 — cli: `lunaferra parse`**
+  - Note (from M0.1): Naming the binary `lunaferra` makes `cargo doc --workspace` warn of an output
+    filename collision with the `lunaferra` library
     ([Cargo issue 6313](https://github.com/rust-lang/cargo/issues/6313)). Setting `doc = false` on
     the `[[bin]]` target in `crates/cli/Cargo.toml` removes the warning, as a scratch workspace
     showed on 2026-11-24 with Cargo 1.100.0.
   - Depends: M1.6
   - Do:
-    - Build the `ferrolua` binary's argument parser and the `parse` command of
+    - Build the `lunaferra` binary's argument parser and the `parse` command of
       [`specs/cli.md`](specs/cli.md#commands).
   - Accept:
     - A valid file exits with 0, a broken one prints its diagnostics and exits with 1, and a missing
       file exits with 2.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
-**Exit criteria (M1):** `ferrolua parse` handles every Ferrolua script in `tests/conformance/`,
+**Exit criteria (M1):** `lunaferra parse` handles every Lunaferra script in `tests/conformance/`,
 reports errors in PUC-Rio's words wherever the syntax is Lua's, and the fuzz targets run clean.
 
 ---
 
-## M2 — Run Ferrolua scripts in the interpreter
+## M2 — Run Lunaferra scripts in the interpreter
 
-**Goal:** `ferrolua run` runs scripts that use the core language and the base library, printing
+**Goal:** `lunaferra run` runs scripts that use the core language and the base library, printing
 what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by reference counting.
 
 - [ ] **M2.1 — bytecode: instructions and prototypes**
@@ -379,7 +379,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       record the full opcode list in that spec.
   - Accept:
     - Every opcode encodes and decodes to itself, and the spec lists every opcode with its operands.
-  - Verify: `cargo test -p ferrolua-bytecode --locked`
+  - Verify: `cargo test -p lunaferra-bytecode --locked`
 
 - [ ] **M2.2 — vm: heap of counted slots and generational handles**
   - Note: 2026-11-24, the owner's choice (ADR-0021): bytes count by fixed charges set in the memory
@@ -389,7 +389,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     - Build the arenas, slots, handles, counting, and freeing work list of
       [`specs/memory.md`](specs/memory.md).
     - Count bytes by the fixed charges of
-      [`specs/memory.md`](specs/memory.md#memory-accounting), with each buffer sized by Ferrolua's
+      [`specs/memory.md`](specs/memory.md#memory-accounting), with each buffer sized by Lunaferra's
       own growth rules, and record the charges this task sets there (ADR-0021).
   - Accept:
     - A stale handle returns the internal error.
@@ -397,7 +397,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     - A dropped heap has freed every byte.
     - Each charge is no smaller than `size_of` of the type it stands for, and a fixed sequence of
       allocations counts exactly the bytes its charges add up to.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M2.3 — vm: values, strings, and interning**
   - Depends: M2.2
@@ -407,7 +407,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Accept:
     - Two short strings with the same bytes share one handle, and two states get different seeds.
     - Two states given the same seed hash every string alike.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M2.4 — vm: tables**
   - Note: 2026-11-24, the owner's choice (ADR-0020): probe steps count against the instruction
@@ -426,7 +426,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       functions as keys, visit its keys in the same order.
     - Each table operation reports one work unit for each probe step past the first, for a set of
       keys crafted to collide under a known seed as for any other; M3.2 enforces the limit.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M2.5 — compiler: names, upvalues, globals, and self-recursion**
   - Note: 2026-11-24, the owner's choice (ADR-0025): names are local to the whole function that
@@ -448,26 +448,26 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       compile errors.
     - Assigning to a `<const>` local, a `for` variable, or a `global <const>` is a compile error
       with PUC-Rio's message.
-  - Verify: `cargo test -p ferrolua-compiler --locked`
+  - Verify: `cargo test -p lunaferra-compiler --locked`
 
 - [ ] **M2.19 — math: floating-point functions with the same bits on every target**
-  - Note: added on 2026-11-24, when the owner chose math functions of Ferrolua's own (ADR-0027).
+  - Note: added on 2026-11-24, when the owner chose math functions of Lunaferra's own (ADR-0027).
     It is listed where it is to be done, before M2.6, whose constant folding uses it.
   - Note: 2026-11-24, the owner accepted ADR-0028 (the targets, host services, math, and tests of
     the six platforms), which sets the crate and the accuracy.
   - Depends: M0.2
   - Do:
-    - Build `ferrolua-math`, with the functions of §6.7 of the manual that IEEE 754 doesn't define
+    - Build `lunaferra-math`, with the functions of §6.7 of the manual that IEEE 754 doesn't define
       exactly, such as sine, cosine, tangent, their inverses, `exp`, and `log` in every base, and
       float `**`, using only the operations
       [`03-platforms.md`](03-platforms.md#the-same-results-on-every-target) allows.
-    - Store a file of inputs, each with its exact value to 40 digits and the bits of Ferrolua's
+    - Store a file of inputs, each with its exact value to 40 digits and the bits of Lunaferra's
       result, including zeros, subnormal numbers, the largest floats, `inf`, `nan`, and the inputs
       near which each function's result changes fastest.
   - Accept:
     - Every stored result is within one unit in the last place of its exact value.
     - Every function gives the stored bits, which M3.18 then checks on every target.
-  - Verify: `cargo test -p ferrolua-math --locked`
+  - Verify: `cargo test -p lunaferra-math --locked`
 
 - [ ] **M2.6 — compiler: expressions, registers, and constant folding**
   - Depends: M2.5, M2.19
@@ -480,7 +480,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Accept:
     - Folded and unfolded constant expressions give the same values, including at overflow,
       division by zero, and `**` of integers.
-  - Verify: `cargo test -p ferrolua-compiler --locked`
+  - Verify: `cargo test -p lunaferra-compiler --locked`
 
 - [ ] **M2.7 — compiler: statements and control flow**
   - Depends: M2.6
@@ -490,7 +490,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       `<close>` variables.
   - Accept:
     - Every prototype the compiler emits for the conformance scripts passes the verifier.
-  - Verify: `cargo test -p ferrolua-compiler --locked`
+  - Verify: `cargo test -p lunaferra-compiler --locked`
 
 - [ ] **M2.8 — vm: the interpreter loop, calls, and varargs**
   - Depends: M2.4, M2.7
@@ -499,13 +499,13 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       tables numbered from 0, and proper tail calls.
   - Accept:
     - 10,000,000 tail calls in a loop use the stack of one.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M2.9 — vm: operators and number printing**
   - Note: 2026-11-24, the owner's choice (ADR-0023): operators give Python's results, `+` joins
     strings, and nothing converts between strings and numbers.
   - Note: 2026-11-24, the owner's choice (ADR-0025): truth follows Python's rule.
-  - Note: 2026-11-24, the owner's choice (ADR-0027): float `**` comes from `ferrolua-math`, and
+  - Note: 2026-11-24, the owner's choice (ADR-0027): float `**` comes from `lunaferra-math`, and
     every NaN prints as `nan` (ADR-0028).
   - Depends: M2.8, M2.19
   - Do:
@@ -522,7 +522,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       their written output.
     - `"10" + 1`, `1 / 0`, `1 << -1`, and `3.0 | 1` raise their recorded errors, and `2 ** 10` is
       the integer 1024.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M2.10 — vm: metatables, metamethods, finalizers, and weak tables**
   - Depends: M2.9
@@ -534,7 +534,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Accept:
     - The conformance script prints its recorded output, and the extension scripts their written
       output.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M2.17 — vm: the deterministic loop collector**
   - Note: added on 2026-11-24, when the owner chose a deterministic loop collector on top of
@@ -560,7 +560,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     - Two runs of every conformance script with a fixed hash seed give the same collection log,
       which matches the log stored for the script.
     - `gc.lua` prints its recorded output.
-  - Verify: `cargo test -p ferrolua-vm --locked`; `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`; `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M2.18 — vm: lists, tuples, and sets**
   - Note: added on 2026-11-24, when the owner chose lists, tuples, and sets beside tables
@@ -581,7 +581,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       key raises the unhashable error.
     - Equal tuples built apart are one key in a table and one member in a set.
     - `collections.lua` prints its written output, once M2.14 can run it.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M2.11 — vm: errors and protected calls**
   - Depends: M2.10
@@ -592,7 +592,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Accept:
     - Every message matches PUC-Rio's, including `(global 'x')`, `(local 'x')`, `(field 'x')`,
       `(upvalue 'x')`, and `(method 'x')`.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M2.20 — vm: spans and hints for runtime errors**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0029). It
@@ -602,12 +602,12 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Depends: M2.11, M2.14
   - Do:
     - Have the compiler record each instruction's span in its debug information, and carry the span
-      and the hints of ADR-0029 in `ferrolua::Error`, working out each hint only when the error
+      and the hints of ADR-0029 in `lunaferra::Error`, working out each hint only when the error
       reaches the host.
   - Accept:
     - Each hint has a test with a script that triggers it and a near miss that gets none.
     - Every message in `tests/conformance/errors.lua` is unchanged.
-  - Verify: `cargo test -p ferrolua-vm -p ferrolua --locked`
+  - Verify: `cargo test -p lunaferra-vm -p lunaferra --locked`
 
 - [ ] **M2.12 — vm: coroutines**
   - Depends: M2.11
@@ -618,7 +618,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Accept:
     - VM tests resume and yield across `pcall`, and get PUC-Rio's error for a yield across
       `table.sort`.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M2.13 — stdlib: the base library**
   - Depends: M2.11
@@ -637,18 +637,18 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     - `positions.lua` prints its written output, and a numeric string passed where a base function
       takes a number raises the wrong-type error.
     - `object_ids.lua` prints its written output, and no `tostring` result contains an address.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
-- [ ] **M2.14 — ferrolua: a minimal embedding API and the conformance runner**
+- [ ] **M2.14 — lunaferra: a minimal embedding API and the conformance runner**
   - Depends: M2.13, M2.17, M2.18
   - Note: 2026-11-24, the owner accepted ADR-0034 (handles with no lifetime, checked against their
     state), which sets the shape of every handle.
   - Note (from M0.5): `cargo xtask record` runs each twin with an empty standard input, so the
-    runner should give each Ferrolua script an empty standard input too.
+    runner should give each Lunaferra script an empty standard input too.
   - Do:
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
-      [`specs/ferrolua.md`](specs/ferrolua.md) sketches.
-    - Build the conformance runner in `crates/ferrolua/tests/conformance.rs`, as
+      [`specs/lunaferra.md`](specs/lunaferra.md) sketches.
+    - Build the conformance runner in `crates/lunaferra/tests/conformance.rs`, as
       [`04-quality.md`](04-quality.md#conformance-scripts) describes, pairing each script with its
       twin's `.out` file.
     - Add the numeric `for` property test of [`specs/language.md`](specs/language.md#tests).
@@ -658,26 +658,27 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     - A script without a twin, or a twin without a script, fails the runner.
     - Generated numeric `for` loops run as Python's `range` does, including `for i = 3, 0, -1 do`,
       which visits 3, 2, and 1.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`; `cargo test -p ferrolua --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`;
+    `cargo test -p lunaferra --locked`
 
-- [ ] **M2.15 — cli: `ferrolua run`**
+- [ ] **M2.15 — cli: `lunaferra run`**
   - Depends: M2.14
   - Do:
-    - Build `ferrolua run <script> [args...]`, with the `arg` table set as PUC-Rio's `lua` sets it.
+    - Build `lunaferra run <script> [args...]`, with the `arg` table set as PUC-Rio's `lua` sets it.
   - Accept:
     - The conformance runner's binary pass prints every script's recorded output.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
 - [ ] **M2.21 — cli: runtime errors with their source line, a caret, and a hint**
   - Note: added on 2026-11-24 with M2.20 (ADR-0029).
   - Depends: M2.15, M2.20
   - Do:
-    - Print runtime errors from `ferrolua run` in the text format of
+    - Print runtime errors from `lunaferra run` in the text format of
       [`specs/diagnostics.md`](specs/diagnostics.md#output-formats).
   - Accept:
     - A script that calls `pirnt` prints its line with carets under `pirnt` and
       "did you mean `print`?", and exits with 1.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
 - [ ] **M2.16 — fuzz: compiler and interpreter targets**
   - Depends: M1.9, M2.14
@@ -689,19 +690,19 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Verify: `cargo xtask fuzz interpreter --seed 0 --runs 1000000` (expect no new saved input)
 
 **Exit criteria (M2):** A person ports a few real Lua 5.5 scripts that use only the base library
-to Ferrolua, runs them with `ferrolua run`, and their output matches what `lua` prints for the
+to Lunaferra, runs them with `lunaferra run`, and their output matches what `lua` prints for the
 originals.
 
 ---
 
-## M3 — Embed Ferrolua with the full standard library and a sandbox
+## M3 — Embed Lunaferra with the full standard library and a sandbox
 
-**Goal:** A Rust program embeds Ferrolua, registers its own functions and types, runs untrusted
+**Goal:** A Rust program embeds Lunaferra, registers its own functions and types, runs untrusted
 scripts within limits, and gets every standard library it grants.
 
-- [ ] **M3.1 — ferrolua: the full embedding API**
+- [ ] **M3.1 — lunaferra: the full embedding API**
   - Depends: M2.14
-  - Decide first: whether `Lua` implements `Send`, as [`specs/ferrolua.md`](specs/ferrolua.md#open-questions)
+  - Decide first: whether `Lua` implements `Send`, as [`specs/lunaferra.md`](specs/lunaferra.md#open-questions)
     describes.
   - Do:
     - Build values tied to their state, `IntoLua` and `FromLua`, with `Vec` and `HashSet`
@@ -712,20 +713,20 @@ scripts within limits, and gets every standard library it grants.
     - `Lua::collect` frees a loop the host dropped, and never a value the host still holds.
     - Using a value after its state is dropped returns `Error::StateDropped` (ADR-0034).
     - Using a value with another state returns an error.
-  - Verify: `cargo test -p ferrolua --locked`
+  - Verify: `cargo test -p lunaferra --locked`
 
-- [ ] **M3.21 — ferrolua: the host's API described once**
+- [ ] **M3.21 — lunaferra: the host's API described once**
   - Note: added on 2026-11-24, when the owner asked for four embedding improvements to draft
     (ADR-0035). It is listed where it is to be done, after M3.1.
   - Note: 2026-11-24, the owner accepted ADR-0035 (the host's API described once).
   - Depends: M3.1
   - Do:
     - Build `Api`, the `TypeInfo` trait for every `FromLua` and `IntoLua` type, and
-      `lua.install(&api)`, as [`specs/ferrolua.md`](specs/ferrolua.md#the-api) describes.
+      `lua.install(&api)`, as [`specs/lunaferra.md`](specs/lunaferra.md#the-api) describes.
   - Accept:
     - An `Api` with a function, a module, and a userdata type installs bindings that scripts call,
-      and `TypeInfo` gives the Ferrolua type of every type `FromLua` and `IntoLua` support.
-  - Verify: `cargo test -p ferrolua --locked`
+      and `TypeInfo` gives the Lunaferra type of every type `FromLua` and `IntoLua` support.
+  - Verify: `cargo test -p lunaferra --locked`
 
 - [ ] **M3.2 — vm: limits**
   - Depends: M3.1
@@ -734,7 +735,7 @@ scripts within limits, and gets every standard library it grants.
     what limit the finalizers that run when a state is dropped run.
   - Do:
     - Enforce every limit of [`specs/sandbox.md`](specs/sandbox.md#limits), including work units
-      inside library calls, with hostile-input tests in `crates/ferrolua/tests/hostile_sandbox.rs`.
+      inside library calls, with hostile-input tests in `crates/lunaferra/tests/hostile_sandbox.rs`.
     - Count the instruction limit for each call from the host, finalizers included, and keep the
       finalizers a stopped collection didn't run for the next collection (ADR-0021).
     - Run the loop collector once before the memory limit stops a script.
@@ -748,7 +749,7 @@ scripts within limits, and gets every standard library it grants.
     - A script that runs just under the instruction limit runs in each of several calls in a row.
     - A `Lua::collect` whose finalizers pass its limit stops at the limit; the host's next call
       runs none of the rest, and the next `Lua::collect` runs them first, in order.
-  - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
+  - Verify: `cargo test -p lunaferra --test hostile_sandbox --locked`
 
 - [ ] **M3.3 — stdlib: strings and patterns**
   - Depends: M2.13, M3.2
@@ -763,7 +764,7 @@ scripts within limits, and gets every standard library it grants.
     - Both scripts print their recorded output, and a backtracking pattern stops at the
       instruction limit.
     - `string.sub` returns what Python's slices return in the property test.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.4 — stdlib: `string.format` and number formatting**
   - Depends: M3.3
@@ -782,7 +783,7 @@ scripts within limits, and gets every standard library it grants.
     - The script prints its recorded output, and `%.17g` reads back every generated float.
     - `format.lua` prints its written output, and `f"{x:>{w}.{p}f}"` gives what `format` gives for
       the same spec.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.5 — stdlib: `string.pack`, `string.packsize`, and `string.unpack`**
   - Depends: M3.3
@@ -791,7 +792,7 @@ scripts within limits, and gets every standard library it grants.
       `tests/conformance/pack.lua`.
   - Accept:
     - The script prints its recorded output, including each error for a malformed format.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.6 — stdlib: the `table` library**
   - Depends: M2.13
@@ -801,7 +802,7 @@ scripts within limits, and gets every standard library it grants.
       algorithm, and add `tests/conformance/table.lua`.
   - Accept:
     - The script prints its recorded output, including the order of equal elements after `sort`.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.15 — stdlib: the `list`, `tuple`, and `set` libraries**
   - Note: added on 2026-11-24, when the owner chose lists, tuples, and sets beside tables
@@ -816,13 +817,13 @@ scripts within limits, and gets every standard library it grants.
     - Each function has a test for each outcome and error, and `collections.lua` prints its written
       output.
     - `tostring` of a list that holds itself writes `...` at the repeat and stops.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.7 — stdlib: `math` and `utf8`**
-  - Note: 2026-11-24, the owner's choice (ADR-0027): the math functions come from `ferrolua-math`.
+  - Note: 2026-11-24, the owner's choice (ADR-0027): the math functions come from `lunaferra-math`.
   - Depends: M2.13, M2.19
   - Do:
-    - Build §6.7 on `ferrolua-math`, with xoshiro256** seeded as PUC-Rio seeds it, and §6.5 with Lua
+    - Build §6.7 on `lunaferra-math`, with xoshiro256** seeded as PUC-Rio seeds it, and §6.5 with Lua
       5.5's `lax` argument, both with the ranges of
       [`specs/stdlib.md`](specs/stdlib.md#positions-and-ranges), and add
       `tests/conformance/math.lua` and `tests/conformance/utf8.lua`.
@@ -830,8 +831,8 @@ scripts within limits, and gets every standard library it grants.
     - `math.randomseed(42)` followed by ten `math.random(1, 101)` calls prints the numbers that
       PUC-Rio's `math.random(1, 100)` gives, for the same range of 1 to 100.
     - `math.lua` and its twin print float results with `%.12g`, so a last-bit difference from the
-      C library that PUC-Rio uses doesn't show, and `ferrolua-math`'s stored bits check the rest.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+      C library that PUC-Rio uses doesn't show, and `lunaferra-math`'s stored bits check the rest.
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.8 — stdlib: the `coroutine` library**
   - Depends: M2.12, M2.13
@@ -839,9 +840,9 @@ scripts within limits, and gets every standard library it grants.
     - Build §6.2 on the VM's threads, and add `tests/conformance/coroutine.lua`.
   - Accept:
     - The script prints its recorded output, including `close` with pending `<close>` variables.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
-- [ ] **M3.22 — ferrolua: host functions that yield, and tasks**
+- [ ] **M3.22 — lunaferra: host functions that yield, and tasks**
   - Note: added on 2026-11-24, when the owner asked for four embedding improvements to draft
     (ADR-0037). It is listed where it is to be done, after M3.8.
   - Note: 2026-11-24, the owner accepted ADR-0037 (scripts that wait on the host).
@@ -855,21 +856,21 @@ scripts within limits, and gets every standard library it grants.
     - A task with `pause_on_limit` that loops past one call's budget pauses, goes on in the next
       call from the same instruction, and gives the same output as a run with no limit.
     - A `string.rep` that runs out partway stops the task with the limit error.
-  - Verify: `cargo test -p ferrolua --locked`
+  - Verify: `cargo test -p lunaferra --locked`
 
-- [ ] **M3.16 — ferrolua: a clock and a hash seed from the host**
+- [ ] **M3.16 — lunaferra: a clock and a hash seed from the host**
   - Note: added on 2026-11-24, when the owner chose the web as a platform (ADR-0027). It is listed
     where it is to be done, before M3.9, whose time functions use it.
   - Depends: M3.1
   - Do:
     - Add `Options::clock`, and use it and `Options::hash_seed` where the standard library has no
-      clock or source of randomness, as [`specs/ferrolua.md`](specs/ferrolua.md) describes
+      clock or source of randomness, as [`specs/lunaferra.md`](specs/lunaferra.md) describes
       (ADR-0028).
   - Accept:
     - On `wasm32-unknown-unknown`, `os.time` is absent without a clock and gives the host's time
       with one, and a state given no seed uses the fixed seed.
-  - Verify: `cargo test -p ferrolua --locked`;
-    `cargo build -p ferrolua --target wasm32-unknown-unknown --locked`
+  - Verify: `cargo test -p lunaferra --locked`;
+    `cargo build -p lunaferra --target wasm32-unknown-unknown --locked`
 
 - [ ] **M3.9 — stdlib: `io` and `os`, under the file access policy**
   - Depends: M3.2, M3.16
@@ -879,7 +880,7 @@ scripts within limits, and gets every standard library it grants.
     - Show file handles by their IDs in `tostring` (ADR-0019).
   - Accept:
     - Every escape path in the sandbox spec's tests is refused under a directory policy.
-  - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
+  - Verify: `cargo test -p lunaferra --test hostile_sandbox --locked`
 
 - [ ] **M3.10 — stdlib: `package` and `require`**
   - Depends: M3.9
@@ -889,9 +890,9 @@ scripts within limits, and gets every standard library it grants.
   - Accept:
     - Modules load once, circular `require` behaves as in PUC-Rio Lua 5.5.1, and `package.loadlib`
       returns `nil` and a message.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
-- [ ] **M3.23 — ferrolua: modules a host adds for `require`**
+- [ ] **M3.23 — lunaferra: modules a host adds for `require`**
   - Note: added on 2026-11-24, when the owner asked for four embedding improvements to draft
     (ADR-0036). It is listed where it is to be done, after M3.10.
   - Note: 2026-11-24, the owner accepted ADR-0036 (modules a host adds for `require`).
@@ -903,17 +904,17 @@ scripts within limits, and gets every standard library it grants.
     - In a state without `package`, `require("game")` returns the host's module, loads a source
       module once, and raises `module 'x' not found` with a hint for an unknown name.
     - With `package` granted, host modules are found before its searchers.
-  - Verify: `cargo test -p ferrolua --locked`
+  - Verify: `cargo test -p lunaferra --locked`
 
 - [ ] **M3.11 — stdlib: the `debug` library**
   - Depends: M2.12
   - Do:
-    - Build §6.10 on Ferrolua's frames, with locals and upvalues numbered from 0 (ADR-0024), and
+    - Build §6.10 on Lunaferra's frames, with locals and upvalues numbered from 0 (ADR-0024), and
       add `tests/conformance/debug.lua`.
     - Make `debug.upvalueid` return the upvalue's ID as an integer (ADR-0019).
   - Accept:
     - `debug.traceback` and `debug.getinfo` print PUC-Rio's output for the script's twin.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M3.12 — bytecode: precompiled chunks and the verifier**
   - Depends: M2.14
@@ -923,19 +924,19 @@ scripts within limits, and gets every standard library it grants.
   - Accept:
     - Each verifier rule rejects a chunk that breaks only that rule, and one million mutated
       chunks from seed 0 crash nothing.
-  - Verify: `cargo test -p ferrolua-bytecode --locked`;
+  - Verify: `cargo test -p lunaferra-bytecode --locked`;
     `cargo xtask fuzz chunk --seed 0 --runs 1000000`
 
-- [ ] **M3.13 — ferrolua: the library allowlist**
+- [ ] **M3.13 — lunaferra: the library allowlist**
   - Depends: M3.2, M3.10, M3.11, M3.12
   - Do:
     - Build library selection, `Libraries::SAFE`, and `Libraries::ALL`, and the escape-attempt
       tests of [`specs/sandbox.md`](specs/sandbox.md#tests).
   - Accept:
     - A `SAFE` state has exactly the functions the sandbox spec lists.
-  - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
+  - Verify: `cargo test -p lunaferra --test hostile_sandbox --locked`
 
-- [ ] **M3.20 — ferrolua: finite limits by default**
+- [ ] **M3.20 — lunaferra: finite limits by default**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0030). It
     is listed where it is to be done, after M3.13.
   - Note: 2026-11-24, the owner accepted ADR-0030 (finite limits by default).
@@ -950,18 +951,18 @@ scripts within limits, and gets every standard library it grants.
       setting.
     - A state made with `Options::trusted()` runs a script that needs more than the defaults to its
       end.
-  - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
+  - Verify: `cargo test -p lunaferra --test hostile_sandbox --locked`
 
-- [ ] **M3.14 — cli: options for `ferrolua run`**
-  - Note: 2026-11-24, the owner accepted ADR-0030 (finite limits by default): `ferrolua run` uses
+- [ ] **M3.14 — cli: options for `lunaferra run`**
+  - Note: 2026-11-24, the owner accepted ADR-0030 (finite limits by default): `lunaferra run` uses
     `Options::trusted()`, and `--sandbox` the defaults.
   - Depends: M3.13
   - Do:
-    - Add `-e`, `-l`, and `--sandbox`, as PUC-Rio's `lua` handles them, and `FERROLUA_INIT` where
+    - Add `-e`, `-l`, and `--sandbox`, as PUC-Rio's `lua` handles them, and `LUNAFERRA_INIT` where
       `lua` reads `LUA_INIT` (ADR-0024).
   - Accept:
-    - `ferrolua run --sandbox` refuses `io.open`, and `-e` and `-l` behave as in `lua`.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+    - `lunaferra run --sandbox` refuses `io.open`, and `-e` and `-l` behave as in `lua`.
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
 - [ ] **M3.19 — cli: an interactive prompt**
   - Note: moved here from the backlog on 2026-11-24, when the owner asked for five improvements to
@@ -974,13 +975,13 @@ scripts within limits, and gets every standard library it grants.
   - Accept:
     - Typing `x = 1` and then `x + 1` prints `2`, and a line that ends inside a function body
       continues after `...`.
-    - Piping a script into `ferrolua` runs it without a prompt, and piping the same two lines into
-      `ferrolua -i` prints `2`.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+    - Piping a script into `lunaferra` runs it without a prompt, and piping the same two lines into
+      `lunaferra -i` prints `2`.
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
 - [ ] **M3.17 — xtask: test runners for Android, iOS, and the web**
   - Note: added on 2026-11-24, when the owner chose six platforms and a browser harness of
-    Ferrolua's own (ADR-0027).
+    Lunaferra's own (ADR-0027).
   - Depends: M2.14
   - Do:
     - Build `cargo xtask test --target <triple>` for every target, as
@@ -1020,13 +1021,13 @@ scripts within limits, and gets every standard library it grants.
   - Verify: open a pull request and observe its checks on GitHub; the owner then makes each job
     required for `main`
 
-**Exit criteria (M3):** A person embeds Ferrolua in a small Rust program, registers a function and
+**Exit criteria (M3):** A person embeds Lunaferra in a small Rust program, registers a function and
 a userdata type, and sees a hostile script stopped by each limit; CI runs the interpreter's tests
 on every target.
 
 ---
 
-## M4 — Write Ferrolua: compound assignment, types, classes, and strict mode
+## M4 — Write Lunaferra: compound assignment, types, classes, and strict mode
 
 **Goal:** Scripts can use compound assignment, type annotations, classes, and strict mode, as
 [`specs/language.md`](specs/language.md) defines.
@@ -1042,7 +1043,7 @@ on every target.
   - Accept:
     - `x--=1` is `x` followed by a comment, `x **= 2` and `x ^= 1` are compound assignments, and
       `x++` is a syntax error.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M4.2 — compiler: compound assignment**
   - Note: 2026-11-24, the owner's choice (ADR-0023): no `++`.
@@ -1053,7 +1054,7 @@ on every target.
   - Accept:
     - `t[f()] += g()` calls `f` once and `g` once, in that order, through metamethods too, and
       `s += "!"` joins strings.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M4.9 — vm: grow strings and lists in place when only one place holds them**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0032). It
@@ -1068,7 +1069,7 @@ on every target.
       n = 10,000 and n = 100,000.
     - A string or list that another variable also holds is copied, and both variables keep their
       values.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M4.3 — syntax: type annotations**
   - Depends: M4.1
@@ -1078,7 +1079,7 @@ on every target.
   - Accept:
     - Generated typed programs compile to the same bytecode with and without their annotations,
       apart from hints.
-  - Verify: `cargo test -p ferrolua-syntax -p ferrolua-compiler --locked`
+  - Verify: `cargo test -p lunaferra-syntax -p lunaferra-compiler --locked`
 
 - [ ] **M4.4 — syntax: class declarations**
   - Depends: M4.3
@@ -1088,7 +1089,7 @@ on every target.
     - Parse class declarations, and record the answers in the language spec.
   - Accept:
     - `class "Point"` is still a call, and `class Point ... end` is a class.
-  - Verify: `cargo test -p ferrolua-syntax --locked`
+  - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M4.5 — vm: classes and instances**
   - Depends: M4.4
@@ -1097,7 +1098,7 @@ on every target.
       methods, and add `tests/extensions/classes/`.
   - Accept:
     - Creating and dropping 100,000 instances of a subclass returns the heap to its size before.
-  - Verify: `cargo test -p ferrolua -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra -p lunaferra-vm --locked`
 
 - [ ] **M4.6 — compiler: strict mode and undeclared-variable errors**
   - Note: 2026-11-24, the owner accepted ADR-0035 (the host's API described once): the host's
@@ -1111,7 +1112,7 @@ on every target.
   - Accept:
     - The example in the spec gives its error, and without its `--!strict` line the same file runs
       to its end.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M4.7 — vm: arity enforcement**
   - Depends: M4.6
@@ -1121,7 +1122,7 @@ on every target.
       `tests/extensions/strict/`.
   - Accept:
     - Strict scripts that finish print the same output with strict mode off.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M4.8 — fuzz: the extensions in the generator**
   - Depends: M4.5, M4.7
@@ -1152,7 +1153,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
     - Record the benchmark machine and the first measurements in a note on this task and in
       [`00-overview.md`](00-overview.md#budgets).
   - Accept:
-    - The runner prints the median time and peak memory of each script on Ferrolua and on
+    - The runner prints the median time and peak memory of each script on Lunaferra and on
       PUC-Rio, the share of time spent updating counts and recording candidates, and the longest
       loop collection, for ADR-0018's thresholds.
   - Verify: `cargo xtask bench`
@@ -1172,7 +1173,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
     - A function dumped after it specialized loads in another state, and the verifier rejects a
       chunk that holds a specialized opcode.
     - The interpreted benchmarks run faster, by an amount a note on this task records.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`; `cargo xtask bench`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`; `cargo xtask bench`
 
 - [ ] **M5.2 — jit: the x86-64 encoder**
   - Depends: M0.1
@@ -1180,7 +1181,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
     - Build `jit::asm`, as [`specs/jit.md`](specs/jit.md#the-encoders) describes.
   - Accept:
     - Each instruction form encodes to the bytes the Intel manual gives, with tests citing the page.
-  - Verify: `cargo test -p ferrolua-jit --locked`
+  - Verify: `cargo test -p lunaferra-jit --locked`
 
 - [ ] **M5.3 — jit: executable memory**
   - Depends: M5.2
@@ -1190,36 +1191,37 @@ output with the JIT on or forced, and the agreed budgets are checked.
     - Build `jit::memory`, with the crate's own `[lints]` table, as ADR-0013 describes.
   - Accept:
     - A test that reads `/proc/self/maps` while code exists finds no mapping with both `w` and `x`.
-  - Verify: `cargo test -p ferrolua-jit --locked`
+  - Verify: `cargo test -p lunaferra-jit --locked`
 
 - [ ] **M5.4 — jit: entry, exits, and the `Tier` trait**
   - Note: 2026-11-24, the owner's choice: `JitMode` and the conformance runner's forced pass moved
     here from M5.8, because M5.5 to M5.7 check their work in `JitMode::Forced`.
   - Note (from M0.3): `cargo xtask coverage` takes no options. It runs `cargo test --workspace` with
-    each crate's default features, so covering `ferrolua` with the `jit` feature off, as well as on,
-    needs an option for it, such as `-p ferrolua`.
+    each crate's default features, so covering `lunaferra` with the `jit` feature off, as well as
+    on, needs an option for it, such as `-p lunaferra`.
   - Depends: M5.3, M2.14
   - Do:
-    - Build `jit::entry`, the `Tier` trait in `ferrolua-vm`, and exits to the interpreter, with
+    - Build `jit::entry`, the `Tier` trait in `lunaferra-vm`, and exits to the interpreter, with
       layout assertions for every `#[repr(C)]` type, as [`specs/vm.md`](specs/vm.md#the-compiled-tier)
       describes.
-    - Add the `ferrolua` crate's `jit` feature, off by default, which plugs the tier in
-      (ADR-0022). Lint, test, and cover `ferrolua` with the feature off (`-p ferrolua`) and on (the
-      workspace run), in CI and in "Definition of done" in [`../CLAUDE.md`](../CLAUDE.md), and check
-      that `cargo tree -p ferrolua --edges normal` lists no `ferrolua-jit`, in
+    - Add the `lunaferra` crate's `jit` feature, off by default, which plugs the tier in
+      (ADR-0022). Lint, test, and cover `lunaferra` with the feature off (`-p lunaferra`) and on
+      (the workspace run), in CI and in "Definition of done" in [`../CLAUDE.md`](../CLAUDE.md), and
+      check that `cargo tree -p lunaferra --edges normal` lists no `lunaferra-jit`, in
       [`04-quality.md`](04-quality.md#automated-checks) as well.
-    - Add `JitMode` to `Options` in both builds of `ferrolua`, refused without the feature, as
+    - Add `JitMode` to `Options` in both builds of `lunaferra`, refused without the feature, as
       [`specs/jit.md`](specs/jit.md#modes) describes, and the forced pass to the conformance runner,
       which runs when the feature is on.
   - Accept:
     - A compiled function that does nothing but exit continues correctly in the interpreter.
-    - Without the feature, `cargo tree -p ferrolua --edges normal --prefix none` lists no
-      `ferrolua-jit`, and `ferrolua`'s tests pass with the feature off and on.
+    - Without the feature, `cargo tree -p lunaferra --edges normal --prefix none` lists no
+      `lunaferra-jit`, and `lunaferra`'s tests pass with the feature off and on.
     - Without the feature, `Lua::new` refuses `JitMode::On` and `JitMode::Forced` with an error that
       names it.
     - With the feature, the conformance runner's forced pass prints every script's recorded output.
-  - Verify: `cargo test -p ferrolua-jit -p ferrolua-vm --locked`; `cargo test -p ferrolua --locked`;
-    `cargo test -p ferrolua --features jit --locked`
+  - Verify: `cargo test -p lunaferra-jit -p lunaferra-vm --locked`;
+    `cargo test -p lunaferra --locked`;
+    `cargo test -p lunaferra --features jit --locked`
 
 - [ ] **M5.5 — jit: baseline tier for arithmetic, tables, and control flow**
   - Depends: M5.4
@@ -1228,7 +1230,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
       [`specs/jit.md`](specs/jit.md#baseline-tier) describes.
   - Accept:
     - Conformance scripts without calls print their output in `JitMode::Forced`.
-  - Verify: `cargo test -p ferrolua --features jit --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --features jit --test conformance --locked`
 
 - [ ] **M5.6 — jit: calls, returns, and on-stack replacement**
   - Depends: M5.5
@@ -1237,7 +1239,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
       replacement.
   - Accept:
     - Every conformance script prints its output in `JitMode::Forced`.
-  - Verify: `cargo test -p ferrolua --features jit --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --features jit --test conformance --locked`
 
 - [ ] **M5.7 — jit: limits and debug hooks in compiled code**
   - Note: 2026-11-24, the owner accepted ADR-0037 (scripts that wait on the host): compiled code
@@ -1250,15 +1252,15 @@ output with the JIT on or forced, and the agreed budgets are checked.
     - Let the loop collector run only at safe points in compiled code, with every count exact.
   - Accept:
     - The limit tests of the sandbox spec pass in `JitMode::Forced`.
-  - Verify: `cargo test -p ferrolua --features jit --test hostile_sandbox --locked`
+  - Verify: `cargo test -p lunaferra --features jit --test hostile_sandbox --locked`
 
-- [ ] **M5.8 — ferrolua: JIT modes and differential fuzzing**
+- [ ] **M5.8 — lunaferra: JIT modes and differential fuzzing**
   - Note: 2026-11-24, the owner's choice: `JitMode` and the conformance runner's forced pass moved
     to M5.4, because M5.5 to M5.7 check their work in `JitMode::Forced`.
   - Depends: M5.7
   - Do:
-    - Turn the `jit` feature on in `ferrolua-cli` and the fuzzer (ADR-0022).
-    - Add `--jit` to `ferrolua run`, and the `differential` fuzz target, which compares the output
+    - Turn the `jit` feature on in `lunaferra-cli` and the fuzzer (ADR-0022).
+    - Add `--jit` to `lunaferra run`, and the `differential` fuzz target, which compares the output
       and collection logs of the interpreter and the JIT.
   - Accept:
     - One million differential runs from seed 0 find no difference in output or collection log
@@ -1294,7 +1296,7 @@ milestone was added on 2026-11-24, when the owner chose all six platforms by the
   - Accept:
     - Each instruction form encodes to the manual's bytes, and labels fix up across the whole
       range of each branch form.
-  - Verify: `cargo test -p ferrolua-jit --locked`
+  - Verify: `cargo test -p lunaferra-jit --locked`
 
 - [ ] **M13.2 — jit: executable memory on Windows, macOS, and Android, and on AArch64**
   - Depends: M5.3, M3.18
@@ -1332,10 +1334,10 @@ milestone was added on 2026-11-24, when the owner chose all six platforms by the
   - Verify: `cargo xtask test --target x86_64-pc-windows-msvc`; observe the stack in a debugger on
     Windows
 
-- [ ] **M13.5 — ferrolua: JIT modes on every target**
+- [ ] **M13.5 — lunaferra: JIT modes on every target**
   - Depends: M13.2, M5.4
   - Do:
-    - Make `JitMode::On` the default where a backend exists, compile `ferrolua-jit` to nothing on
+    - Make `JitMode::On` the default where a backend exists, compile `lunaferra-jit` to nothing on
       iOS and the web, and fall back to the interpreter when the operating system refuses
       executable memory, as [`specs/jit.md`](specs/jit.md#modes) describes (ADR-0028).
   - Accept:
@@ -1360,7 +1362,7 @@ Windows PC, and an Android device, and sees each script print the same output as
 
 ## M6 — Type-check scripts before they run
 
-**Goal:** `ferrolua check` reports type errors in annotated Ferrolua code, using inline
+**Goal:** `lunaferra check` reports type errors in annotated Lunaferra code, using inline
 annotations, LuaCATS comments, and declarations for the standard library.
 
 - [ ] **M6.1 — analysis: names, scopes, and symbols**
@@ -1370,7 +1372,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
       [`specs/analysis.md`](specs/analysis.md#names-and-scopes) describes.
   - Accept:
     - On generated programs, every name resolves as the compiler resolves it.
-  - Verify: `cargo test -p ferrolua-analysis --locked`
+  - Verify: `cargo test -p lunaferra-analysis --locked`
 
 - [ ] **M6.2 — analysis: control flow and data flow**
   - Depends: M6.1
@@ -1378,18 +1380,18 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - Build control flow graphs, reaching definitions, and liveness.
   - Accept:
     - Unit tests give the expected graph for each statement kind, including `goto` and `break`.
-  - Verify: `cargo test -p ferrolua-analysis --locked`
+  - Verify: `cargo test -p lunaferra-analysis --locked`
 
-- [ ] **M6.3 — analysis: projects, modules, and `.ferrolua.lua`**
+- [ ] **M6.3 — analysis: projects, modules, and `.lunaferra.lua`**
   - Depends: M6.2
   - Decide first: the owner accepts ADR-0016 (a data-only Lua configuration file).
   - Do:
-    - Read `.ferrolua.lua` as [`specs/diagnostics.md`](specs/diagnostics.md#configuration-ferrolualua)
+    - Read `.lunaferra.lua` as [`specs/diagnostics.md`](specs/diagnostics.md#configuration-lunaferralua)
       describes, and link files through `require`.
   - Accept:
     - A configuration file with a function call is rejected with its message, and a project of
       three files linked by `require` resolves each module's value.
-  - Verify: `cargo test -p ferrolua-analysis --locked`
+  - Verify: `cargo test -p lunaferra-analysis --locked`
 
 - [ ] **M6.4 — types: representation and subtyping**
   - Depends: M6.1
@@ -1398,7 +1400,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
       and `set<T>` (ADR-0025), and the subtype relation.
   - Accept:
     - Subtyping is reflexive and transitive on generated types, and recursive types terminate.
-  - Verify: `cargo test -p ferrolua-types --locked`
+  - Verify: `cargo test -p lunaferra-types --locked`
 
 - [ ] **M6.5 — types: inference, narrowing, and checking**
   - Depends: M6.2, M6.4
@@ -1407,7 +1409,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
       first `T` codes in the diagnostics spec.
   - Accept:
     - Each `T` code has a file that triggers it and a near miss that doesn't.
-  - Verify: `cargo test -p ferrolua-types --locked`
+  - Verify: `cargo test -p lunaferra-types --locked`
 
 - [ ] **M6.6 — types: declaration files and the standard library**
   - Depends: M6.5
@@ -1417,7 +1419,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
   - Accept:
     - With `check_all` on, the conformance scripts give no `T` diagnostics beyond their marked
       lines.
-  - Verify: `cargo test -p ferrolua-types --locked`
+  - Verify: `cargo test -p lunaferra-types --locked`
 
 - [ ] **M6.12 — types: declarations from a host's API**
   - Note: added on 2026-11-24 with M3.21 (ADR-0035).
@@ -1426,9 +1428,9 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - Build `api.declarations()`, which writes an installed `Api` as a declaration file in the
       syntax of [`specs/types.md`](specs/types.md#declarations).
   - Accept:
-    - `ferrolua check` reports a wrong argument type in a script that calls a host function
+    - `lunaferra check` reports a wrong argument type in a script that calls a host function
       declared this way, and the language server completes the host's names.
-  - Verify: `cargo test -p ferrolua -p ferrolua-types --locked`
+  - Verify: `cargo test -p lunaferra -p lunaferra-types --locked`
 
 - [ ] **M6.7 — types: LuaCATS annotations**
   - Depends: M6.5
@@ -1436,7 +1438,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - Read the LuaCATS tags of [`specs/types.md`](specs/types.md#luacats-annotations).
   - Accept:
     - A file annotated only with LuaCATS gets the same diagnostics as its inline-annotated twin.
-  - Verify: `cargo test -p ferrolua-types --locked`
+  - Verify: `cargo test -p lunaferra-types --locked`
 
 - [ ] **M6.8 — types: classes and strict arity**
   - Depends: M4.5, M4.7, M6.5
@@ -1445,7 +1447,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
   - Accept:
     - Reading an undeclared field of an instance and a wrong argument count in a strict file each
       give their `T` diagnostic.
-  - Verify: `cargo test -p ferrolua-types --locked`
+  - Verify: `cargo test -p lunaferra-types --locked`
 
 - [ ] **M6.9 — json: values, parser, and writer**
   - Depends: M0.2
@@ -1453,16 +1455,16 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - Build [`specs/json.md`](specs/json.md) without message framing, plus the `json` fuzz target.
   - Accept:
     - Every valid and invalid test document is accepted or rejected as RFC 8259 says.
-  - Verify: `cargo test -p ferrolua-json --locked`
+  - Verify: `cargo test -p lunaferra-json --locked`
 
-- [ ] **M6.10 — cli: `ferrolua check`**
+- [ ] **M6.10 — cli: `lunaferra check`**
   - Depends: M6.6, M6.9
   - Do:
-    - Build `ferrolua check` with text and JSON Lines output, and the diagnostic registry test of
+    - Build `lunaferra check` with text and JSON Lines output, and the diagnostic registry test of
       [`specs/diagnostics.md`](specs/diagnostics.md#tests).
   - Accept:
     - The exit status follows [`specs/cli.md`](specs/cli.md#exit-status), and JSON output parses.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
 - [ ] **M6.11 — fuzz: analysis and type checker targets**
   - Depends: M6.6, M4.8
@@ -1472,24 +1474,24 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - One million runs of each from seed 0 crash nothing.
   - Verify: `cargo xtask fuzz types --seed 0 --runs 1000000`
 
-**Exit criteria (M6):** A person annotates a real script, sees `ferrolua check` find a planted type
+**Exit criteria (M6):** A person annotates a real script, sees `lunaferra check` find a planted type
 error, and sees no diagnostics on unannotated files.
 
 ---
 
 ## M7 — Lint and format scripts
 
-**Goal:** `ferrolua lint` finds likely bugs, slow code, and reference loops, and `ferrolua fmt`
+**Goal:** `lunaferra lint` finds likely bugs, slow code, and reference loops, and `lunaferra fmt`
 formats files without changing what they do.
 
 - [ ] **M7.1 — lint: the rule engine, configuration, and suppression**
   - Depends: M6.3, M6.5
   - Do:
-    - Build rule registration, severities from `.ferrolua.lua`, and suppression comments, as
+    - Build rule registration, severities from `.lunaferra.lua`, and suppression comments, as
       [`specs/diagnostics.md`](specs/diagnostics.md#suppression-comments) describes.
   - Accept:
     - Each comment form suppresses exactly the codes and lines it names.
-  - Verify: `cargo test -p ferrolua-lint --locked`
+  - Verify: `cargo test -p lunaferra-lint --locked`
 
 - [ ] **M7.2 — lint: correctness, porting, and memory rules**
   - Note: 2026-11-24, the owner's choice (ADR-0023): the porting rules join this task, to catch
@@ -1502,7 +1504,7 @@ formats files without changing what they do.
     - Each rule has a triggering file and a near miss, `Class.__index = Class` is reported, and so
       are `x ^ 2`, `for i = 1, #t do`, and a counter closure that assigns an outer local without
       `nonlocal`.
-  - Verify: `cargo test -p ferrolua-lint --locked`
+  - Verify: `cargo test -p lunaferra-lint --locked`
 
 - [ ] **M7.3 — lint: performance and style rules**
   - Depends: M7.1
@@ -1510,7 +1512,7 @@ formats files without changing what they do.
     - Build the performance and style rules, with fixes where they are certain.
   - Accept:
     - Every offered fix leaves the bytecode unchanged apart from the fixed construct.
-  - Verify: `cargo test -p ferrolua-lint --locked`
+  - Verify: `cargo test -p lunaferra-lint --locked`
 
 - [ ] **M7.4 — fmt: layout and comments**
   - Depends: M1.7
@@ -1519,7 +1521,7 @@ formats files without changing what they do.
   - Accept:
     - The meaning, idempotence, and comment property tests pass.
     - `[[1], [2]]` written as a list comes out as `[ [1], [2] ]`, and f-string text is unchanged.
-  - Verify: `cargo test -p ferrolua-fmt --locked`
+  - Verify: `cargo test -p lunaferra-fmt --locked`
 
 - [ ] **M7.5 — fmt: options and the check mode**
   - Depends: M7.4, M6.3
@@ -1527,29 +1529,29 @@ formats files without changing what they do.
     - Read the options of [`specs/fmt.md`](specs/fmt.md#options), and report `F` diagnostics.
   - Accept:
     - Every expected-output case passes with each option at its limits.
-  - Verify: `cargo test -p ferrolua-fmt --locked`
+  - Verify: `cargo test -p lunaferra-fmt --locked`
 
-- [ ] **M7.6 — cli: `ferrolua lint` and `ferrolua fmt`**
+- [ ] **M7.6 — cli: `lunaferra lint` and `lunaferra fmt`**
   - Depends: M7.2, M7.3, M7.5
   - Do:
     - Build both commands, with `--fix` and `--check`.
   - Accept:
-    - `ferrolua fmt --check` exits with 1 on an unformatted file and 0 after `ferrolua fmt`.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+    - `lunaferra fmt --check` exits with 1 on an unformatted file and 0 after `lunaferra fmt`.
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
-- [ ] **M7.7 — ci: lint and format the repository's Ferrolua scripts**
+- [ ] **M7.7 — ci: lint and format the repository's Lunaferra scripts**
   - Note: On 2026-11-25 the owner asked for the references to `.claude/rules/lua.md`, which M0.1
     removed, to go, so this task adds the two commands to the checks in `04-quality.md` and
     `CLAUDE.md` instead.
   - Depends: M7.6, M0.6
   - Do:
-    - Format the Ferrolua scripts in `tests/` and `benches/`, excluding the Lua 5.5 twins in
-      `reference/` folders in `.ferrolua.lua`, run both commands on them in CI, and add both to the
+    - Format the Lunaferra scripts in `tests/` and `benches/`, excluding the Lua 5.5 twins in
+      `reference/` folders in `.lunaferra.lua`, run both commands on them in CI, and add both to the
       [automated checks](04-quality.md#automated-checks) and to "Definition of done" in
       [`../CLAUDE.md`](../CLAUDE.md).
   - Accept:
     - CI fails on a pull request that adds an unformatted script.
-  - Verify: `ferrolua fmt --check tests benches`; `ferrolua lint tests benches`
+  - Verify: `lunaferra fmt --check tests benches`; `lunaferra lint tests benches`
 
 **Exit criteria (M7):** A person runs both commands on a real project, and its formatted code
 still passes its tests.
@@ -1558,17 +1560,17 @@ still passes its tests.
 
 ## M8 — Find security problems in Lua code
 
-**Goal:** `ferrolua sast` follows untrusted data to dangerous functions across a project and
+**Goal:** `lunaferra sast` follows untrusted data to dangerous functions across a project and
 reports each flow, in text or as SARIF for code scanning.
 
 - [ ] **M8.1 — sast: sources, sinks, and sanitizers**
   - Depends: M6.3, M6.5
   - Do:
     - Build the built-in lists of [`specs/sast.md`](specs/sast.md#sources-sinks-and-sanitizers) and
-      the `sast` settings in `.ferrolua.lua`.
+      the `sast` settings in `.lunaferra.lua`.
   - Accept:
     - A host-declared source and sink are honored like built-in ones.
-  - Verify: `cargo test -p ferrolua-sast --locked`
+  - Verify: `cargo test -p lunaferra-sast --locked`
 
 - [ ] **M8.2 — sast: taint analysis across functions and files**
   - Depends: M8.1
@@ -1577,7 +1579,7 @@ reports each flow, in text or as SARIF for code scanning.
   - Accept:
     - A flow through five functions in three files is reported with its whole path, and recursion
       terminates.
-  - Verify: `cargo test -p ferrolua-sast --locked`
+  - Verify: `cargo test -p lunaferra-sast --locked`
 
 - [ ] **M8.3 — sast: the security rules**
   - Depends: M8.2
@@ -1585,7 +1587,7 @@ reports each flow, in text or as SARIF for code scanning.
     - Build each rule of [`specs/sast.md`](specs/sast.md#rules), registering each code.
   - Accept:
     - Each rule reports its flow and stays quiet through a sanitizer.
-  - Verify: `cargo test -p ferrolua-sast --locked`
+  - Verify: `cargo test -p lunaferra-sast --locked`
 
 - [ ] **M8.4 — sast: SARIF output**
   - Depends: M8.3, M6.9
@@ -1594,7 +1596,7 @@ reports each flow, in text or as SARIF for code scanning.
   - Accept:
     - The log has every field SARIF 2.1.0 requires, and GitHub accepts it in a test upload to a
       scratch repository.
-  - Verify: `cargo test -p ferrolua-sast --locked`; upload a log with
+  - Verify: `cargo test -p lunaferra-sast --locked`; upload a log with
     `github/codeql-action/upload-sarif` and observe the results under **Security**
 
 - [ ] **M8.5 — fuzz: the SAST target**
@@ -1605,15 +1607,15 @@ reports each flow, in text or as SARIF for code scanning.
     - One million runs from seed 0 crash nothing.
   - Verify: `cargo xtask fuzz sast --seed 0 --runs 1000000`
 
-- [ ] **M8.6 — cli: `ferrolua sast`**
+- [ ] **M8.6 — cli: `lunaferra sast`**
   - Depends: M8.4
   - Do:
     - Build the command, with `--format sarif`.
   - Accept:
     - The exit status follows the CLI spec, and the SARIF output matches the library's.
-  - Verify: `cargo test -p ferrolua-cli --locked`
+  - Verify: `cargo test -p lunaferra-cli --locked`
 
-**Exit criteria (M8):** A person runs `ferrolua sast` on a script with a planted command injection
+**Exit criteria (M8):** A person runs `lunaferra sast` on a script with a planted command injection
 and sees the flow reported, in the terminal and in GitHub's code scanning.
 
 ---
@@ -1621,7 +1623,7 @@ and sees the flow reported, in the terminal and in GitHub's code scanning.
 ## M9 — Edit with auto complete and live diagnostics
 
 **Goal:** An editor with an LSP client gets type-aware completion, diagnostics as you type, hover,
-navigation, rename, and formatting from `ferrolua lsp`.
+navigation, rename, and formatting from `lunaferra lsp`.
 
 - [ ] **M9.1 — json: message framing and JSON-RPC**
   - Depends: M6.9
@@ -1629,7 +1631,7 @@ navigation, rename, and formatting from `ferrolua lsp`.
     - Build the framing and JSON-RPC layer of [`specs/json.md`](specs/json.md#message-framing).
   - Accept:
     - A header that lies about its length is rejected without reading past the limit.
-  - Verify: `cargo test -p ferrolua-json --locked`
+  - Verify: `cargo test -p lunaferra-json --locked`
 
 - [ ] **M9.2 — lsp: lifecycle, documents, and diagnostics**
   - Depends: M9.1, M7.2, M8.3
@@ -1638,7 +1640,7 @@ navigation, rename, and formatting from `ferrolua lsp`.
       diagnostics.
   - Accept:
     - An end-to-end test opens a file, edits it, and receives the right diagnostics after each edit.
-  - Verify: `cargo test -p ferrolua-lsp --locked`
+  - Verify: `cargo test -p lunaferra-lsp --locked`
 
 - [ ] **M9.3 — lsp: completion**
   - Depends: M9.2
@@ -1646,7 +1648,7 @@ navigation, rename, and formatting from `ferrolua lsp`.
     - Build completion as [`specs/lsp.md`](specs/lsp.md#features) describes, on unparsed code too.
   - Accept:
     - After `p.` where `p` is an instance, the items are exactly its fields and methods.
-  - Verify: `cargo test -p ferrolua-lsp --locked`
+  - Verify: `cargo test -p lunaferra-lsp --locked`
 
 - [ ] **M9.4 — lsp: hover, signature help, navigation, and symbols**
   - Depends: M9.2
@@ -1654,7 +1656,7 @@ navigation, rename, and formatting from `ferrolua lsp`.
     - Build hover, signature help, definition, references, and document symbols.
   - Accept:
     - Each request gives the expected result on the end-to-end test project.
-  - Verify: `cargo test -p ferrolua-lsp --locked`
+  - Verify: `cargo test -p lunaferra-lsp --locked`
 
 - [ ] **M9.5 — lsp: rename, formatting, and code actions**
   - Depends: M9.4, M7.5
@@ -1662,7 +1664,7 @@ navigation, rename, and formatting from `ferrolua lsp`.
     - Build rename across files, formatting, and code actions from diagnostic fixes.
   - Accept:
     - Rename changes exactly the references that find-references returns.
-  - Verify: `cargo test -p ferrolua-lsp --locked`
+  - Verify: `cargo test -p lunaferra-lsp --locked`
 
 - [ ] **M9.6 — lsp: the completion budget**
   - Depends: M9.3, M5.9
@@ -1672,14 +1674,14 @@ navigation, rename, and formatting from `ferrolua lsp`.
     - The check passes on the benchmark machine, and fails on a deliberately slowed build.
   - Verify: `cargo xtask bench --check`
 
-- [ ] **M9.7 — cli: `ferrolua lsp` and editor setup**
+- [ ] **M9.7 — cli: `lunaferra lsp` and editor setup**
   - Depends: M9.5
   - Do:
     - Build the command, and a guide in `docs/` to configuring Neovim, Helix, Emacs, and Zed.
   - Accept:
     - A person follows the guide in one editor and gets completion and diagnostics.
-  - Verify: `cargo test -p ferrolua-cli --locked`; follow the guide in Neovim and observe completion
-    after `p.`
+  - Verify: `cargo test -p lunaferra-cli --locked`; follow the guide in Neovim and observe
+    completion after `p.`
 
 **Exit criteria (M9):** A person edits a real project in an editor and gets completion and
 diagnostics without noticeable delay.
@@ -1689,7 +1691,7 @@ diagnostics without noticeable delay.
 ## M10 — Debug scripts from an editor
 
 **Goal:** An editor with a DAP client sets breakpoints, steps, and inspects variables in scripts
-launched by `ferrolua dap` or running inside a host.
+launched by `lunaferra dap` or running inside a host.
 
 - [ ] **M10.1 — vm: the debugger interface**
   - Depends: M5.7
@@ -1698,7 +1700,7 @@ launched by `ferrolua dap` or running inside a host.
       [`specs/vm.md`](specs/vm.md#debug-hooks) describes.
   - Accept:
     - A breakpoint stops before the line's first instruction every time it runs, with the JIT on.
-  - Verify: `cargo test -p ferrolua-vm --locked`
+  - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M10.2 — dap: lifecycle, launch, and breakpoints**
   - Depends: M10.1, M9.1
@@ -1707,7 +1709,7 @@ launched by `ferrolua dap` or running inside a host.
       [`specs/dap.md`](specs/dap.md#features).
   - Accept:
     - An end-to-end test launches a script, stops at a conditional breakpoint, and continues.
-  - Verify: `cargo test -p ferrolua-dap --locked`
+  - Verify: `cargo test -p lunaferra-dap --locked`
 
 - [ ] **M10.3 — dap: stack, variables, and evaluation**
   - Depends: M10.2
@@ -1717,23 +1719,23 @@ launched by `ferrolua dap` or running inside a host.
     - Show objects by the IDs `tostring` prints (ADR-0019).
   - Accept:
     - Variables shown for a frame are exactly the locals and upvalues in scope.
-  - Verify: `cargo test -p ferrolua-dap --locked`
+  - Verify: `cargo test -p lunaferra-dap --locked`
 
-- [ ] **M10.4 — ferrolua: a debug server inside a host**
+- [ ] **M10.4 — lunaferra: a debug server inside a host**
   - Depends: M10.3
   - Do:
     - Let a host serve the protocol over a loopback TCP port, off by default.
   - Accept:
     - An editor attaches to a running host, stops at a breakpoint, and the host resumes afterward.
-  - Verify: `cargo test -p ferrolua --locked`
+  - Verify: `cargo test -p lunaferra --locked`
 
-- [ ] **M10.5 — cli: `ferrolua dap` and editor setup**
+- [ ] **M10.5 — cli: `lunaferra dap` and editor setup**
   - Depends: M10.3
   - Do:
     - Build the command, and add debugging to the editor guide.
   - Accept:
     - A person follows the guide and debugs a script in one editor.
-  - Verify: `cargo test -p ferrolua-cli --locked`; follow the guide in Neovim and step through a
+  - Verify: `cargo test -p lunaferra-cli --locked`; follow the guide in Neovim and step through a
     script
 
 **Exit criteria (M10):** A person debugs a script inside a small host program from an editor.
@@ -1754,7 +1756,7 @@ hints from annotations, within the optimizing JIT budget.
       types the baseline tier recorded.
   - Accept:
     - Every conformance script prints its output with the optimizing tier forced.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M11.2 — jit: optimizations**
   - Depends: M11.1
@@ -1772,7 +1774,7 @@ hints from annotations, within the optimizing JIT budget.
   - Accept:
     - Every exit rebuilds the interpreter's frame exactly, and every count is exact at each safe
       point, checked by the shadow run.
-  - Verify: `cargo test -p ferrolua-jit --locked`
+  - Verify: `cargo test -p lunaferra-jit --locked`
 
 - [ ] **M11.4 — jit: hints from type annotations**
   - Depends: M11.2
@@ -1780,7 +1782,7 @@ hints from annotations, within the optimizing JIT budget.
     - Use the compiler's hints as first guesses, always behind a guard (ADR-0006).
   - Accept:
     - A wrong annotation gives the right result through an exit, never a wrong value.
-  - Verify: `cargo test -p ferrolua-jit --locked`
+  - Verify: `cargo test -p lunaferra-jit --locked`
 
 - [ ] **M11.5 — xtask: the optimizing JIT budget**
   - Depends: M11.3, M11.4
@@ -1796,8 +1798,8 @@ hints from annotations, within the optimizing JIT budget.
 
 ## M12 — First release on crates.io
 
-**Goal:** Ferrolua's crates are on crates.io with documentation, and a user can follow a guide to
-embed Ferrolua and use its language and tools.
+**Goal:** Lunaferra's crates are on crates.io with documentation, and a user can follow a guide to
+embed Lunaferra and use its language and tools.
 
 - [ ] **M12.1 — docs: the release document**
   - Depends: M11.5, M13.6
@@ -1809,10 +1811,10 @@ embed Ferrolua and use its language and tools.
     - The checklist names every step from tagging to publishing, in order.
   - Verify: read the rendered document
 
-- [ ] **M12.2 — ferrolua: API review, READMEs, and docs.rs settings**
+- [ ] **M12.2 — lunaferra: API review, READMEs, and docs.rs settings**
   - Note (from M0.1): No crate sets `version` yet, so Cargo gives each one 0.0.0 and won't publish
-    it. Once the crates have versions, `ferrolua-testkit`, `ferrolua-fuzz`, `ferrolua-webtest`, and
-    `xtask`, which the crate map keeps off crates.io, each need `publish = false`.
+    it. Once the crates have versions, `lunaferra-testkit`, `lunaferra-fuzz`, `lunaferra-webtest`,
+    and `xtask`, which the crate map keeps off crates.io, each need `publish = false`.
   - Depends: M12.1
   - Do:
     - Review every public item of every published crate by hand, give each crate a README, and set
@@ -1824,7 +1826,7 @@ embed Ferrolua and use its language and tools.
 - [ ] **M12.3 — docs: user guide**
   - Depends: M12.2
   - Do:
-    - Write a guide to embedding Ferrolua on each platform, to its language and how it differs from
+    - Write a guide to embedding Lunaferra on each platform, to its language and how it differs from
       Lua 5.5, and to its tools, with examples that run as doc tests or conformance scripts.
   - Accept:
     - Every example in the guide runs.
@@ -1838,7 +1840,7 @@ embed Ferrolua and use its language and tools.
     - A test tag runs every dry run.
   - Verify: push a test tag and observe the workflow; the owner publishes with their own token
 
-**Exit criteria (M12):** The owner publishes the crates, and a new user embeds Ferrolua by
+**Exit criteria (M12):** The owner publishes the crates, and a new user embeds Lunaferra by
 following the guide, on any of the six platforms.
 
 ---
@@ -1848,18 +1850,18 @@ following the guide, on any of the six platforms.
 | Item | Trigger / reason |
 | :- | :- |
 | A WebAssembly JIT, which compiles hot functions to WebAssembly modules in the browser; the web runs interpreted today (ADR-0027) | A web host measures its scripts too slow interpreted |
-| `wasm32-wasip1`, the WebAssembly System Interface, as a target | A host asks to run Ferrolua under WASI |
+| `wasm32-wasip1`, the WebAssembly System Interface, as a target | A host asks to run Lunaferra under WASI |
 | 32-bit targets, such as Android on ARMv7 | A host asks for one |
-| Arrow-key history and line editing at the interactive prompt, which need the terminal's raw mode and so `unsafe` system calls (ADR-0033) | The standard library gains a way to set raw mode, or the owner allows `unsafe` in `ferrolua-cli` |
-| The Lua C API and C modules; today hosts must be Rust programs (ADR-0017) | A C or C++ host asks to embed Ferrolua |
+| Arrow-key history and line editing at the interactive prompt, which need the terminal's raw mode and so `unsafe` system calls (ADR-0033) | The standard library gains a way to set raw mode, or the owner allows `unsafe` in `lunaferra-cli` |
+| The Lua C API and C modules; today hosts must be Rust programs (ADR-0017) | A C or C++ host asks to embed Lunaferra |
 | Incremental loop collection, which spreads one collection over several safe points to shorten pauses | A host measures a collection pause above the agreed budget that turning off automatic runs and scheduling collections can't avoid |
 | Spreading the freeing of one large structure over several safe points | A benchmark measures a pause over 1 ms from freeing one value |
 | Deferred counting of register references, which changes when `__gc` runs and needs a new record | M5.1 shows count updates above ADR-0018's threshold after M11.2 |
-| Running lua.org's official 5.5.1 test suite, ported to Ferrolua; it isn't part of the platform today | The owner adds it to the platform in a decision record |
-| A tool that ports Lua 5.5 scripts to Ferrolua's operators, indexes, and ranges, and reports what it can't change safely (ADR-0023) | A user reports porting a Lua library by hand, or a host asks for one |
+| Running lua.org's official 5.5.1 test suite, ported to Lunaferra; it isn't part of the platform today | The owner adds it to the platform in a decision record |
+| A tool that ports Lua 5.5 scripts to Lunaferra's operators, indexes, and ranges, and reports what it can't change safely (ADR-0023) | A user reports porting a Lua library by hand, or a host asks for one |
 | Coverage-guided fuzzing; stable Rust can't read coverage counters while running | A stable rustc option exposes coverage counters in process |
 | Branch coverage instead of regions | rustc stabilizes branch coverage |
-| A mutation testing tool of Ferrolua's own; none runs today | A bug ships past a test that ran its code without asserting on the result |
+| A mutation testing tool of Lunaferra's own; none runs today | A bug ships past a test that ran its code without asserting on the result |
 | A Visual Studio Code extension (ADR-0015) | The owner decides to publish one, with its client either written here or approved as an exception |
 | Sharing compiled prototypes between states | A host measures the cost of loading the same scripts into many states |
 | Re-recording conformance output for a new Lua 5.5 release | lua.org releases Lua 5.5.2 |

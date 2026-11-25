@@ -26,7 +26,7 @@ pub(crate) struct Workspace {
 /// A member crate of a [`Workspace`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Crate {
-    /// The package name, such as `ferrolua-testkit`.
+    /// The package name, such as `lunaferra-testkit`.
     pub(crate) name: String,
     /// The folder of its `Cargo.toml`.
     pub(crate) dir: PathBuf,

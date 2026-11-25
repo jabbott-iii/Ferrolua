@@ -242,7 +242,7 @@ mod tests {
     /// A folder of this test's own under the system's temporary folder, removed if it exists.
     fn work(name: &str) -> PathBuf {
         let work = env::temp_dir().join(format!(
-            "ferrolua-fuzz-runner-{}-{name}",
+            "lunaferra-fuzz-runner-{}-{name}",
             std::process::id()
         ));
         // The folder is left from an earlier run only if that run stopped early.
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn makes_its_work_folder_and_removes_it_when_dropped() {
         let folder = work("made");
-        let runner = Runner::new(Path::new("ferrolua-fuzz"), LIMIT, folder.clone()).unwrap();
+        let runner = Runner::new(Path::new("lunaferra-fuzz"), LIMIT, folder.clone()).unwrap();
         assert!(folder.is_dir());
         drop(runner);
         assert!(!folder.exists());
@@ -281,7 +281,7 @@ mod tests {
     fn fails_when_its_work_folder_cannot_be_made() {
         let file = work("file-in-the-way");
         fs::write(&file, "a file where a folder goes\n").unwrap();
-        let error = Runner::new(Path::new("ferrolua-fuzz"), LIMIT, file.join("work")).unwrap_err();
+        let error = Runner::new(Path::new("lunaferra-fuzz"), LIMIT, file.join("work")).unwrap_err();
         assert!(matches!(error, Error::Work(_)));
         fs::remove_file(file).unwrap();
     }
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn fails_when_its_work_folder_is_gone() {
         let folder = work("gone");
-        let runner = Runner::new(Path::new("ferrolua-fuzz"), LIMIT, folder.clone()).unwrap();
+        let runner = Runner::new(Path::new("lunaferra-fuzz"), LIMIT, folder.clone()).unwrap();
         fs::remove_dir_all(&folder).unwrap();
         let error = runner
             .run(target::find("fixture-panic").unwrap(), &[Vec::new()])

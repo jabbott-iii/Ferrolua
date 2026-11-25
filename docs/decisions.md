@@ -1,6 +1,6 @@
 # Decision Log
 
-This log records each significant or hard-to-reverse decision about Ferrolua as an architecture
+This log records each significant or hard-to-reverse decision about Lunaferra as an architecture
 decision record (ADR): what was decided, why, and what would change it. Records are numbered in the
 order they were made, and an accepted record's decision is never edited: a new record supersedes
 it. A record is `Accepted` only when the project's owner made or approved the decision; until then
@@ -8,24 +8,24 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0001 — Branch from Lua 5.5
 
-- **Status:** Accepted; ADR-0023 makes Ferrolua a language of its own, so PUC-Rio Lua 5.5.1 is the
-  reference only for what Ferrolua keeps from Lua 5.5, through paired scripts
+- **Status:** Accepted; ADR-0023 makes Lunaferra a language of its own, so PUC-Rio Lua 5.5.1 is the
+  reference only for what Lunaferra keeps from Lua 5.5, through paired scripts
 - **Date:** 2026-11-24
-- **Context:** Ferrolua implements an existing Lua version, so scripts written for it run on
-  Ferrolua and its behavior can be checked against a reference. Lua 5.5 was released on
+- **Context:** Lunaferra implements an existing Lua version, so scripts written for it run on
+  Lunaferra and its behavior can be checked against a reference. Lua 5.5 was released on
   December 22, 2025, and its current release is 5.5.1, from August 3, 2026, as
   [lua.org's version history](https://www.lua.org/versions.html) lists. The same page says Lua 5.4
   ends at 5.4.9: "There will be no further releases of Lua 5.4." Lua 5.5 adds `global`
-  declarations, which make an undeclared name an error inside their scope. That gives Ferrolua's
+  declarations, which make an undeclared name an error inside their scope. That gives Lunaferra's
   undeclared-variable errors a standard base to build on (ADR-0004).
-- **Decision** (the owner chose Lua 5.5 on 2026-11-24): Ferrolua branches from Lua 5.5. The
+- **Decision** (the owner chose Lua 5.5 on 2026-11-24): Lunaferra branches from Lua 5.5. The
   reference is PUC-Rio Lua 5.5.1, the interpreter that Lua's authors at the Pontifical Catholic
   University of Rio de Janeiro (PUC-Rio) publish, and the
   [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/). A valid Lua 5.5 script must print
-  on Ferrolua what it prints on PUC-Rio Lua 5.5.1, apart from the differences other records name.
+  on Lunaferra what it prints on PUC-Rio Lua 5.5.1, apart from the differences other records name.
 - **Consequences:**
   - Good: the baseline is the current Lua release, which still gets fixes, and its `global`
-    declarations match the strict mode Ferrolua wants.
+    declarations match the strict mode Lunaferra wants.
   - Good: conformance has one reference interpreter to record expected output from.
   - Bad: Lua 5.1 and LuaJIT code that relies on `setfenv`, `module`, or `unpack` as a global doesn't
     run unchanged, and much of the Lua ecosystem targets 5.1.
@@ -45,21 +45,21 @@ it is `Proposed`, and no code may depend on it.
 
 - **Status:** Accepted
 - **Date:** 2026-11-24
-- **Context:** Ferrolua runs scripts its hosts didn't write, so every line of code in it is part
+- **Context:** Lunaferra runs scripts its hosts didn't write, so every line of code in it is part
   of its attack surface. A dependency brings in code that its owners can change in any release,
   and a dependency tree grows with each update. The owner set the rule in
   `.claude/rules/dependencies.md`, and [`02-dependency-policy.md`](02-dependency-policy.md) explains
   it for contributors.
 - **Decision** (the owner chose no third-party crates at all, dev-dependencies included, on
-  2026-11-24): Ferrolua uses only the Rust toolchain, its standard library, PUC-Rio Lua 5.5 from
+  2026-11-24): Lunaferra uses only the Rust toolchain, its standard library, PUC-Rio Lua 5.5 from
   lua.org as the reference for tests, Linux, Git, and GitHub. It uses no third-party crate, even for
   tests, linting, formatting, benchmarks, coverage, or fuzzing. An exception needs its own accepted
   record first.
 - **Consequences:**
-  - Good: `cargo tree` lists only Ferrolua's own crates, so a host that embeds Ferrolua adds no
+  - Good: `cargo tree` lists only Lunaferra's own crates, so a host that embeds Lunaferra adds no
     one else's code.
   - Good: no update can bring in a package the project didn't review.
-  - Bad: Ferrolua writes its own JSON parser, x86-64 assembler, float formatting, argument parser,
+  - Bad: Lunaferra writes its own JSON parser, x86-64 assembler, float formatting, argument parser,
     property-test helper, and fuzzer. [`00-overview.md`](00-overview.md) estimates their size.
   - Bad: tools many Rust projects use, such as cargo-llvm-cov, cargo-mutants, cargo-semver-checks,
     and libFuzzer, are out. The toolchain's `llvm-tools` component stands in for coverage.
@@ -68,7 +68,7 @@ it is `Proposed`, and no code may depend on it.
     its secrets.
   - Allow a short list of widely used crates: popularity isn't evidence that a crate is safe, and
     the list would grow.
-- **Revisit when:** a law, a contract, or a platform requires a specific library, or Ferrolua needs
+- **Revisit when:** a law, a contract, or a platform requires a specific library, or Lunaferra needs
   cryptography that the standard library doesn't provide.
 
 ## ADR-0003 — Free memory by reference counting, with no garbage collector
@@ -76,7 +76,7 @@ it is `Proposed`, and no code may depend on it.
 - **Status:** Superseded by ADR-0018
 - **Date:** 2026-11-24
 - **Context:** PUC-Rio Lua frees memory with a tracing garbage collector: it pauses now and then to
-  find every value still reachable from the program, and frees the rest. Ferrolua aims for the
+  find every value still reachable from the program, and frees the rest. Lunaferra aims for the
   memory model Rust programs use instead: a value is freed at a known point, and freeing never
   waits for a collector to run. Reference counting does this. Each value counts the references to
   it and is freed when the count reaches zero, the model behind Rust's `Rc`. Reference counting
@@ -89,9 +89,9 @@ it is `Proposed`, and no code may depend on it.
     included.
   - A local function's references to itself compile to "the running function" and hold no count,
     so recursion makes no loop.
-  - Classes built with Ferrolua's class syntax (ADR-0007) need no self-reference.
+  - Classes built with Lunaferra's class syntax (ADR-0007) need no self-reference.
   - The linter reports the loop patterns it can find.
-  - Ferrolua has no collector of any kind, including one that runs only on request.
+  - Lunaferra has no collector of any kind, including one that runs only on request.
   - [`specs/memory.md`](specs/memory.md) gives the details.
 - **Consequences:**
   - Good: memory is freed at a predictable point, with no collection pauses, and `__gc` finalizers
@@ -122,12 +122,12 @@ it is `Proposed`, and no code may depend on it.
 
 - **Status:** Superseded by ADR-0023, which keeps strict mode turned on per chunk
 - **Date:** 2026-11-24
-- **Context:** Ferrolua adds optional types, classes, compound assignment and `++`, arity
+- **Context:** Lunaferra adds optional types, classes, compound assignment and `++`, arity
   enforcement, and undeclared-variable errors to Lua 5.5. The new syntax is a syntax error in
   Lua 5.5 today, so accepting it changes no valid script. The two checks are different: Lua 5.5
   lets a caller pass any number of arguments and lets code read any global, so turning the checks
   on changes how valid scripts run.
-- **Decision** (the owner chose the first of three options on 2026-11-24): Ferrolua's language is
+- **Decision** (the owner chose the first of three options on 2026-11-24): Lunaferra's language is
   a superset of Lua 5.5. Every valid Lua 5.5 script runs unchanged, and the new syntax works in
   every chunk. Arity enforcement and undeclared-variable errors, together called strict mode, are
   off unless the host turns them on for a chunk or the chunk turns them on with a directive
@@ -136,7 +136,7 @@ it is `Proposed`, and no code may depend on it.
   - Good: conformance with PUC-Rio Lua 5.5.1 stays a hard promise, and existing Lua code runs
     without changes.
   - Good: a project can move to strict mode one file at a time.
-  - Bad: a file that uses Ferrolua's syntax doesn't run on PUC-Rio Lua, so the repository's
+  - Bad: a file that uses Lunaferra's syntax doesn't run on PUC-Rio Lua, so the repository's
     conformance scripts can't use it.
   - Bad: every new token and keyword must be checked against valid Lua 5.5, which a property
     test in M4.1 does.
@@ -145,7 +145,7 @@ it is `Proposed`, and no code may depend on it.
     out.
   - A separate dialect with no promise to run Lua 5.5 scripts: it would lose the reference
     interpreter that conformance tests compare against.
-- **Revisit when:** a future Lua release adds syntax that conflicts with one of Ferrolua's
+- **Revisit when:** a future Lua release adds syntax that conflicts with one of Lunaferra's
   extensions.
 
 ## ADR-0005 — Add `++` and compound assignment, but no `--` or XOR-assign
@@ -155,7 +155,7 @@ it is `Proposed`, and no code may depend on it.
 - **Context:** C, Java, and JavaScript programmers expect `x += 1` and `x++`. In Lua, `--` starts a
   comment, so `x--` can't mean "decrement" without breaking every comment written after code on a
   line. Lua also uses `~=` for "not equal", so it can't mean XOR-assign.
-- **Decision** (the owner chose the first of three options on 2026-11-24): Ferrolua adds `x++` and
+- **Decision** (the owner chose the first of three options on 2026-11-24): Lunaferra adds `x++` and
   the compound assignments `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `^=`, `..=`, `&=`, `|=`, `<<=`, and
   `>>=`. Decrement is written `x -= 1`, and there is no XOR-assign. Each is a statement, like Lua's
   own assignment, and none is an expression.
@@ -166,12 +166,12 @@ it is `Proposed`, and no code may depend on it.
   - Bad: `++` has no matching decrement, which surprises C programmers.
 - **Alternatives considered:**
   - Compound assignment only: symmetric, but drops the increment that loops use most.
-  - `++` and `--`, with a new comment marker in Ferrolua files: it breaks every existing Lua file.
+  - `++` and `--`, with a new comment marker in Lunaferra files: it breaks every existing Lua file.
 - **Revisit when:** a future Lua release gives `++` or a compound operator a meaning of its own.
 
 ## ADR-0006 — Write optional types inline, check them before run, and use them only as guarded hints
 
-- **Status:** Accepted; under ADR-0023, plain Lua 5.5 files no longer parse as Ferrolua, so the
+- **Status:** Accepted; under ADR-0023, plain Lua 5.5 files no longer parse as Lunaferra, so the
   LuaCATS annotations it reads serve code ported from Lua 5.5
 - **Date:** 2026-11-24
 - **Context:** Optional types let a program declare what kind of value a variable holds, so a tool
@@ -209,7 +209,7 @@ it is `Proposed`, and no code may depend on it.
   so only the loop collector (ADR-0018) frees it. Every library builds classes a little differently,
   so tools can't tell what fields an object has. A class declaration in the language fixes both
   problems.
-- **Decision:** Ferrolua adds a `class` declaration with fields, methods, single inheritance with
+- **Decision:** Lunaferra adds a `class` declaration with fields, methods, single inheritance with
   `extends`, a constructor named `new`, and `super` calls, as
   [`specs/language.md`](specs/language.md) describes. `class` is a keyword only at the start of a
   statement and followed by a name, so a function named `class` keeps working.
@@ -271,7 +271,7 @@ it is `Proposed`, and no code may depend on it.
 - **Context:** The compiler needs a fast parse of valid code. The formatter, linter, type checker,
   and language server need every comment and space, and a useful tree even for code that is still
   being typed. Two parsers would drift apart, and the tools would accept code the compiler rejects.
-- **Decision:** `ferrolua-syntax` has one parser, which emits a stream of events: start a node,
+- **Decision:** `lunaferra-syntax` has one parser, which emits a stream of events: start a node,
   add a token, finish a node, report an error. Two consumers build from the same events:
   - a lossless syntax tree, which keeps every byte of the source and marks errors in place, for
     the tools;
@@ -289,23 +289,23 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** benchmarks show that parsing through events makes `load` more than 20% slower
   than a direct parser would.
 
-## ADR-0010 — Run Ferrolua's own register bytecode, and verify precompiled chunks
+## ADR-0010 — Run Lunaferra's own register bytecode, and verify precompiled chunks
 
 - **Status:** Proposed
 - **Date:** 2026-11-24
 - **Context:** PUC-Rio Lua compiles source to a register-based bytecode and can save it as a
   precompiled chunk with `string.dump`. Its format changes between releases and fits its own VM.
-  Ferrolua's VM, its reference counting (ADR-0018), and its extensions need instructions PUC-Rio's
+  Lunaferra's VM, its reference counting (ADR-0018), and its extensions need instructions PUC-Rio's
   format lacks. A precompiled chunk is untrusted input: a crafted one can point a register or a jump
   anywhere.
-- **Decision:** Ferrolua compiles to a register-based bytecode of its own, defined in
-  `ferrolua-bytecode`. `string.dump` writes Ferrolua's format, and `load` reads only that format.
+- **Decision:** Lunaferra compiles to a register-based bytecode of its own, defined in
+  `lunaferra-bytecode`. `string.dump` writes Lunaferra's format, and `load` reads only that format.
   Loading a precompiled chunk is off unless the host turns it on (ADR-0014), and a verifier checks
   every register, constant, upvalue, and jump target before the chunk runs. The JIT relies on the
   verifier's checks, so the verifier is part of the safety argument.
 - **Consequences:**
   - Good: the bytecode fits the VM, and a crafted chunk is rejected before it runs.
-  - Bad: chunks compiled by PUC-Rio's `luac` don't load in Ferrolua. This is an intended difference
+  - Bad: chunks compiled by PUC-Rio's `luac` don't load in Lunaferra. This is an intended difference
     from PUC-Rio Lua 5.5.1.
 - **Alternatives considered:**
   - PUC-Rio's format: it would load `luac` output, but the VM would inherit a format built for
@@ -341,7 +341,7 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** benchmarks show that handle checks cost more than 10% of the interpreter's run
   time after the JIT removes the ones it can.
 
-## ADR-0012 — Build a method JIT for x86-64 and AArch64 with assemblers of Ferrolua's own
+## ADR-0012 — Build a method JIT for x86-64 and AArch64 with assemblers of Lunaferra's own
 
 - **Status:** Proposed
 - **Date:** 2026-11-24
@@ -350,9 +350,9 @@ it is `Proposed`, and no code may depend on it.
   - A method JIT compiles whole functions.
   - A tracing JIT, like LuaJIT's, records the path a loop takes and compiles that path.
   Tracing JITs reach high speeds on loops, but they are harder to make correct and to debug. ADR-0002
-  rules out assembler libraries, so Ferrolua writes its own encoders. ADR-0027 asks for a JIT on
+  rules out assembler libraries, so Lunaferra writes its own encoders. ADR-0027 asks for a JIT on
   every platform that allows one: Linux, Windows, macOS, and Android, on x86-64 and AArch64.
-- **Decision:** Ferrolua's JIT works in tiers:
+- **Decision:** Lunaferra's JIT works in tiers:
   - The interpreter counts calls and loop iterations.
   - A hot function goes to a baseline tier, which translates each instruction into machine code,
     with guards on the types it has seen (M5).
@@ -382,9 +382,9 @@ it is `Proposed`, and no code may depend on it.
 - **Date:** 2026-11-24
 - **Context:** The unsafe policy in `.claude/rules/rust.md` forbids `unsafe` in every crate until an
   accepted record names the crate, its modules, and the invariants its `unsafe` code relies on.
-  Running generated machine code needs `unsafe`: Ferrolua must map memory, make it executable, and
+  Running generated machine code needs `unsafe`: Lunaferra must map memory, make it executable, and
   call into it. With the heap in safe Rust (ADR-0011), nothing else needs it.
-- **Decision:** Only `ferrolua-jit` may use `unsafe`, and only in two modules:
+- **Decision:** Only `lunaferra-jit` may use `unsafe`, and only in two modules:
   - `jit::memory` maps, protects, and unmaps executable memory with each operating system's own
     calls (ADR-0027: a JIT on Linux, Windows, macOS, and Android), declared in `extern` blocks
     against the libraries the standard library already links:
@@ -402,7 +402,7 @@ it is `Proposed`, and no code may depend on it.
      and no thread runs code from memory it can write.
   2. Generated code runs only from a buffer that `jit::memory` finalized, and the buffer lives as
      long as any function or frame refers to it.
-  3. Generated code reads and writes VM state only through `#[repr(C)]` layouts that `ferrolua-vm`
+  3. Generated code reads and writes VM state only through `#[repr(C)]` layouts that `lunaferra-vm`
      exports, and tests check each layout's size and field offsets.
   4. Generated code checks each value's type and each index before using it, and exits to the
      interpreter when a check fails, unless the bytecode verifier (ADR-0010) already proved the
@@ -413,10 +413,10 @@ it is `Proposed`, and no code may depend on it.
   7. On AArch64, every byte of a buffer reaches the instruction cache before the buffer first
      runs.
 - **Consequences:**
-  - Good: one crate, two modules, and seven invariants hold all of Ferrolua's `unsafe` code.
+  - Good: one crate, two modules, and seven invariants hold all of Lunaferra's `unsafe` code.
   - Bad: generated code itself can't be checked by the Rust compiler. Differential tests, which run
     each script interpreted and with the JIT forced on, and fuzzing stand in (M5.8).
-  - Follow-up: `ferrolua-jit` repeats the workspace lints with `unsafe_code` at `deny`, and each
+  - Follow-up: `lunaferra-jit` repeats the workspace lints with `unsafe_code` at `deny`, and each
     `unsafe` block allows it locally, with its `// SAFETY:` comment.
 - **Alternatives considered:**
   - Inline assembly system calls instead of `extern "C"`: no reliance on the C library, but more
@@ -450,7 +450,7 @@ it is `Proposed`, and no code may depend on it.
   - Let `pcall` catch limit errors: a script could catch the error and keep running.
 - **Revisit when:** the owner accepts or changes this record, which M3.2 needs first.
 
-## ADR-0015 — Support editors through language and debug servers of Ferrolua's own
+## ADR-0015 — Support editors through language and debug servers of Lunaferra's own
 
 - **Status:** Proposed
 - **Date:** 2026-11-24
@@ -458,9 +458,9 @@ it is `Proposed`, and no code may depend on it.
   and the Debug Adapter Protocol (DAP) let one server work with many editors, such as Neovim,
   Helix, Emacs, Zed, and Visual Studio Code. Both protocols exchange JSON messages. ADR-0002 rules
   out JSON and protocol crates.
-- **Decision:** `ferrolua lsp` and `ferrolua dap` serve the two protocols over standard input and
-  output. They are built on `ferrolua-json`, which parses and writes JSON and frames protocol
-  messages. A host that embeds Ferrolua can also serve the debug protocol over a local TCP
+- **Decision:** `lunaferra lsp` and `lunaferra dap` serve the two protocols over standard input and
+  output. They are built on `lunaferra-json`, which parses and writes JSON and frames protocol
+  messages. A host that embeds Lunaferra can also serve the debug protocol over a local TCP
   connection, so a developer can debug scripts inside a running host.
 - **Consequences:**
   - Good: every editor with a built-in LSP or DAP client works with no plugin.
@@ -477,9 +477,9 @@ it is `Proposed`, and no code may depend on it.
 - **Date:** 2026-11-24
 - **Context:** The linter, formatter, type checker, and SAST tool (static application security
   testing, which finds security problems in source code without running it) need per-project
-  settings. TOML, the format Cargo uses, would need a parser of Ferrolua's own (ADR-0002). Lua tools
-  such as luacheck already use Lua files for settings, and Ferrolua has a Lua parser.
-- **Decision:** The tools read `.ferrolua.lua` at the project root. Its one statement is
+  settings. TOML, the format Cargo uses, would need a parser of Lunaferra's own (ADR-0002). Lua
+  tools such as luacheck already use Lua files for settings, and Lunaferra has a Lua parser.
+- **Decision:** The tools read `.lunaferra.lua` at the project root. Its one statement is
   `return { ... }`, built only from table constructors, strings, numbers, and booleans. The tools
   parse it and never run it, so it can't execute code.
   [`specs/diagnostics.md`](specs/diagnostics.md) lists the settings.
@@ -500,15 +500,16 @@ it is `Proposed`, and no code may depend on it.
   it are built against that API. Supporting it would mean `extern "C"` functions that take raw
   pointers from C code, which needs `unsafe`, and a stack-based interface that doesn't fit
   reference counting.
-- **Decision:** Ferrolua has a Rust embedding API only, in the `ferrolua` crate. C modules built for
-  PUC-Rio Lua don't load, `package.loadlib` returns an error, and `package.cpath` has no searcher.
+- **Decision:** Lunaferra has a Rust embedding API only, in the `lunaferra` crate. C modules built
+  for PUC-Rio Lua don't load, `package.loadlib` returns an error, and `package.cpath` has no
+  searcher.
 - **Consequences:**
   - Good: no `unsafe` code at the host boundary, and an API that can hold Rust's guarantees.
-  - Bad: C and C++ hosts can't embed Ferrolua, and Lua libraries written in C, such as LuaSocket and
-    LuaFileSystem, don't load.
+  - Bad: C and C++ hosts can't embed Lunaferra, and Lua libraries written in C, such as LuaSocket
+    and LuaFileSystem, don't load.
 - **Alternatives considered:**
   - The full Lua C API: the whole C ecosystem, at the cost of `unsafe` code at every call.
-- **Revisit when:** a C or C++ host asks to embed Ferrolua.
+- **Revisit when:** a C or C++ host asks to embed Lunaferra.
 
 ## ADR-0018 — Free loops with a deterministic collector on top of reference counting
 
@@ -583,7 +584,7 @@ it is `Proposed`, and no code may depend on it.
   That weakens address space layout randomization (ASLR), the operating system's defense of placing
   memory at unpredictable addresses, and helps an attacker exploit any memory bug in the host.
   Addresses also change from run to run, so output that contains one can't repeat, which breaks the
-  determinism ADR-0018 promises and keeps such output out of tests. Ferrolua's values are handles
+  determinism ADR-0018 promises and keeps such output out of tests. Lunaferra's values are handles
   into arenas, not pointers (ADR-0011, proposed), so it has no reason to print addresses at all.
 - **Decision** (the owner chose IDs instead of addresses on 2026-11-24):
   - Every object that Lua code can name, such as a table, a function, a thread, a userdata, or a
@@ -593,7 +594,7 @@ it is `Proposed`, and no code may depend on it.
   - `tostring` and `print` show the ID where PUC-Rio shows an address, as in `table: #42`.
     `string.format("%p")` prints the ID, and `debug.upvalueid` returns an upvalue's ID as an
     integer. The debugger shows the same IDs.
-  - No output Ferrolua produces contains a memory address.
+  - No output Lunaferra produces contains a memory address.
   - [`specs/memory.md`](specs/memory.md#object-ids) says how IDs are assigned, and
     [`specs/stdlib.md`](specs/stdlib.md#object-ids-in-output) gives the exact formats.
 - **Consequences:**
@@ -615,7 +616,7 @@ it is `Proposed`, and no code may depend on it.
     out, and the same slot prints alike once its generation wraps.
   - Print the ID in hexadecimal with a `0x` prefix: code that parses addresses keeps working, but
     the output would pass for an address and mislead readers.
-- **Revisit when:** a widely used Lua library breaks on Ferrolua because it parses `tostring`'s
+- **Revisit when:** a widely used Lua library breaks on Lunaferra because it parses `tostring`'s
   output.
 
 ## ADR-0020 — Bound the probe steps of table operations, and hash reference keys by handle
@@ -630,7 +631,7 @@ it is `Proposed`, and no code may depend on it.
     of n² probe steps. This attack is called hash flooding.
   - By default the seed comes from the standard library's `RandomState`, so a script can't predict
     collisions ([`specs/sandbox.md`](specs/sandbox.md#isolation)). A host that needs runs to repeat
-    fixes the seed with `Options::hash_seed` ([`specs/ferrolua.md`](specs/ferrolua.md)), and then
+    fixes the seed with `Options::hash_seed` ([`specs/lunaferra.md`](specs/lunaferra.md)), and then
     the defense is gone: under a seed known in advance, a script, or data that a script uses as
     keys, can make one table operation run for seconds.
   - The instruction limit counts bytecode instructions and the work units inside library calls, but
@@ -640,9 +641,9 @@ it is `Proposed`, and no code may depend on it.
     PUC-Rio Lua hashes them by address, so the order in which `pairs` visits them changes between
     runs whatever the seed. ADR-0018 and ADR-0019 promise runs that repeat exactly under a fixed
     hash seed.
-  - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, needs both.
+  - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Lunaferra, needs both.
     Its ADR-0080 sets each state's seed from the game's seed, so that recordings replay, and asks
-    Ferrolua to bound probe steps and to hash reference keys by handle.
+    Lunaferra to bound probe steps and to hash reference keys by handle.
 - **Decision** (the owner chose both points on 2026-11-24, with Nadir's ADR-0080):
   - **Bounded probes.** No set of keys, under any seed, makes one table operation run long. Either
     each probe step past the first counts as one work unit against the instruction limit, as
@@ -682,11 +683,11 @@ it is `Proposed`, and no code may depend on it.
   requirements
 - **Date:** 2026-11-24
 - **Context:**
-  - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, keeps
+  - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Lunaferra, keeps
     finalizers and weak tables in its scripts (its ADR-0081, which the owner accepted on
     2026-11-24). It turns the loop collector's automatic runs off and calls `Lua::collect` at the
     end of each game tick, after every script has run, so each loop's finalizer runs at one known
-    point. It asks two things of Ferrolua:
+    point. It asks two things of Lunaferra:
     - the finalizers that `Lua::collect` runs count against that call's instruction budget, so one
       that loops forever stops there and costs no other script;
     - a state's allocated bytes count the same on all six of Nadir's targets (x86-64 and AArch64,
@@ -720,7 +721,7 @@ it is `Proposed`, and no code may depend on it.
     `Lua::collect` returns the limit error.
   - **Bytes count by fixed charges.** The memory spec sets a charge for each kind of object and for
     each element of each kind of buffer, such as 16 bytes for each slot of a table's array part.
-    The count never comes from `size_of`, `Vec::capacity`, or the allocator. Ferrolua sizes every
+    The count never comes from `size_of`, `Vec::capacity`, or the allocator. Lunaferra sizes every
     buffer by its own growth rules and reserves exactly that capacity, and the tables that index
     objects, such as the string intern table and the object-ID side table, charge a fixed amount
     for each entry. The same allocations therefore count the same bytes on every target and with
@@ -742,7 +743,7 @@ it is `Proposed`, and no code may depend on it.
   - Bad: the count models the memory rather than measuring it. It leaves out the allocator's own
     overhead and the free slots an arena keeps for reuse, and each charge must stay no smaller than
     the type it stands for, which a test checks.
-  - Bad: every change to what Ferrolua allocates, or to a charge, changes the stored logs, which
+  - Bad: every change to what Lunaferra allocates, or to a charge, changes the stored logs, which
     are recorded again and reviewed in the same change, and a host's recordings from an earlier
     release may diverge.
   - Follow-up: M2.2 builds the charges and records them in the memory spec; M2.17 stores the
@@ -764,25 +765,25 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** a host measures a state whose real memory is more than twice its counted bytes,
   or needs a limit on a state's total work across calls.
 
-## ADR-0022 — Put the JIT behind an optional `jit` feature of `ferrolua`, off by default
+## ADR-0022 — Put the JIT behind an optional `jit` feature of `lunaferra`, off by default
 
 - **Status:** Accepted; on 2026-11-24 the owner chose the agent's recommendation, an optional
   feature off by default. Keeping `JitMode` in both builds, refused without the feature, is the
   agent's detail within it
 - **Date:** 2026-11-24
 - **Context:**
-  - The `ferrolua` crate, the one a host adds, depends on `ferrolua-jit`
-    ([`01-architecture.md`](01-architecture.md#crate-map)). `ferrolua-jit` is the only crate with
+  - The `lunaferra` crate, the one a host adds, depends on `lunaferra-jit`
+    ([`01-architecture.md`](01-architecture.md#crate-map)). `lunaferra-jit` is the only crate with
     `unsafe` code (ADR-0013, proposed: only its memory and entry modules), maps executable memory,
     and has a backend for Linux on x86-64 only (ADR-0012, proposed: a method JIT with tiers).
-    `ferrolua-vm` already doesn't depend on it: the VM defines a `Tier` trait for compiled code, and
-    `ferrolua` plugs the JIT in.
+    `lunaferra-vm` already doesn't depend on it: the VM defines a `Tier` trait for compiled code,
+    and `lunaferra` plugs the JIT in.
   - Every host therefore links the JIT's code, even one that sets `JitMode::Off`.
-    [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, takes a
-    Ferrolua crate as its own code only if the crate forbids `unsafe`, and asks that the JIT be a
+    [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Lunaferra, takes a
+    Lunaferra crate as its own code only if the crate forbids `unsafe`, and asks that the JIT be a
     crate of its own or a feature off by default (its ADR-0079, requirement 10). Its dependency
     check fails on any package in its `Cargo.lock` that it doesn't allow, so as planned it can't
-    depend on `ferrolua`.
+    depend on `lunaferra`.
   - Cargo leaves an optional dependency that no crate turns on out of a host's `Cargo.lock`, but
     lists a dependency gated to one target on every machine. Inside a workspace, it turns a feature
     on for every crate built in the same run once one crate asks for it: `cargo test --workspace`
@@ -790,36 +791,36 @@ it is `Proposed`, and no code may depend on it.
     without. Both were checked on 2026-11-24 in a scratch workspace.
 - **Decision** (the owner chose an optional feature, off by default, on 2026-11-24, over a run-time
   switch, a crate the host adds, a dependency gated by target, and hosts using the inner crates):
-  - **An optional feature.** `ferrolua-jit` is an optional dependency of `ferrolua`, turned on by
-    its `jit` feature (`jit = ["dep:ferrolua-jit"]`), which is off by default. Without it, a host's
-    build contains no `ferrolua-jit`, and no Ferrolua code with `unsafe`.
+  - **An optional feature.** `lunaferra-jit` is an optional dependency of `lunaferra`, turned on by
+    its `jit` feature (`jit = ["dep:lunaferra-jit"]`), which is off by default. Without it, a host's
+    build contains no `lunaferra-jit`, and no Lunaferra code with `unsafe`.
   - **The same API in both builds.** `JitMode` and `Options::jit` exist with or without the
     feature, so turning it on, as any crate in a host's tree can, changes no host's code. Without
     the feature, the default mode is `JitMode::Off`, and `Lua::new` refuses `JitMode::On` and
     `JitMode::Forced` with an error that names the feature, so a host that asks for the JIT without
     it finds out when it creates the state.
-  - **Who turns it on.** `ferrolua-cli`, so the `ferrolua` command runs with the JIT, and any host
+  - **Who turns it on.** `lunaferra-cli`, so the `lunaferra` command runs with the JIT, and any host
     that asks with `features = ["jit"]`. The conformance runner's forced pass and the
     `differential` fuzz target need it too.
-  - **Both builds checked.** CI lints, tests, and covers `ferrolua` with the feature on, in the
-    workspace run, and off, with `-p ferrolua`, and checks that
-    `cargo tree -p ferrolua --edges normal` lists no `ferrolua-jit`.
+  - **Both builds checked.** CI lints, tests, and covers `lunaferra` with the feature on, in the
+    workspace run, and off, with `-p lunaferra`, and checks that
+    `cargo tree -p lunaferra --edges normal` lists no `lunaferra-jit`.
 - **Consequences:**
   - Good: a host gets no `unsafe` code and no executable memory unless it asks, as the
     architecture's first principle, memory safety first, wants. Nadir's requirement 10 is met.
-  - Good: without the feature, `ferrolua` is portable Rust, so a new target needs CI jobs for the
+  - Good: without the feature, `lunaferra` is portable Rust, so a new target needs CI jobs for the
     interpreter, not a JIT backend.
-  - Good: the `Tier` trait stays between `ferrolua-vm` and `ferrolua`, and the embedding API is the
-    same in both builds.
-  - Bad: a host that adds `ferrolua` and reads nothing else runs at the interpreter's speed, not
+  - Good: the `Tier` trait stays between `lunaferra-vm` and `lunaferra`, and the embedding API is
+    the same in both builds.
+  - Bad: a host that adds `lunaferra` and reads nothing else runs at the interpreter's speed, not
     the JIT's.
   - Bad: asking for the JIT without the feature fails when the state is created, not when the host
     compiles.
-  - Bad: `ferrolua` has two builds to lint, test, and cover, and its code that plugs the JIT in sits
-    behind `#[cfg(feature = "jit")]`.
+  - Bad: `lunaferra` has two builds to lint, test, and cover, and its code that plugs the JIT in
+    sits behind `#[cfg(feature = "jit")]`.
   - Follow-up: M5.4 adds the feature, `JitMode` in both builds, and the checks of both builds;
     M5.5 to M5.7 run their forced-mode checks with it on; M5.8 turns the feature on in
-    `ferrolua-cli` and the fuzzer.
+    `lunaferra-cli` and the fuzzer.
 - **Alternatives considered:**
   - Keep the dependency, and let hosts turn the JIT off with `JitMode::Off`: every host still links
     the JIT's code, and Nadir's dependency check rejects it.
@@ -827,21 +828,21 @@ it is `Proposed`, and no code may depend on it.
     leave it out with `default-features = false`, but every other host gets `unsafe` code by
     default.
   - A crate the host adds and passes to `Options`: no feature, but the `Tier` trait becomes a public
-    interface of `ferrolua-vm`, and hosts keep two crates at matching versions.
+    interface of `lunaferra-vm`, and hosts keep two crates at matching versions.
   - A dependency for Linux on x86-64 only: Cargo still lists it in every host's `Cargo.lock`, and
     hosts on that target link it.
-  - Hosts use `ferrolua-vm`, `ferrolua-compiler`, and `ferrolua-stdlib` directly: those APIs are
-    internal, and each host would rewrite what `ferrolua` wires together.
+  - Hosts use `lunaferra-vm`, `lunaferra-compiler`, and `lunaferra-stdlib` directly: those APIs are
+    internal, and each host would rewrite what `lunaferra` wires together.
 - **Revisit when:** a host reports running without the JIT because it missed the feature, or the
   `Tier` trait has to become public for another reason.
 
-## ADR-0023 — Make Ferrolua a language of its own, with Python's operators and 0-based indexes
+## ADR-0023 — Make Lunaferra a language of its own, with Python's operators and 0-based indexes
 
 - **Status:** Accepted; ADR-0025 adds f-strings, locals by default, lists, tuples, sets, and
   Python's truth
 - **Date:** 2026-11-24
 - **Context:**
-  - ADR-0004 made Ferrolua's language a superset of Lua 5.5, so every valid Lua 5.5 script runs
+  - ADR-0004 made Lunaferra's language a superset of Lua 5.5, so every valid Lua 5.5 script runs
     unchanged, and ADR-0005 added `++` and compound assignment as C, Java, and JavaScript write
     them. On 2026-11-24 the owner asked instead for operators that follow Python's, for simplicity,
     and for indexes that start at 0 instead of 1.
@@ -856,11 +857,11 @@ it is `Proposed`, and no code may depend on it.
     `is`, `is not`, chained comparisons, and conditional expressions join the language; a range
     excludes its end, as Python's `range` does; operators on numbers give Python's results; and
     library functions stop converting their arguments too.
-  - PUC-Rio Lua 5.5.1 is the reference for what Ferrolua shares with Lua 5.5 (ADR-0001), and 26
+  - PUC-Rio Lua 5.5.1 is the reference for what Lunaferra shares with Lua 5.5 (ADR-0001), and 26
     documents relied on running the same script on both.
 - **Decision** (the owner chose the first of three options for the scope, and one option for each
   of six details, on 2026-11-24):
-  - **A language of its own.** Ferrolua's language derives from Lua 5.5. It keeps Lua's statements,
+  - **A language of its own.** Lunaferra's language derives from Lua 5.5. It keeps Lua's statements,
     values, tables, metatables, closures, coroutines, and standard library, apart from the changes
     below. It no longer promises to run Lua 5.5 scripts unchanged, and has no mode that does.
     Strict mode stays off unless a chunk or its host turns it on, as ADR-0004 decided.
@@ -892,7 +893,7 @@ it is `Proposed`, and no code may depend on it.
     [`specs/stdlib.md`](specs/stdlib.md) the positions each library function takes. ADR-0024
     settles the details these choices leave open.
 - **Consequences:**
-  - Good: a reader who knows Python reads Ferrolua's expressions, indexes, and ranges without
+  - Good: a reader who knows Python reads Lunaferra's expressions, indexes, and ranges without
     learning Lua's spellings, and a loop over a list needs no `- 1`.
   - Good: `"10" + 1` raises an error instead of giving 11, so a string that holds a number can't
     change a sum unnoticed.
@@ -900,12 +901,12 @@ it is `Proposed`, and no code may depend on it.
     `c and x or y` gives `y`.
   - Bad: a Lua 5.5 script runs unchanged only if it uses none of the changed operators, indexes, or
     ranges. Existing Lua code and libraries need porting, and Lua tools such as lua-language-server,
-    StyLua, and luacheck misread Ferrolua files.
+    StyLua, and luacheck misread Lunaferra files.
   - Bad: `in` tests a table's keys, as Python's `in` does for a dictionary, so `3 in {1, 2, 3}` is
     false: that table's keys are 0, 1, and 2. A Python programmer who reads the table as a list
     expects true.
-  - Bad: PUC-Rio Lua can't run Ferrolua's conformance scripts. Each becomes a pair: a Lua 5.5
-    reference script that PUC-Rio runs to record the expected output, and its Ferrolua twin, which
+  - Bad: PUC-Rio Lua can't run Lunaferra's conformance scripts. Each becomes a pair: a Lua 5.5
+    reference script that PUC-Rio runs to record the expected output, and its Lunaferra twin, which
     must print the same ([`04-quality.md`](04-quality.md#conformance-scripts)). Behavior with no
     Lua 5.5 counterpart is checked against output written from the spec.
   - Bad: code ported from Lua that squares with `x ^ 2` now computes an XOR, with no error when `x`
@@ -917,7 +918,7 @@ it is `Proposed`, and no code may depend on it.
     M2.7 compile chained comparisons, conditional expressions, and half-open `for` loops; M2.9
     builds the operators' results and records their messages; M2.13 and M3.3–M3.11 move the
     libraries to 0-based, half-open positions with no conversion; M4.1 and M4.2 build Python's
-    compound assignment; M7.2 adds the porting rules; the owner decides whether Ferrolua files keep
+    compound assignment; M7.2 adds the porting rules; the owner decides whether Lunaferra files keep
     the `.lua` extension.
 - **Alternatives considered:**
   - A mode that each chunk turns on, with Lua 5.5 as the default: existing scripts keep running,
@@ -966,10 +967,10 @@ it is `Proposed`, and no code may depend on it.
     the first.
   - **`math.random(0)`** still returns an integer whose bits are all random, because the empty
     range it would otherwise name has no use.
-  - **`ferrolua run` reads `FERROLUA_INIT`** instead of `LUA_INIT_5_5` and `LUA_INIT`, which hold
+  - **`lunaferra run` reads `LUNAFERRA_INIT`** instead of `LUA_INIT_5_5` and `LUA_INIT`, which hold
     Lua 5.5 code for `lua`.
   - **Not adopted from Python:** `@` (matrix multiplication), `:=` (assignment inside an
-    expression), slices such as `t[0:3]`, `lambda`, and `await`. Ferrolua has no matrices, its
+    expression), slices such as `t[0:3]`, `lambda`, and `await`. Lunaferra has no matrices, its
     assignments are statements, `:` already calls methods, `function` already makes an anonymous
     function, and coroutines already suspend.
 - **Consequences:**
@@ -983,7 +984,7 @@ it is `Proposed`, and no code may depend on it.
   - Bad: a Lua script that names a variable `is` must rename it.
   - Follow-up: M1.5 reserves `is`; M2.9 builds `in`, `is`, unary `+`, and the integer checks of the
     bitwise operators; M2.13 rejects floats for integer parameters; M3.7 keeps `math.random(0)`;
-    M3.11 numbers locals and upvalues from 0; M3.14 reads `FERROLUA_INIT`.
+    M3.11 numbers locals and upvalues from 0; M3.14 reads `LUNAFERRA_INIT`.
 - **Alternatives considered:**
   - Python's truth, where `0`, `""`, and empty containers are false: familiar to Python
     programmers, but it changes every condition in ported code, and a table would be false when
@@ -1004,7 +1005,7 @@ it is `Proposed`, and no code may depend on it.
 - **Status:** Accepted; the owner also accepted ADR-0026, which settles its details, on 2026-11-24
 - **Date:** 2026-11-24
 - **Context:**
-  - ADR-0023 made Ferrolua a language of its own, with Python's operators and 0-based indexes, and
+  - ADR-0023 made Lunaferra a language of its own, with Python's operators and 0-based indexes, and
     ADR-0024 kept Lua's rule for truth, where only `nil` and `false` are false. On 2026-11-24 the
     owner asked for four more of Python's features: formatted string literals (f-strings),
     local-by-default scoping, dedicated collection types, and Python's truth.
@@ -1083,7 +1084,7 @@ it is `Proposed`, and no code may depend on it.
 - **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:** ADR-0025 records the owner's choices. Writing them into the language spec raised
-  questions they don't answer. Python's f-strings use `:` for a format spec, where Ferrolua also
+  questions they don't answer. Python's f-strings use `:` for a format spec, where Lunaferra also
   uses `:` to call a method. Python's `global` statement covers one function, while Lua 5.5's
   `global` declarations also cover the functions nested in them. Python's lists, tuples, and sets
   live in a language without Lua's multiple results, metatables, or long strings. Python's truth
@@ -1204,18 +1205,18 @@ it is `Proposed`, and no code may depend on it.
     the web.
   - An iOS app can't make memory executable without an entitlement Apple doesn't give ordinary
     apps, and a browser runs WebAssembly, not native machine code, so neither can run what
-    Ferrolua's JIT writes.
+    Lunaferra's JIT writes.
   - Rust's `f64::sin`, `f64::exp`, and similar methods call each platform's math library, and those
     libraries can differ in a result's last bit. A script that uses `math.sin` can then print
     different digits on two targets, and a run recorded on one can replay differently on another.
   - Rust's test harness doesn't run in a browser, and the programs that run WebAssembly outside
     one, such as Node.js and Wasmtime, are third party (ADR-0002).
   - Asked the same day, the owner chose a JIT wherever the platform allows one, all six platforms
-    by the first release, a browser test harness of Ferrolua's own, and math functions of
-    Ferrolua's own that give the same bits everywhere.
+    by the first release, a browser test harness of Lunaferra's own, and math functions of
+    Lunaferra's own that give the same bits everywhere.
 - **Decision** (the owner chose the first of the options for each of four questions on
   2026-11-24):
-  - **Six platforms.** Ferrolua runs on Linux, Windows, macOS, Android, iOS, and the web
+  - **Six platforms.** Lunaferra runs on Linux, Windows, macOS, Android, iOS, and the web
     (WebAssembly in a browser), on the Rust targets [`03-platforms.md`](03-platforms.md) lists.
     The platform in `.claude/rules/dependencies.md` widens to each one's own tools: Microsoft's
     compiler tools and SDK for Windows, Apple's Xcode for macOS and iOS, Google's Android SDK and
@@ -1225,11 +1226,11 @@ it is `Proposed`, and no code may depend on it.
   - **All six by the first release.** The interpreter builds and passes its tests on every
     platform in CI from M3 on. A new milestone, M13, after M5, adds the AArch64 backend and the
     executable memory of Windows, macOS, and Android, and the first release (M12) ships all six.
-  - **A browser test harness of Ferrolua's own.** An `xtask` command builds the tests to
+  - **A browser test harness of Lunaferra's own.** An `xtask` command builds the tests to
     WebAssembly, serves them from a local server written with the standard library, and runs them
     in the headless browser on the CI runner. The browser is the web platform itself, so the
     harness adds no third-party code.
-  - **The same math everywhere.** Ferrolua computes the functions that IEEE 754, the
+  - **The same math everywhere.** Lunaferra computes the functions that IEEE 754, the
     floating-point standard, doesn't define exactly, such as `math.sin`, `math.exp`, `math.log`,
     and `**` on floats, with code of its own, so every target gives the same bits.
   - [`03-platforms.md`](03-platforms.md) gives the targets, what each needs, and the invariants
@@ -1245,7 +1246,7 @@ it is `Proposed`, and no code may depend on it.
     systems, each with `unsafe` code under ADR-0013 (proposed).
   - Bad: CI builds and tests eleven Rust targets, including an Android emulator and an iOS
     simulator, which costs runner time on every pull request.
-  - Bad: a math library of Ferrolua's own, whose last bit can differ from the C library's that
+  - Bad: a math library of Lunaferra's own, whose last bit can differ from the C library's that
     PUC-Rio uses, so conformance scripts print math results with fewer digits than a float holds.
   - Bad: iOS and web hosts run only interpreted, far from the JIT's budgets.
   - Follow-up: M2.19 builds the math functions; M3.16 lets a host give a clock and a hash seed
@@ -1282,8 +1283,9 @@ it is `Proposed`, and no code may depend on it.
     `x86_64-apple-darwin`; Android on `aarch64-linux-android` and `x86_64-linux-android`, which
     emulators and Chromebooks run; iOS on `aarch64-apple-ios`, with `aarch64-apple-ios-sim` for the
     simulator; and the web on `wasm32-unknown-unknown`. The library targets all eleven; the
-    `ferrolua` command, the language server, and the debug adapter target Linux, Windows, and macOS.
-  - **The JIT where it can't run.** On iOS and the web, `ferrolua-jit` compiles to nothing, so a
+    `lunaferra` command, the language server, and the debug adapter target Linux, Windows, and
+    macOS.
+  - **The JIT where it can't run.** On iOS and the web, `lunaferra-jit` compiles to nothing, so a
     host can turn the `jit` feature on for every target. There the default mode is `JitMode::Off`,
     and `Lua::new` refuses `On` and `Forced` with an error that names the target, as ADR-0022's
     refusal names the missing feature.
@@ -1303,7 +1305,7 @@ it is `Proposed`, and no code may depend on it.
     `Options::hash_seed` gives the seed; without one there, the state uses a fixed seed, and a host
     that runs untrusted scripts sets an instruction limit, which bounds hash flooding (ADR-0020).
     `io` and file-based `require` exist there only through a host's loader.
-  - **Math.** A new crate, `ferrolua-math`, holds the functions, so constant folding, the VM's
+  - **Math.** A new crate, `lunaferra-math`, holds the functions, so constant folding, the VM's
     `**`, the JIT, and the `math` library share one implementation. Each result is within one unit
     in the last place of the exact value, and is computed with only addition, subtraction,
     multiplication, division, and square root, which IEEE 754 defines exactly, never with fused
@@ -1321,7 +1323,7 @@ it is `Proposed`, and no code may depend on it.
       emulator through `adb`. On iOS, it runs them in the simulator through `xcrun simctl spawn`.
       The owner runs both on a device before each release.
     - On the web, the harness runs the conformance and extension scripts, the saved fuzz inputs,
-      and the stored collection logs through `ferrolua`'s API. Rust's own unit tests, which its
+      and the stored collection logs through `lunaferra`'s API. Rust's own unit tests, which its
       test harness can't run in a browser, run natively.
     - Coverage is measured on Linux, Windows, and macOS, and the floor holds on each, so code only
       one operating system compiles is covered there.
@@ -1336,9 +1338,9 @@ it is `Proposed`, and no code may depend on it.
   - Good: a web host supplies the two services a browser lacks, and nothing else changes.
   - Bad: `JitMode::On` no longer guarantees compiled code; a host that needs it checks the state.
   - Bad: `string.pack` can still tell processors apart through a NaN's bits.
-  - Bad: within one unit in the last place, not correctly rounded, so Ferrolua's math can differ
+  - Bad: within one unit in the last place, not correctly rounded, so Lunaferra's math can differ
     from another correct library in the last bit.
-  - Follow-up: M2.19 builds `ferrolua-math` and its stored results; M3.16 adds `Options::clock`;
+  - Follow-up: M2.19 builds `lunaferra-math` and its stored results; M3.16 adds `Options::clock`;
     M3.4 prints NaN as `nan`; M3.17 builds the runners; M13.2 builds the executable memory of each
     operating system; M13.5 builds the fallback and the question the host asks.
 - **Alternatives considered:**
@@ -1358,9 +1360,9 @@ it is `Proposed`, and no code may depend on it.
 - **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
-  - The owner wants Ferrolua to stay easy to learn. On 2026-11-24 the owner asked the agent to
+  - The owner wants Lunaferra to stay easy to learn. On 2026-11-24 the owner asked the agent to
     draft this record as one of five improvements, and accepted it the same day.
-  - A runtime error keeps PUC-Rio Lua 5.5.1's wording where Ferrolua shares the error, because
+  - A runtime error keeps PUC-Rio Lua 5.5.1's wording where Lunaferra shares the error, because
     scripts match on it ([`specs/vm.md`](specs/vm.md#errors)), and it names only a line:
     `game.lua:12: attempt to call a nil value (global 'pirnt')`.
   - Python 3.10 added "Did you mean" suggestions for misspelled names, and Python 3.11 prints the
@@ -1372,8 +1374,8 @@ it is `Proposed`, and no code may depend on it.
   - Each instruction's debug information records the byte span of the expression it came from, not
     only its line.
   - A runtime error's message stays exactly as it is, so `pcall` and scripts see no change. Beside
-    it, `ferrolua::Error` carries the span and, where Ferrolua can work one out, a hint.
-  - Ferrolua works out a hint only once an error reaches the host, never while the script runs:
+    it, `lunaferra::Error` carries the span and, where Lunaferra can work one out, a hint.
+  - Lunaferra works out a hint only once an error reaches the host, never while the script runs:
     - for a name or field that isn't defined, the closest visible one within two edits, as in
       "did you mean `print`?";
     - for a local read before assignment, where an enclosing function has the same name,
@@ -1381,7 +1383,7 @@ it is `Proposed`, and no code may depend on it.
     - for `+` between a string and a number, "convert with `tostring(n)`, or use an f-string";
     - for indexing `nil` through `self` in a method called with `.`, "call it with `:`";
     - for a list index out of range, the list's length.
-  - The `ferrolua` command and the debugger print a runtime error in the diagnostics' text format:
+  - The `lunaferra` command and the debugger print a runtime error in the diagnostics' text format:
     the message, the file, line, and column, the source line with carets under the span, and the
     hint. `debug.traceback` keeps PUC-Rio's format.
 - **Consequences:**
@@ -1391,7 +1393,7 @@ it is `Proposed`, and no code may depend on it.
   - Bad: debug information grows by a span for each instruction, in memory and in precompiled
     chunks.
   - Bad: each hint is code that must stay right, because a wrong hint misleads; each has a test.
-  - Follow-up: M2.20 records the spans and builds the hints; M2.21 prints them in `ferrolua run`;
+  - Follow-up: M2.20 records the spans and builds the hints; M2.21 prints them in `lunaferra run`;
     M10.3 shows them in the debugger.
 - **Alternatives considered:**
   - The hint inside the message string: every tool would show it, but scripts that match messages
@@ -1420,8 +1422,8 @@ it is `Proposed`, and no code may depend on it.
     own scripts. `Limits::none()` turns the limits off and leaves the libraries as they are.
   - A limit error names the limit and the setting that raises it, such as
     `instruction limit of 1000000000 reached in one call (Limits::instructions)`.
-  - `ferrolua run` uses `Options::trusted()`, because a person runs their own scripts there, and
-    `ferrolua run --sandbox` uses the defaults.
+  - `lunaferra run` uses `Options::trusted()`, because a person runs their own scripts there, and
+    `lunaferra run --sandbox` uses the defaults.
   - M5.1's benchmarks check that no benchmark script reaches a default limit, and the numbers are
     revisited with those measurements.
 - **Consequences:**
@@ -1497,7 +1499,7 @@ it is `Proposed`, and no code may depend on it.
     loop copies the whole string each time, and building a string from n parts takes time that
     grows with n². `xs = xs + [v]` copies a list the same way. The linter warns about it, and
     f-strings and `string.join` avoid it, but learners write the loop first.
-  - CPython appends to a string in place when nothing else refers to it. Ferrolua counts
+  - CPython appends to a string in place when nothing else refers to it. Lunaferra counts
     references (ADR-0018), so it knows the same fact at no extra cost.
   - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements, and
     accepted it the same day.
@@ -1508,7 +1510,7 @@ it is `Proposed`, and no code may depend on it.
     reference, are copied as before.
   - The result equals what a copy would give, and nothing else can see the change, because nothing
     else refers to the value.
-  - The buffer grows by Ferrolua's own rule and its bytes count by the fixed charges of ADR-0021.
+  - The buffer grows by Lunaferra's own rule and its bytes count by the fixed charges of ADR-0021.
     The JIT applies the same rule, so collections fall at the same points interpreted and
     compiled.
   - An append in place drops the string's cached hash.
@@ -1533,12 +1535,12 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** a benchmark shows the check for a single owner slowing `+` on shared strings, or
   a host reports a loop that stays slow because its string is shared.
 
-## ADR-0033 — Start an interactive prompt from `ferrolua` with no arguments, in M3
+## ADR-0033 — Start an interactive prompt from `lunaferra` with no arguments, in M3
 
 - **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
-  - The backlog holds "an interactive prompt for `ferrolua` with no arguments, as `lua` has",
+  - The backlog holds "an interactive prompt for `lunaferra` with no arguments, as `lua` has",
     waiting for a user to ask. Python and Lua both start a prompt when run with no arguments, and
     learners try expressions there before they write a file.
   - With locals by default (ADR-0025), each line typed at a prompt is a chunk of its own, so every
@@ -1548,7 +1550,7 @@ it is `Proposed`, and no code may depend on it.
   - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements, and
     accepted it the same day.
 - **Decision** (the owner accepted the agent's proposal on 2026-11-24):
-  - `ferrolua` with no arguments starts a prompt when standard input is a terminal, which
+  - `lunaferra` with no arguments starts a prompt when standard input is a terminal, which
     `std::io::IsTerminal` tells. Otherwise it runs standard input as a script, as `lua -` does.
   - A line that parses as an expression prints its value as an f-string's `!r` would write it, as
     Python's prompt does. A chunk that isn't finished continues on the next line, after a `...`
@@ -1571,7 +1573,7 @@ it is `Proposed`, and no code may depend on it.
   - Keep the prompt in the backlog: no work now, but learners have nowhere to try code.
   - Each line's names lost, as Lua's prompt loses `local x`: simplest, but almost useless with
     locals by default.
-  - Raw mode with `unsafe` code in `ferrolua-cli`: history from the start, but a second crate with
+  - Raw mode with `unsafe` code in `lunaferra-cli`: history from the start, but a second crate with
     `unsafe`, which ADR-0013 rules out.
 - **Revisit when:** the standard library gains a way to set the terminal's raw mode, or a user
   reports being misled because a line behaves differently at the prompt than in a file.
@@ -1583,14 +1585,14 @@ it is `Proposed`, and no code may depend on it.
 - **Context:**
   - Every handle a host holds, such as `Value<'lua>`, `Table<'lua>`, or `Function<'lua>`, carries
     its state's lifetime, so using one after its state is dropped doesn't compile
-    ([`specs/ferrolua.md`](specs/ferrolua.md)). A host that keeps a value across calls stores it in
-    the state's registry and keeps the key instead.
+    ([`specs/lunaferra.md`](specs/lunaferra.md)). A host that keeps a value across calls stores it
+    in the state's registry and keeps the key instead.
   - Game hosts keep script callbacks in their own structures, such as an entity's `on_hit`
     handler. A lifetime parameter then spreads to every type that holds one, or the host goes
     through registry keys for each.
   - mlua, the most used Rust binding to Lua, dropped its `'lua` lifetime in version 0.10 for this
     reason, and checks a handle's state when it is used.
-  - Ferrolua's handles are already checked: a handle names a slot and its generation (ADR-0011),
+  - Lunaferra's handles are already checked: a handle names a slot and its generation (ADR-0011),
     and using a value with the wrong state already returns an error.
   - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
     embedding, and accepted it the same day.
@@ -1603,12 +1605,12 @@ it is `Proposed`, and no code may depend on it.
     returns today. Dropping a handle after its state is gone does nothing.
   - The registry stays, for hosts that want keys, but a host no longer needs it to keep a value.
 - **Consequences:**
-  - Good: a host's types hold Ferrolua values with no lifetime parameters, and a callback lives in
+  - Good: a host's types hold Lunaferra values with no lifetime parameters, and a callback lives in
     an entity as any other field does.
   - Good: examples and documentation lose most of their lifetime annotations, which new Rust
     users find hard.
   - Bad: using a value after its state is dropped is an error at run time instead of a compile
-    error, so one invariant of [`specs/ferrolua.md`](specs/ferrolua.md) changes.
+    error, so one invariant of [`specs/lunaferra.md`](specs/lunaferra.md) changes.
   - Bad: each handle carries a link to its state, and each use checks it.
   - Bad: a handle kept inside a userdata's Rust data is a reference the loop collector can't see,
     so a loop through it lives until the state is dropped. A userdata's user values, which the
@@ -1629,11 +1631,11 @@ it is `Proposed`, and no code may depend on it.
 - **Date:** 2026-11-24
 - **Context:**
   - A host registers each function with `lua.globals().set(name, lua.create_function(...))`
-    ([`specs/ferrolua.md`](specs/ferrolua.md)). The type checker and the language server learn the
+    ([`specs/lunaferra.md`](specs/lunaferra.md)). The type checker and the language server learn the
     host's API only from declaration files written by hand
     ([`specs/types.md`](specs/types.md#declarations)), which drift from the Rust code they
     describe.
-  - `ferrolua.md` leaves open how a host lists the globals it registers, so that strict mode and
+  - `lunaferra.md` leaves open how a host lists the globals it registers, so that strict mode and
     the type checker know them, and M4.6 must decide it.
   - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
     embedding, and accepted it the same day.
@@ -1641,13 +1643,13 @@ it is `Proposed`, and no code may depend on it.
   - A host describes the functions, constants, modules, and userdata types it gives scripts with an
     `Api` builder: each one's name, doc comment, and, for a function, its parameter names.
   - The types come from the Rust signature. A `TypeInfo` trait, which every `FromLua` and `IntoLua`
-    type implements, gives each Rust type its Ferrolua type: `String` is `string`, `i64` is
+    type implements, gives each Rust type its Lunaferra type: `String` is `string`, `i64` is
     `integer`, `Vec<T>` is `list<T>`, and `Option<T>` is `T?`.
   - `lua.install(&api)` registers the bindings, and `api.declarations()` writes the same API as a
-    declaration file, in the syntax M6.6 settles, which `ferrolua check`, the linter, and the
-    language server read through `declarations` in `.ferrolua.lua`.
+    declaration file, in the syntax M6.6 settles, which `lunaferra check`, the linter, and the
+    language server read through `declarations` in `.lunaferra.lua`.
   - Strict mode takes the names an installed `Api` defines as the host's globals, which answers
-    the open question in `ferrolua.md`.
+    the open question in `lunaferra.md`.
   - `create_function` stays, for functions a host makes on the fly.
 - **Consequences:**
   - Good: one description gives the bindings, the documentation on hover, completion, type
@@ -1661,12 +1663,12 @@ it is `Proposed`, and no code may depend on it.
     `Api`; M4.6 reads the names.
 - **Alternatives considered:**
   - Declaration files by hand: nothing to build, but they drift from the code.
-  - An attribute macro such as `#[ferrolua::export]` on Rust functions: the tidiest syntax, but a
-    procedural macro needs a Rust parser, which Ferrolua would have to write itself (ADR-0002).
+  - An attribute macro such as `#[lunaferra::export]` on Rust functions: the tidiest syntax, but a
+    procedural macro needs a Rust parser, which Lunaferra would have to write itself (ADR-0002).
   - Reading the host's doc comments from rustdoc's JSON output: no builder, but that output needs a
     nightly compiler.
 - **Revisit when:** hosts often describe a function as `any` because its Rust signature can't say
-  more, or Ferrolua gets a Rust parser of its own that a macro could use.
+  more, or Lunaferra gets a Rust parser of its own that a macro could use.
 
 ## ADR-0036 — Let a host add modules that `require` finds, without granting `package`
 
@@ -1686,7 +1688,7 @@ it is `Proposed`, and no code may depend on it.
     with `package`, it searches those first and then `package`'s searchers.
   - `Lua::add_module(name, value)` registers a value, usually a table or one an `Api` built
     (ADR-0035), as the module `name`.
-  - `Lua::add_source_module(name, source)` registers Ferrolua source that `require` compiles and
+  - `Lua::add_source_module(name, source)` registers Lunaferra source that `require` compiles and
     runs on first use, as it does a file, so a host can ship scripts with `include_str!`.
   - A module loads once per state. Without `package`, scripts can't read or replace the cache of
     loaded modules, because `package.loaded` doesn't exist.
@@ -1749,7 +1751,7 @@ it is `Proposed`, and no code may depend on it.
     and M13.3 pause compiled code at the same instruction.
 - **Alternatives considered:**
   - Rust `async` functions as host functions: idiomatic Rust, but they need an executor, which
-    Ferrolua would write itself, and every host would have to drive it.
+    Lunaferra would write itself, and every host would have to drive it.
   - Waiting written in Lua with `coroutine.wrap`: no API, but every host's scripts would carry the
     same scheduler code.
   - A thread for each script: real parallelism, but a state runs on one thread at a time, and

@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: "To report a security vulnerability, don't use this form: follow the
-        [security policy](https://github.com/jabbott-iii/Ferrolua/security/policy). Leave
+        [security policy](https://github.com/jabbott-iii/Lunaferra/security/policy). Leave
         passwords, tokens, and personal data out of this report."
   - type: input
     id: version
@@ -42,12 +42,12 @@ body:
     id: rustc
     attributes:
       label: "Rust version"
-      description: "The output of `rustc --version`, if you built Ferrolua or a program that embeds it."
+      description: "The output of `rustc --version`, if you built Lunaferra or a program that embeds it."
   - type: textarea
     id: script
     attributes:
-      label: "Ferrolua script or host code"
-      description: "The shortest Ferrolua script, or Rust code that embeds Ferrolua, that shows the problem."
+      label: "Lunaferra script or host code"
+      description: "The shortest Lunaferra script, or Rust code that embeds Lunaferra, that shows the problem."
       render: "lua"
     validations:
       required: true

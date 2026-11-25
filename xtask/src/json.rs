@@ -2,7 +2,7 @@
 //! tests ran. It follows RFC 8259 strictly, and keeps only what the tasks read: a number becomes
 //! [`Value::Integer`] when it is an integer that fits in a `u64`, and [`Value::Number`] otherwise.
 //!
-//! `ferrolua-json` (task M6.9) will be Ferrolua's JSON crate, but `xtask` depends on no other crate,
+//! `lunaferra-json` (task M6.9) will be Lunaferra's JSON crate, but `xtask` depends on no other crate,
 //! so it has this reader of its own.
 
 use std::fmt;

@@ -48,7 +48,7 @@ mod tests {
 
     #[test]
     fn fails_when_the_program_cannot_start() {
-        let missing = env::temp_dir().join("ferrolua-xtask-no-such-program");
+        let missing = env::temp_dir().join("lunaferra-xtask-no-such-program");
         let error = capture("missing", &mut Command::new(missing)).unwrap_err();
         assert!(matches!(
             error,

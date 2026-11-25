@@ -45,7 +45,7 @@ pub(crate) enum Error {
     NoTests,
     /// The Lua interpreter couldn't start, for example because it isn't installed.
     NoLua {
-        /// The interpreter, as `FERROLUA_PUC_LUA` or the `PATH` gave it.
+        /// The interpreter, as `LUNAFERRA_PUC_LUA` or the `PATH` gave it.
         lua: PathBuf,
         /// Why it couldn't start.
         source: io::Error,
@@ -94,7 +94,7 @@ pub(crate) enum Error {
 }
 
 /// How to fix an interpreter that `cargo xtask record` can't use.
-const INSTALL_LUA: &str = "install PUC-Rio Lua 5.5.1, or set `FERROLUA_PUC_LUA` to its path";
+const INSTALL_LUA: &str = "install PUC-Rio Lua 5.5.1, or set `LUNAFERRA_PUC_LUA` to its path";
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -239,7 +239,7 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "couldn't start `lua`: not found: install PUC-Rio Lua 5.5.1, or set \
-             `FERROLUA_PUC_LUA` to its path"
+             `LUNAFERRA_PUC_LUA` to its path"
         );
     }
 
@@ -252,7 +252,7 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "`/usr/bin/lua` reports `Lua 5.4.7  Copyright (C) 1994-2024 Lua.org, PUC-Rio` as its \
-             version, not Lua 5.5.1: install PUC-Rio Lua 5.5.1, or set `FERROLUA_PUC_LUA` to its \
+             version, not Lua 5.5.1: install PUC-Rio Lua 5.5.1, or set `LUNAFERRA_PUC_LUA` to its \
              path"
         );
     }
@@ -266,7 +266,7 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "`lua` reports no version, not Lua 5.5.1: install PUC-Rio Lua 5.5.1, or set \
-             `FERROLUA_PUC_LUA` to its path"
+             `LUNAFERRA_PUC_LUA` to its path"
         );
     }
 

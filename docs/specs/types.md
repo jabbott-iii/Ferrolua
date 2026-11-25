@@ -1,6 +1,6 @@
-# Subsystem: `ferrolua-types`
+# Subsystem: `lunaferra-types`
 
-`ferrolua-types` is Ferrolua's type checker. It checks the inline annotations of
+`lunaferra-types` is Lunaferra's type checker. It checks the inline annotations of
 [`language.md`](language.md#type-annotations-adr-0006) and the LuaCATS annotations in comments, infers
 types for unannotated locals, and reports `T` diagnostics before a script runs (ADR-0006: types are
 inline, checked before run, and only hints at run time). Typing is gradual: code without annotations
@@ -50,17 +50,17 @@ Classes are nominal: only instances of a class or its subclasses have its type.
 
 ## Declarations
 
-Types for the standard library, and for host APIs, come from declaration files: Ferrolua files
-with `declare` statements and no code, such as `declare function print(...: any)`. Ferrolua ships
+Types for the standard library, and for host APIs, come from declaration files: Lunaferra files
+with `declare` statements and no code, such as `declare function print(...: any)`. Lunaferra ships
 declarations for all of its standard library. Projects list their own in `declarations` in
-`.ferrolua.lua` ([`diagnostics.md`](diagnostics.md#configuration-ferrolualua)). M6.6 settles the
+`.lunaferra.lua` ([`diagnostics.md`](diagnostics.md#configuration-lunaferralua)). M6.6 settles the
 declaration syntax. A host writes its declaration file from the same `Api` description that
 registers its bindings, so the two never drift (ADR-0035: the host's API described once; M6.12).
 
 ## Which files are checked
 
 A file is checked when it has at least one annotation, inline or LuaCATS, or starts with
-`--!strict`, or when `.ferrolua.lua` sets `types = { check_all = true }`. Other files get no `T`
+`--!strict`, or when `.lunaferra.lua` sets `types = { check_all = true }`. Other files get no `T`
 diagnostics, so adding the checker to an untyped project reports nothing until the project opts
 in.
 
@@ -88,7 +88,7 @@ the conflict.
   types.
 - Invariant 3: a property test on generated typed programs.
 - Invariant 4: a test runs the checker on every conformance script with `check_all` on. The lines
-  that pass wrong arguments on purpose carry a `--ferrolua:allow` comment for their `T` code, and
+  that pass wrong arguments on purpose carry a `--lunaferra:allow` comment for their `T` code, and
   the test expects no other `T` diagnostics.
 - Each `T` code has a test file in `crates/types/tests/` with one case that triggers it and one
   near miss that doesn't.

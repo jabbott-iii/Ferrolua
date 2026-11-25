@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-cli"
+name = "lunaferra-cli"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

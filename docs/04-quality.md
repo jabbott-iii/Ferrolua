@@ -1,9 +1,9 @@
 # 04 — Quality
 
-Ferrolua's tests guard three things: that it runs its language as the specs define it, and the part
+Lunaferra's tests guard three things: that it runs its language as the specs define it, and the part
 it keeps from Lua 5.5 exactly as PUC-Rio Lua 5.5.1 does; that a hostile script can't break memory
 safety or the host; and that it stays within its performance budgets. This document lists the test
-layers, the test tools Ferrolua writes for itself, the checks every change passes, and the review
+layers, the test tools Lunaferra writes for itself, the checks every change passes, and the review
 checklists. The rules behind it are [`.claude/rules/testing.md`](../.claude/rules/testing.md), which
 forbids weakening a test to make it pass and sets coverage at 100% of lines and regions.
 
@@ -13,11 +13,11 @@ forbids weakening a test to make it pass and sets coverage at 100% of lines and 
 | :- | :- | :- |
 | Unit tests | `#[cfg(test)] mod tests` beside the code | Each function's outcomes and edges |
 | Integration tests | Each crate's `tests/` | The crate through its public API only |
-| Conformance scripts | `tests/conformance/` | Behavior Ferrolua keeps from Lua 5.5, against the output PUC-Rio Lua 5.5.1 printed for each script's Lua 5.5 twin, interpreted and with the JIT forced on |
+| Conformance scripts | `tests/conformance/` | Behavior Lunaferra keeps from Lua 5.5, against the output PUC-Rio Lua 5.5.1 printed for each script's Lua 5.5 twin, interpreted and with the JIT forced on |
 | Extension scripts | `tests/extensions/` | Behavior with no Lua 5.5 counterpart: Python's operators, indexes, ranges, f-strings, scoping, collections, and truth, the language extensions, and the intended differences, against output written from the spec |
-| Differential tests | `crates/ferrolua/tests/` and a fuzz target | The interpreter and the JIT print the same output, raise the same errors, and give the same collection log |
-| Determinism tests | `crates/ferrolua/tests/` | Two runs with a fixed hash seed give the same collection log, which matches the log stored for the script, on every target ([`specs/memory.md`](specs/memory.md#determinism)) |
-| Property tests | Beside the code, using `ferrolua-testkit` | Laws that hold for every input, such as "formatting doesn't change the bytecode" |
+| Differential tests | `crates/lunaferra/tests/` and a fuzz target | The interpreter and the JIT print the same output, raise the same errors, and give the same collection log |
+| Determinism tests | `crates/lunaferra/tests/` | Two runs with a fixed hash seed give the same collection log, which matches the log stored for the script, on every target ([`specs/memory.md`](specs/memory.md#determinism)) |
+| Property tests | Beside the code, using `lunaferra-testkit` | Laws that hold for every input, such as "formatting doesn't change the bytecode" |
 | Hostile-input tests | `tests/hostile_*.rs` in each crate that reads outside data | Empty, oversized, malformed, truncated, and deeply nested input, and each limit one past its value |
 | Fuzzing | `fuzz/`, with crashes saved in `fuzz/regressions/` | Every parser and loader of outside data, for crashes and hangs |
 | Benchmarks | `benches/` in each crate, and `benches/lua/` | Run time and memory against the budgets in [`00-overview.md`](00-overview.md) |
@@ -28,40 +28,40 @@ every saved fuzz input.
 
 ### Conformance scripts
 
-PUC-Rio Lua can't run Ferrolua's scripts (ADR-0023: a language of its own, with Python's operators
-and 0-based indexes), so each feature Ferrolua keeps from Lua 5.5 has a pair of scripts, named
+PUC-Rio Lua can't run Lunaferra's scripts (ADR-0023: a language of its own, with Python's operators
+and 0-based indexes), so each feature Lunaferra keeps from Lua 5.5 has a pair of scripts, named
 after the feature, such as `goto.lua`:
 
-- `tests/conformance/goto.lua`, written in Ferrolua;
+- `tests/conformance/goto.lua`, written in Lunaferra;
 - `tests/conformance/reference/goto.lua`, its twin in plain Lua 5.5, with `goto.out` beside it,
   holding what PUC-Rio Lua 5.5.1 printed for the twin.
 
 The twins make the same calls in the same order, keep each statement on the same line so that line
 numbers in messages agree, and print the same text. Where a value means something different in
-the two languages, the reference script prints it in Ferrolua's terms. A Lua position `i` prints as
-`i - 1`. The end `j` of a Lua range from `i` to `j` prints unchanged, because Ferrolua's range for
+the two languages, the reference script prints it in Lunaferra's terms. A Lua position `i` prints as
+`i - 1`. The end `j` of a Lua range from `i` to `j` prints unchanged, because Lunaferra's range for
 the same elements stops before `j`. Both scripts run under their file name alone as the chunk name,
 such as `goto.lua`, so messages name the same chunk. A script without a twin, or a twin without a
 script, fails the runner.
 
-A Rust test in `crates/ferrolua/tests/conformance.rs` runs each Ferrolua script in a fresh state
+A Rust test in `crates/lunaferra/tests/conformance.rs` runs each Lunaferra script in a fresh state
 with the full standard library, captures what it prints, and compares the bytes with its twin's
 `.out` file. It runs each script twice: interpreted, and with the JIT compiling every function on
-its first call. The second run needs the `ferrolua` crate's `jit` feature, which is off by default
+its first call. The second run needs the `lunaferra` crate's `jit` feature, which is off by default
 (ADR-0022: the JIT is an optional feature), so CI runs the runner with the feature on.
 
 A script's output must not depend on what Lua leaves unspecified, or the recorded output won't
 repeat:
 
 - the order `pairs` and `next` visit keys, so scripts sort keys before printing them;
-- how objects print: `tostring` shows an ID for a table or a function on Ferrolua (ADR-0019:
+- how objects print: `tostring` shows an ID for a table or a function on Lunaferra (ADR-0019:
   objects print as IDs, never addresses) but an address on PUC-Rio, so conformance scripts never
   print one, while extension scripts may;
 - the time, and `math.random` without a fixed seed;
-- the sign of a NaN, which PUC-Rio prints as `-nan` or `nan` by processor while Ferrolua always
+- the sign of a NaN, which PUC-Rio prints as `-nan` or `nan` by processor while Lunaferra always
   prints `nan`, and the last digits of `math` functions, which come from the C library on PUC-Rio
-  and from `ferrolua-math` on Ferrolua (ADR-0027), so scripts print those with `%.12g`;
-- when a value outside a loop is freed, which is earlier on Ferrolua by design (ADR-0018:
+  and from `lunaferra-math` on Lunaferra (ADR-0027), so scripts print those with `%.12g`;
+- when a value outside a loop is freed, which is earlier on Lunaferra by design (ADR-0018:
   reference counting plus a deterministic loop collector). A script that observes freeing only
   after calling `collectgarbage()` behaves as on PUC-Rio and stays in `tests/conformance/`;
   one that observes it earlier goes in `tests/extensions/`.
@@ -71,10 +71,10 @@ difference before committing it.
 
 ## The project's own test tools
 
-ADR-0002 (Ferrolua uses no third-party code) rules out test libraries, so Ferrolua writes these.
+ADR-0002 (Lunaferra uses no third-party code) rules out test libraries, so Lunaferra writes these.
 Each is tested like any other code.
 
-### `ferrolua-testkit`
+### `lunaferra-testkit`
 
 A dev-dependency of the other crates, never published (M0.2):
 
@@ -83,7 +83,7 @@ A dev-dependency of the other crates, never published (M0.2):
   of the reference code that their authors publish at <https://prng.di.unimi.it/>;
 - a property-test runner: it checks a property against a fixed number of generated cases, and on a
   failure, shrinks the case to a smaller one that still fails and reports the seed;
-- a generator of valid Ferrolua programs (M1.9), built from the grammar in
+- a generator of valid Lunaferra programs (M1.9), built from the grammar in
   [`specs/syntax.md`](specs/syntax.md) and [`specs/language.md`](specs/language.md), which the
   fuzzer and the property tests share.
 
@@ -100,11 +100,11 @@ edits while shrinking. Case `i` uses seed `seed + i`, so the seed of a failing c
 alone. `Config::check` returns the failure, and `Config::assert` panics with a report of the seed,
 the shrunk case, and the original case, which the test harness prints.
 
-### `ferrolua-fuzz`
+### `lunaferra-fuzz`
 
 The fuzzer, a program in `fuzz/` that `cargo xtask fuzz` builds and runs (M0.4). A fuzzer feeds a
 target, such as the parser, a large number of inputs, and reports each one that makes the target
-fail. Ferrolua's fuzzer isn't coverage-guided, because stable Rust offers no way to read coverage
+fail. Lunaferra's fuzzer isn't coverage-guided, because stable Rust offers no way to read coverage
 counters while a program runs. It makes up for that in three ways:
 
 - **Mutation:** each run takes an input from `fuzz/corpus/<target>/` and changes it with one to
@@ -135,7 +135,7 @@ location.
 
 `cargo test` replays every saved input, each in a child process under the time limit, through the
 test `every_input_saved_in_the_repository_runs_as_it_should` in `fuzz/tests/fuzzer.rs`. A saved
-input of a target that checks Ferrolua's code must pass. The two fixture targets, `fixture-panic`
+input of a target that checks Lunaferra's code must pass. The two fixture targets, `fixture-panic`
 and `fixture-hang`, fail on purpose, to give the fuzzer's own tests something to find, and their
 saved inputs must still fail as each is built to.
 
@@ -149,15 +149,15 @@ cargo xtask fuzz --replay-saved
 `fuzz/src/target.rs` that takes an input's bytes, and it must keep no state from one input to the
 next, because a child runs many inputs, and shrinking runs one again alone.
 
-### `ferrolua-webtest`
+### `lunaferra-webtest`
 
 The WebAssembly test module of the browser harness, in `xtask/webtest/` (M3.17). Rust's test harness
 can't run in a browser, so this module, built for `wasm32-unknown-unknown`, runs the conformance and
-extension scripts, the saved fuzz inputs, and the stored collection logs through `ferrolua`'s API,
+extension scripts, the saved fuzz inputs, and the stored collection logs through `lunaferra`'s API,
 and reports each result to the page that loaded it.
 `cargo xtask test --target wasm32-unknown-unknown` serves the module and the page from a local HTTP
 server written with the standard library, opens the page in a headless browser, and collects the
-results (ADR-0027: a browser harness of Ferrolua's own).
+results (ADR-0027: a browser harness of Lunaferra's own).
 
 ### `xtask`
 
@@ -184,26 +184,26 @@ Build tasks run with `cargo xtask`, written with the standard library alone:
 - `cargo xtask record [script]` (M0.5): runs PUC-Rio Lua 5.5.1 on the reference scripts in
   `tests/conformance/reference/`, or on the one script named, and saves what each prints to
   standard output in a `.out` file beside it, such as `goto.out` for `goto.lua`. It reads the
-  interpreter's path from `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`, and refuses an
+  interpreter's path from `LUNAFERRA_PUC_LUA`, or finds `lua` on the `PATH`, and refuses an
   interpreter whose `lua -v` doesn't report 5.5.1. Its rules:
   - It runs each script as `lua -E goto.lua` from that folder, so Lua names the chunk `goto.lua`,
     as the twins require. `-E` makes Lua ignore `LUA_INIT`, `LUA_PATH`, and its other
     environment variables, which could change what a script prints, and each script reads an empty
     standard input.
   - A named script must be one of the `.lua` files in `tests/conformance/reference/`, so it
-    refuses the Ferrolua script `tests/conformance/goto.lua`.
+    refuses the Lunaferra script `tests/conformance/goto.lua`.
   - It saves the `.out` files only after Lua has run every script and exited with status 0 each
     time. If any script stops with an error, it saves no `.out` file, and Lua's message appears on
     standard error.
   - It prints one line for each `.out` file, which says whether the file is `new`, `changed`, or
     `unchanged`, and leaves an unchanged file as it is.
-- `cargo xtask fuzz [arguments]` (M0.4): builds `ferrolua-fuzz` and runs it with the arguments
+- `cargo xtask fuzz [arguments]` (M0.4): builds `lunaferra-fuzz` and runs it with the arguments
   after `fuzz`, as the section above describes, and exits with its status. Unlike the other tasks,
   it leaves the report to the fuzzer.
 - `cargo xtask test --target <triple>` (M3.17): runs the tests on any target in
   [`03-platforms.md`](03-platforms.md#how-tests-run-on-each-target), natively, in the Android
-  emulator, in the iOS simulator, or in a headless browser through a harness of Ferrolua's own.
-- `cargo xtask bench` (M5.1): runs each script in `benches/lua/` on Ferrolua, and its Lua 5.5
+  emulator, in the iOS simulator, or in a headless browser through a harness of Lunaferra's own.
+- `cargo xtask bench` (M5.1): runs each script in `benches/lua/` on Lunaferra, and its Lua 5.5
   twin in `benches/lua/reference/` on PUC-Rio Lua 5.5.1, and reports the median of several runs.
 
 ## Automated checks
@@ -219,8 +219,8 @@ cargo xtask coverage
 cargo tree --workspace --edges normal,build,dev --target all --prefix none
 ```
 
-The last command must list only Ferrolua's own crates. Once M7 lands, `ferrolua fmt --check` and
-`ferrolua lint` also check every Ferrolua script in `tests/` and `benches/`, skipping the Lua 5.5
+The last command must list only Lunaferra's own crates. Once M7 lands, `lunaferra fmt --check` and
+`lunaferra lint` also check every Lunaferra script in `tests/` and `benches/`, skipping the Lua 5.5
 twins in `reference/` folders.
 
 ## Continuous integration

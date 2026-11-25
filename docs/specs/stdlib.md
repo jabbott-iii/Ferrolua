@@ -1,8 +1,8 @@
-# Subsystem: `ferrolua-stdlib`
+# Subsystem: `lunaferra-stdlib`
 
-`ferrolua-stdlib` implements Lua 5.5's standard libraries, §6 of the manual: the base library,
+`lunaferra-stdlib` implements Lua 5.5's standard libraries, §6 of the manual: the base library,
 `coroutine`, `package`, `string`, `utf8`, `table`, `math`, `io`, `os`, and `debug`, and the `list`,
-`tuple`, and `set` libraries and f-string formatting that Ferrolua adds (ADR-0025: f-strings,
+`tuple`, and `set` libraries and f-string formatting that Lunaferra adds (ADR-0025: f-strings,
 locals by default, lists, tuples, and sets, and Python's truth). Positions count
 from 0, ranges stop before their end, and no argument converts between strings and numbers
 (ADR-0023: a language of its own, with Python's operators and 0-based indexes). Apart from those
@@ -17,7 +17,7 @@ the rest in M3.
 
 Scripts depend on exact output: the digits `string.format("%g", x)` prints, the matches a pattern
 finds, the order `table.sort` leaves equal elements in. Matching PUC-Rio means reproducing its
-behavior, which conformance scripts record. ADR-0002 (no third-party code) means Ferrolua writes
+behavior, which conformance scripts record. ADR-0002 (no third-party code) means Lunaferra writes
 each function itself instead of copying PUC-Rio's C. A task may read PUC-Rio's source to learn what
 it does, and its conformance scripts then prove the Rust version does the same.
 
@@ -76,13 +76,13 @@ Pattern capture numbers, stack levels, line numbers, `file:seek` offsets, and th
 | Base | `print` writes through the host's output sink; `load` and `loadfile` accept mode `"t"`, and `"b"` only when the host allows precompiled chunks; `collectgarbage` follows [`memory.md`](memory.md#collectgarbage); `_VERSION` is `"Lua 5.5"`; `assert` tests truth as [`language.md`](language.md#truth-adr-0025) defines it; `type` also returns `"list"`, `"tuple"`, and `"set"`; and `list`, `tuple`, `set`, and `format` are new |
 | `coroutine` | Every function in §6.2, including `close` and `isyieldable` |
 | `package` | `require`, which exists in every state and finds the host's modules first (ADR-0036: modules a host adds for `require`), `package.loaded`, `package.preload`, `package.path`, `package.searchpath`, and a Lua searcher that reads files through the host's loader; `package.loadlib` returns `nil` and an error message, and `package.cpath` has no searcher (ADR-0017) |
-| `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, `dump` in Ferrolua's chunk format, and `join` (ADR-0026) |
+| `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, `dump` in Lunaferra's chunk format, and `join` (ADR-0026) |
 | `utf8` | Every function, with Lua 5.5's `lax` argument and the end position from `utf8.offset` |
 | `table` | `create`, `concat`, `insert`, `move`, `pack`, `remove`, `sort`, and `unpack`; `sort` uses PUC-Rio's algorithm, so equal elements end up in the same order and `invalid order function for sorting` is raised in the same cases |
-| `math` | Every function IEEE 754 doesn't define exactly comes from `ferrolua-math`, with the same bits on every target (ADR-0027: six platforms, the same results everywhere); `math.random` uses xoshiro256**, seeded as PUC-Rio seeds it, so `math.randomseed(42)` gives the same sequence; `math.randomseed()` with no argument takes its seed from `RandomState`, or from the host's seed where the standard library has no source of randomness |
+| `math` | Every function IEEE 754 doesn't define exactly comes from `lunaferra-math`, with the same bits on every target (ADR-0027: six platforms, the same results everywhere); `math.random` uses xoshiro256**, seeded as PUC-Rio seeds it, so `math.randomseed(42)` gives the same sequence; `math.randomseed()` with no argument takes its seed from `RandomState`, or from the host's seed where the standard library has no source of randomness |
 | `io` | File handles as userdata with `__close` and `__gc`, shown by their IDs; opened only under the file access policy |
-| `os` | Time functions always, from the host's clock where the standard library has none, as on the web ([`ferrolua.md`](ferrolua.md)); the rest only when granted; `os.exit` returns an exit error to the host |
-| `debug` | Every function in §6.10, working on Ferrolua's frames, locals, and upvalues; `upvalueid` returns an integer ID |
+| `os` | Time functions always, from the host's clock where the standard library has none, as on the web ([`lunaferra.md`](lunaferra.md)); the rest only when granted; `os.exit` returns an exit error to the host |
+| `debug` | Every function in §6.10, working on Lunaferra's frames, locals, and upvalues; `upvalueid` returns an integer ID |
 
 | `list`, `tuple`, and `set` | The methods of [Lists, tuples, and sets](#lists-tuples-and-sets) |
 
@@ -125,7 +125,7 @@ spec ::= [[fill]align][sign]['z']['#']['0'][width][grouping]['.' precision][type
 - Integers take the types `b`, `c`, `d`, `o`, `x`, `X`, and `n`; floats take `e`, `E`, `f`, `F`,
   `g`, `G`, `n`, and `%`; strings take `s`. Without a type, an integer formats as `d`, a string as
   `s`, and a float with the digits `tostring` prints, unless a precision is given.
-- `n` formats as `d` or `g` does, because Ferrolua has no locale.
+- `n` formats as `d` or `g` does, because Lunaferra has no locale.
 - Floats use the same exact decimal conversion as `string.format`, below.
 - A value whose metatable has `__format` is formatted by `__format(value, spec)`, which must
   return a string (ADR-0026). A spec on any other value that isn't a number or a string
@@ -137,7 +137,7 @@ spec ::= [[fill]align][sign]['z']['#']['0'][width][grouping]['.' precision][type
 ## Number formatting
 
 `tostring` on a float, `string.format` with `%a`, `%e`, `%f`, and `%g`, and `%q` all print the
-exact characters PUC-Rio prints, which comes from the C library's `printf` on Linux. Ferrolua
+exact characters PUC-Rio prints, which comes from the C library's `printf` on Linux. Lunaferra
 formats floats itself, with exact decimal conversion so rounding matches in every case, including
 subnormal numbers, `inf`, and `-inf`. Every NaN prints as `nan`, whatever its sign, because
 processors give a new NaN different signs and the same script must print the same text on every
@@ -146,11 +146,11 @@ scripts don't print NaN.
 
 ## Object IDs in output
 
-Where PUC-Rio Lua prints an address, Ferrolua prints the object's ID from
+Where PUC-Rio Lua prints an address, Lunaferra prints the object's ID from
 [`memory.md`](memory.md#object-ids), written `#` followed by the number in decimal (ADR-0019).
 The `#` keeps an ID from reading as a number or as an address.
 
-| Where | PUC-Rio prints | Ferrolua prints |
+| Where | PUC-Rio prints | Lunaferra prints |
 | :- | :- | :- |
 | `tostring` and `print` of a table, function, thread, or userdata without `__tostring` | `table: 0x5581f1a3c2a0` | `table: #42` |
 | The same, with a string `__name` in the metatable | `Point: 0x5581f1a3c2a0` | `Point: #42` |

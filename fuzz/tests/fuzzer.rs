@@ -1,5 +1,5 @@
-//! Runs the `ferrolua-fuzz` program the way `cargo xtask fuzz` does, and checks what it reports and
-//! saves. Each test keeps its files in a folder of its own under the target folder, so no test
+//! Runs the `lunaferra-fuzz` program the way `cargo xtask fuzz` does, and checks what it reports
+//! and saves. Each test keeps its files in a folder of its own under the target folder, so no test
 //! writes to `fuzz/corpus/` or `fuzz/regressions/`, except the one that replays every input saved
 //! there, which only reads them.
 
@@ -29,7 +29,7 @@ fn folder(name: &str) -> PathBuf {
 
 /// A command that runs the fuzzer with `args`.
 fn fuzzer(args: &[&str]) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_ferrolua-fuzz"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_lunaferra-fuzz"));
     command.args(args).env_remove("RUST_BACKTRACE");
     command
 }
@@ -287,7 +287,7 @@ fn fails_when_a_folder_of_saved_inputs_is_named_after_no_target() {
 }
 
 /// The test that `cargo test` replays every saved input with: each input in
-/// `fuzz/regressions/` must run as its target says, which for a target that checks Ferrolua's code
+/// `fuzz/regressions/` must run as its target says, which for a target that checks Lunaferra's code
 /// means it passes.
 #[test]
 fn every_input_saved_in_the_repository_runs_as_it_should() {

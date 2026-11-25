@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-testkit"
+name = "lunaferra-testkit"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

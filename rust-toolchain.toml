@@ -1,4 +1,4 @@
-# The Rust version Ferrolua builds with. `llvm-tools` provides `llvm-profdata` and `llvm-cov` for
+# The Rust version Lunaferra builds with. `llvm-tools` provides `llvm-profdata` and `llvm-cov` for
 # `cargo xtask coverage`. Change this file only in a commit of its own.
 [toolchain]
 channel = "1.100.0"

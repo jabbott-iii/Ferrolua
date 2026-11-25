@@ -1,6 +1,6 @@
-# Subsystem: `ferrolua-math`
+# Subsystem: `lunaferra-math`
 
-`ferrolua-math` computes the floating-point functions that IEEE 754, the floating-point standard,
+`lunaferra-math` computes the floating-point functions that IEEE 754, the floating-point standard,
 doesn't define exactly, such as sine, the exponential, the logarithm, and float powers. It uses
 only the operations IEEE 754 does define exactly, so it gives the same bits on every target
 (ADR-0027: six platforms, and the same results on each). The compiler's constant folding, the
@@ -8,7 +8,7 @@ VM's `**`, the JIT, and the `math` library all call it, so a value never depends
 computed it. Its accuracy and its place as a crate of its own come from ADR-0028. It lands in
 M2.19.
 
-## Why a math library of Ferrolua's own
+## Why a math library of Lunaferra's own
 
 Rust's `f64::sin`, `f64::exp`, `f64::powf`, and their kin call each platform's math library:
 glibc on Linux, Microsoft's on Windows, Apple's on macOS and iOS, Bionic on Android, and a
@@ -60,7 +60,7 @@ each of them exactly, so the VM and the library compute them directly.
 ## Tests
 
 - Invariants 1 and 2: the stored file lists inputs, each input's exact value to 40 digits, and the
-  bits of Ferrolua's result, including zeros, subnormal numbers, the largest floats, `inf`, `nan`,
+  bits of Lunaferra's result, including zeros, subnormal numbers, the largest floats, `inf`, `nan`,
   and the inputs near which each function's result changes fastest. A contributor computes the
   exact values with any high-precision tool; the project doesn't depend on one. The test runs on
   every target in CI from M3.18 on ([`03-platforms.md`](../03-platforms.md)).

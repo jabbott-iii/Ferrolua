@@ -33,7 +33,7 @@ impl SplitMix64 {
     }
 }
 
-/// xoshiro256**, the generator behind every random choice in Ferrolua's tests: 256 bits of state,
+/// xoshiro256**, the generator behind every random choice in Lunaferra's tests: 256 bits of state,
 /// 64-bit outputs, and a period of 2^256 − 1.
 ///
 /// It isn't a cryptographic generator, so never use it for keys or other secrets.

@@ -1,11 +1,11 @@
-# Subsystem: `ferrolua-lsp`
+# Subsystem: `lunaferra-lsp`
 
-`ferrolua-lsp` is Ferrolua's language server. It speaks the Language Server Protocol (LSP) 3.17
+`lunaferra-lsp` is Lunaferra's language server. It speaks the Language Server Protocol (LSP) 3.17
 over standard input and output, so any editor with an LSP client gets auto complete, diagnostics,
-hover, navigation, renaming, and formatting for Lua and Ferrolua files (ADR-0015, proposed). It
+hover, navigation, renaming, and formatting for Lua and Lunaferra files (ADR-0015, proposed). It
 builds on the shared model of [`analysis.md`](analysis.md) and the types of [`types.md`](types.md),
 so completion knows the fields of typed tables, the members of classes, the exports of required
-modules, and the standard library. `ferrolua lsp` starts it. It lands in M9.
+modules, and the standard library. `lunaferra lsp` starts it. It lands in M9.
 
 ## Why completion is built on types
 
@@ -52,5 +52,5 @@ the newest one.
 - Invariant 2: a benchmark in `crates/lsp/benches/` that M9.6 makes a failing check.
 - Invariant 3: a property test inserts each item at generated cursor positions.
 - Invariant 4: a property test on generated projects.
-- End-to-end tests start `ferrolua lsp` as a process and drive it through its standard input and
+- End-to-end tests start `lunaferra lsp` as a process and drive it through its standard input and
   output, as an editor would.

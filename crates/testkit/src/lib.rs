@@ -1,9 +1,9 @@
-//! `ferrolua-testkit` holds the test tools that Ferrolua writes for itself: a seeded random
-//! generator, and a property-test runner that shrinks a failing case. ADR-0002 (Ferrolua uses no
+//! `lunaferra-testkit` holds the test tools that Lunaferra writes for itself: a seeded random
+//! generator, and a property-test runner that shrinks a failing case. ADR-0002 (Lunaferra uses no
 //! third-party code) rules out test libraries, so these take their place.
 //!
 //! The other crates use it only as a dev-dependency, and it is never published, as the [quality
-//! document] describes. It depends on nothing but the standard library. A generator of Ferrolua
+//! document] describes. It depends on nothing but the standard library. A generator of Lunaferra
 //! programs joins it in task M1.9 of the [roadmap], which adds the fuzz targets for the lexer and
 //! the parser.
 //!
@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```
-//! use ferrolua_testkit::Config;
+//! use lunaferra_testkit::Config;
 //!
 //! // Reversing a list twice gives back the list.
 //! Config::default().assert(
@@ -60,8 +60,8 @@
 //! target, as long as the generator and the property are deterministic. [`Config`] says which
 //! seed each case uses, and [`Failure`] reports the seed of the case that failed.
 //!
-//! [quality document]: https://github.com/jabbott-iii/Ferrolua/blob/main/docs/04-quality.md#ferrolua-testkit
-//! [roadmap]: https://github.com/jabbott-iii/Ferrolua/blob/main/docs/roadmap.md
+//! [quality document]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/04-quality.md#lunaferra-testkit
+//! [roadmap]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/roadmap.md
 
 mod property;
 mod rng;

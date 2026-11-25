@@ -25,7 +25,7 @@ party, and until **Approved exceptions** is filled in, treat it as "none".
 - **Allowed publishers:** `https://github.com/jabbott-iii` and `https://crates.io/users/jabbott-iii`
 - **Platform:** Rust's toolchain from rustup at the version in `rust-toolchain.toml` (rustc, Cargo,
   the standard library, rustdoc, rustfmt, Clippy, and the `llvm-tools` component), PUC-Rio Lua 5.5
-  from lua.org, the reference interpreter for the part of Ferrolua's language kept from Lua 5.5,
+  from lua.org, the reference interpreter for the part of Lunaferra's language kept from Lua 5.5,
   the six platforms of `docs/03-platforms.md` with their own tools (Linux on x86-64 and AArch64;
   Windows with Microsoft's compiler tools and Windows SDK; macOS and iOS with Apple's Xcode, its
   SDKs, and the iOS simulator; Android with Google's Android SDK, NDK, and emulator; and the web
@@ -34,8 +34,8 @@ party, and until **Approved exceptions** is filled in, treat it as "none".
 - **Manifests:** the `Cargo.toml` files, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/config.toml`,
   the `uses:` lines in `.github/workflows/`, and `.gitmodules`, which doesn't exist yet
 - **Tree commands:** `cargo tree --workspace --edges normal,build,dev --target all --prefix none`.
-  It must list only Ferrolua's own crates
-- **Approved exceptions:** none. Ferrolua uses no third-party code, including test, lint, and
+  It must list only Lunaferra's own crates
+- **Approved exceptions:** none. Lunaferra uses no third-party code, including test, lint, and
   format tools. A proposed exception first needs an accepted architecture decision record (ADR) in
   `docs/decisions.md`, and approved ones are listed in `docs/02-dependency-policy.md`
 

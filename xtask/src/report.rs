@@ -429,7 +429,7 @@ mod tests {
         let report = Report {
             rows: vec![
                 row("alpha", tally(12, 12), tally(20, 20)),
-                row("ferrolua-empty", tally(0, 0), tally(0, 0)),
+                row("lunaferra-none", tally(0, 0), tally(0, 0)),
                 row("beta", tally(3, 3), tally(5, 5)),
             ],
             misses: Vec::new(),
@@ -438,7 +438,7 @@ mod tests {
             report.render(),
             "crate                   lines        regions\n\
              alpha           12/12 100.00%  20/20 100.00%\n\
-             ferrolua-empty    0/0       -    0/0       -\n\
+             lunaferra-none    0/0       -    0/0       -\n\
              beta              3/3 100.00%    5/5 100.00%\n\
              total           15/15 100.00%  25/25 100.00%\n\
              \n\

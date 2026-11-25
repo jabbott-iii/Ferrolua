@@ -18,21 +18,22 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
   and manifests, and the steps in `roadmap-and-docs.md` and `writing.md`
 - **Never commit:** `target/`, `debug/`, `**/*.rs.bk`, `*.pdb`, `**/mutants.out*/`, and
   `rustc-ice-*.txt`, as `.gitignore` lists
-- **Push effect:** none yet: Ferrolua has no GitHub Actions workflows. The repository is public, so
+- **Push effect:** none yet: Lunaferra has no GitHub Actions workflows. The repository is public, so
   a push to `main` publishes the code
-- **Scopes:** the crate names in the crate map of `docs/01-architecture.md`, without any `ferrolua-`
-  prefix; `workspace` for the root `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `clippy.toml`,
-  and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for `.claude/` and `CLAUDE.md`
+- **Scopes:** the crate names in the crate map of `docs/01-architecture.md`, without any
+  `lunaferra-` prefix; `workspace` for the root `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`,
+  `clippy.toml`, and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for `.claude/` and
+  `CLAUDE.md`
 - **Changes that travel together:** a roadmap task's code, tests, ticked checkbox, and the **Status
-  locations** of `roadmap-and-docs.md`; a change to how Ferrolua runs a script with the conformance
+  locations** of `roadmap-and-docs.md`; a change to how Lunaferra runs a script with the conformance
   or extension script that covers it, and a conformance script with its Lua 5.5 twin; an `unsafe`
   block with its `// SAFETY:` comment and the test that exercises it; and a change to a published
   crate's public API with its doc comments and its crate README
 - **Task IDs:** end the summary with the roadmap task's ID in parentheses, for example
   `feat: parse goto statements and labels (M1.3)`, when the commit finishes or advances one
 - **Breaking changes:** a break in a published crate's public API (see **Public API** in `rust.md`);
-  a change to how a valid Ferrolua script runs; a new intended difference from how PUC-Rio
-  Lua 5.5.1 runs the part of the language Ferrolua keeps from Lua 5.5; and a renamed or removed
+  a change to how a valid Lunaferra script runs; a new intended difference from how PUC-Rio
+  Lua 5.5.1 runs the part of the language Lunaferra keeps from Lua 5.5; and a renamed or removed
   diagnostic code that users' lint settings refer to. Each adds `BREAKING CHANGE:` and names the
   architecture decision record (ADR) in `docs/decisions.md` that records it
 

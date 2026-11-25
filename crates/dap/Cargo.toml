@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-dap"
+name = "lunaferra-dap"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

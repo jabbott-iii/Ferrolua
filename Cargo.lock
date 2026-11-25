@@ -3,86 +3,86 @@
 version = 4
 
 [[package]]
-name = "ferrolua"
+name = "lunaferra"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-analysis"
+name = "lunaferra-analysis"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-bytecode"
+name = "lunaferra-bytecode"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-cli"
+name = "lunaferra-cli"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-compiler"
+name = "lunaferra-compiler"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-dap"
+name = "lunaferra-dap"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-fmt"
+name = "lunaferra-fmt"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-fuzz"
+name = "lunaferra-fuzz"
 version = "0.0.0"
 dependencies = [
- "ferrolua-testkit",
+ "lunaferra-testkit",
 ]
 
 [[package]]
-name = "ferrolua-jit"
+name = "lunaferra-jit"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-json"
+name = "lunaferra-json"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-lint"
+name = "lunaferra-lint"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-lsp"
+name = "lunaferra-lsp"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-math"
+name = "lunaferra-math"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-sast"
+name = "lunaferra-sast"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-stdlib"
+name = "lunaferra-stdlib"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-syntax"
+name = "lunaferra-syntax"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-testkit"
+name = "lunaferra-testkit"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-types"
+name = "lunaferra-types"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-vm"
+name = "lunaferra-vm"
 version = "0.0.0"
 
 [[package]]
-name = "ferrolua-webtest"
+name = "lunaferra-webtest"
 version = "0.0.0"
 
 [[package]]

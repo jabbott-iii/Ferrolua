@@ -3,14 +3,14 @@
 This spec is the contract between a host and the scripts it runs: which libraries a script can
 reach, which limits stop it, and what a hostile script can and can't do. The VM is the sandbox
 (ADR-0014, proposed: hosts allowlist libraries, and the VM enforces limits that `pcall` can't
-catch). `ferrolua-vm` enforces the limits, `ferrolua-stdlib` honors the library choices, and
-`ferrolua` exposes both to hosts. The limits land in M3.2, and the library allowlist in M3.13.
+catch). `lunaferra-vm` enforces the limits, `lunaferra-stdlib` honors the library choices, and
+`lunaferra` exposes both to hosts. The limits land in M3.2, and the library allowlist in M3.13.
 
 ## Why the VM is the sandbox
 
 Hosts embed Lua to run code they didn't write: game mods, user plugins, rules in a server. An
 operating system sandbox, such as a separate process, is strong but heavy for a host that runs
-thousands of small scripts, and differs on every platform. Ferrolua instead gives a script only the
+thousands of small scripts, and differs on every platform. Lunaferra instead gives a script only the
 functions its host grants, and counts every resource a script uses inside the VM, including the
 work done inside library functions, so a host never depends on a script's cooperation. The cost is
 a check on each counted resource, and a limit error that `pcall` can't catch, unlike PUC-Rio Lua's
@@ -35,7 +35,7 @@ a state unless the host registers it.
 | Precompiled chunks | Off | `load` with mode `"b"` and `string.dump` (ADR-0010) |
 
 Two presets cover common cases: `Libraries::SAFE`, the defaults above, and `Libraries::ALL`,
-everything, which the `ferrolua run` command uses because its user runs their own script.
+everything, which the `lunaferra run` command uses because its user runs their own script.
 
 ### File access
 
@@ -43,7 +43,7 @@ A host that grants `io` also picks a policy: no files, read-only under one direc
 under one directory, or unrestricted. Under a directory policy, every path is resolved to an
 absolute path with symbolic links followed, and refused unless it is inside the directory. A path
 that leaves it, such as `../secret`, raises an error. Between that check and the open, another
-process could replace a directory with a symbolic link; Ferrolua documents this race rather than
+process could replace a directory with a symbolic link; Lunaferra documents this race rather than
 claim to close it. On the web the standard library has no file system, so a host that grants `io`
 there supplies its own loader.
 
@@ -128,7 +128,7 @@ is.
 
 ## Tests
 
-`crates/ferrolua/tests/hostile_sandbox.rs` holds the escape attempts, each with its exact error:
+`crates/lunaferra/tests/hostile_sandbox.rs` holds the escape attempts, each with its exact error:
 
 - Invariant 1: for every function in the full standard library, a script in a `SAFE` state checks
   that it is absent unless the table above lists it.

@@ -1,10 +1,10 @@
-# Subsystem: `ferrolua-syntax`
+# Subsystem: `lunaferra-syntax`
 
-`ferrolua-syntax` turns Ferrolua source into tokens and trees. It has one parser that emits events,
-and two builders that consume them: a lossless syntax tree for the tools and a compact tree for the
-compiler (ADR-0009, proposed: one parser for the compiler and the tools). It also defines spans,
-line maps, and the `Diagnostic` type every tool reports ([`diagnostics.md`](diagnostics.md)). It
-accepts the language of [`language.md`](language.md), Lua 5.5's syntax with Python's operators
+`lunaferra-syntax` turns Lunaferra source into tokens and trees. It has one parser that emits
+events, and two builders that consume them: a lossless syntax tree for the tools and a compact tree
+for the compiler (ADR-0009, proposed: one parser for the compiler and the tools). It also defines
+spans, line maps, and the `Diagnostic` type every tool reports ([`diagnostics.md`](diagnostics.md)).
+It accepts the language of [`language.md`](language.md), Lua 5.5's syntax with Python's operators
 (ADR-0023: a language of its own, with Python's operators and 0-based indexes), never panics on any
 input, and enforces the size and nesting limits in [`sandbox.md`](sandbox.md). It lands in M1; the
 syntax of compound assignment, types, classes, and strict mode lands in M4.
@@ -104,8 +104,8 @@ checker.
 
 For `load` and the compiler, a syntax error produces PUC-Rio's format,
 `<chunkname>:<line>: <message> near '<token>'`, such as `input:3: 'end' expected near <eof>`. An
-error in syntax that Ferrolua shares with Lua 5.5 has the same message and token text as on PUC-Rio
-Lua 5.5.1; the messages for Lua's removed operators and for Ferrolua's own syntax are recorded in
+error in syntax that Lunaferra shares with Lua 5.5 has the same message and token text as on PUC-Rio
+Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own syntax are recorded in
 `language.md`. For the tools, each error is a
 `P` diagnostic with a span and, where certain, a fix.
 
@@ -115,7 +115,7 @@ Lua 5.5.1; the messages for Lua's removed operators and for Ferrolua's own synta
    input, valid or not.
 2. The parser never panics, and finishes in time proportional to the input's length.
 3. For valid input, the compact tree built from the events matches the lossless tree's structure.
-4. For every syntax error in syntax Ferrolua shares with Lua 5.5, Ferrolua reports PUC-Rio Lua
+4. For every syntax error in syntax Lunaferra shares with Lua 5.5, Lunaferra reports PUC-Rio Lua
    5.5.1's message and line.
 5. Nesting one level past PUC-Rio Lua 5.5.1's limit stops with PUC-Rio's message.
 6. Every expression groups as the precedence table says ([`language.md`](language.md#invariants),

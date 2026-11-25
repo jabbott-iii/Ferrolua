@@ -1,6 +1,6 @@
 # Subsystem: `memory`
 
-This spec is the contract for how Ferrolua stores and frees Lua values. Every value is reference
+This spec is the contract for how Lunaferra stores and frees Lua values. Every value is reference
 counted and freed when its count reaches zero. A deterministic loop collector frees the values that
 only reference loops keep alive, at points the program itself fixes (ADR-0018: reference counting
 plus a loop collector run by allocation count and on request). Values live in per-state arenas and
@@ -8,15 +8,15 @@ are reached through generational handles, so the heap is safe Rust and a countin
 freed memory (ADR-0011, proposed). Bytes are counted by fixed charges, so collections fall at the
 same points on every target, and each collection's finalizers run in the call that ran it
 (ADR-0021: instructions are limited per call, a collection's finalizers included, and
-bytes are counted alike on every target). `ferrolua-vm` implements it: the counted heap in M2.2,
-and the loop collector in M2.17. `ferrolua-jit` and `ferrolua-stdlib` follow its rules.
+bytes are counted alike on every target). `lunaferra-vm` implements it: the counted heap in M2.2,
+and the loop collector in M2.17. `lunaferra-jit` and `lunaferra-stdlib` follow its rules.
 
 ## Why reference counting with a loop collector
 
 A tracing garbage collector, such as PUC-Rio Lua's, finds every value still reachable from the
 program and frees the rest, so it frees loops, but nothing is freed until it runs, and the VM must
 tell it about every store. Reference counting frees each value at a known point, the way Rust's
-`Rc` does, but can't free a loop of values that refer to each other. Ferrolua uses both: counting
+`Rc` does, but can't free a loop of values that refer to each other. Lunaferra uses both: counting
 frees most values at once, and a collector that looks only at suspected loops frees the rest.
 
 Both run at points the program fixes, never on a timer or another thread. The same run therefore
@@ -81,14 +81,14 @@ enum Value {
 }
 ```
 
-A `Value` is 16 bytes, the same size as PUC-Rio's. Ferrolua has no light userdata, because it has
+A `Value` is 16 bytes, the same size as PUC-Rio's. Lunaferra has no light userdata, because it has
 no C API (ADR-0017). Classes and instances appear as variants of their own once ADR-0007 settles
 how `type` reports them.
 
 ## Object IDs
 
 Lua code never sees a handle or an address. Wherever PUC-Rio would show an object's address,
-Ferrolua shows the object's ID instead (ADR-0019: objects print as IDs, never addresses).
+Lunaferra shows the object's ID instead (ADR-0019: objects print as IDs, never addresses).
 
 - An object has no ID until `tostring`, `string.format("%p")`, `debug.upvalueid`, or the debugger
   asks for one. Then the state's counter, which starts at 1, gives it the next number.
@@ -108,7 +108,7 @@ Every place that holds a `Value` holds a counted reference:
 - each upvalue cell, closure, and metatable link;
 - the registry, the string metatable, and the loaded-module table;
 - each value the host or a native function holds through the embedding API
-  ([`ferrolua.md`](ferrolua.md)).
+  ([`lunaferra.md`](lunaferra.md)).
 
 Copying a value into one of these increments its count, and overwriting or dropping one decrements
 it. A count that would pass `u32::MAX` stays at `u32::MAX`, and that object is freed only when the
@@ -130,7 +130,7 @@ uses the same stack as freeing one.
 
 ### Finalizers
 
-Ferrolua runs pending finalizers at safe points: after the current instruction finishes, before a
+Lunaferra runs pending finalizers at safe points: after the current instruction finishes, before a
 call returns to the host, and when a script calls `collectgarbage`. Objects freed by counting are
 finalized in the order they reached zero, and objects freed by one loop collection in the reverse
 of the order they were marked, as PUC-Rio does. A finalizer never runs in the middle of an
@@ -175,7 +175,7 @@ freed by counting alone. A local function that is assigned anywhere else keeps a
 ## The loop collector
 
 Values that refer to each other in a loop keep each other's counts above zero after the program
-drops its last reference to the loop. Common sources are `Class.__index = Class` without Ferrolua's
+drops its last reference to the loop. Common sources are `Class.__index = Class` without Lunaferra's
 class syntax, trees whose children point to their parents, doubly linked lists, a coroutine whose
 function refers to the coroutine, and local functions that call each other. The loop collector
 frees them by trial deletion, the synchronous algorithm of Bacon and Rajan's "Concurrent Cycle
@@ -216,7 +216,7 @@ The collector runs only at safe points, and only in these cases:
 - **By allocation count:** when the bytes the state has allocated since the last collection pass
   `pause` percent of the bytes in use right after it. `pause` is 100 by default, so the collector
   runs once the program has allocated as much again as it held. The host sets it in
-  `ferrolua::Options`, and a script with `collectgarbage("param", "pause", n)`.
+  `lunaferra::Options`, and a script with `collectgarbage("param", "pause", n)`.
 - **On request:** when a script calls `collectgarbage()` or `collectgarbage("step")`, or the host
   calls `Lua::collect`.
 - **Before a memory error:** when an allocation would fail or pass the host's limit, the VM runs
@@ -255,7 +255,7 @@ handles. When the object a weak entry names is freed, its generation changes, an
 the entry as absent from then on. As in Lua, strings, numbers, and booleans are never removed from
 a weak table, so those entries stay counted.
 
-A table with weak keys and strong values is an ephemeron table. For the loop collector, Ferrolua
+A table with weak keys and strong values is an ephemeron table. For the loop collector, Lunaferra
 treats each entry's value as referenced by the entry's key, not by the table. A value that refers
 back to its own key therefore doesn't keep the pair alive, as §2.5.4 of the manual requires. When a
 weak key is freed, its entry is removed and its value released at the next collection, or when the
@@ -271,7 +271,7 @@ allocator:
 - An object counts its kind's charge, which covers its slot, from its allocation until it is freed.
 - A buffer counts its capacity times a charge for each element: 16 bytes, the size of a `Value`, for
   each slot of a table's array part or a thread's stack, and 1 for each byte of a string.
-- Ferrolua sizes each buffer by its own growth rules and reserves exactly that capacity with
+- Lunaferra sizes each buffer by its own growth rules and reserves exactly that capacity with
   `try_reserve_exact`, so a failed allocation returns an error instead of aborting the process.
 - The tables that index objects, such as the string intern table and the object-ID side table,
   charge a fixed amount for each entry.
@@ -288,7 +288,7 @@ slots an arena keeps for reuse. After the collection that runs before a memory e
 
 ## `collectgarbage`
 
-| Option | Ferrolua's behavior |
+| Option | Lunaferra's behavior |
 | :- | :- |
 | `"collect"` (the default) | Runs pending finalizers, a full loop collection, and the finalizers it queued; returns `0` |
 | `"count"` | Returns the bytes in use divided by 1,024, as a float |
@@ -324,10 +324,10 @@ frees every value left.
 9. A finalizer runs at most once each time its object is marked, and the finalizers of one
    collection run in the reverse of the order their objects were marked.
 10. A self-recursive local function makes no loop.
-11. `ferrolua-vm` contains no `unsafe` code.
+11. `lunaferra-vm` contains no `unsafe` code.
 12. No two objects in a state ever get the same ID, and no ID is reused after its object is
     freed.
-13. The counted bytes depend only on the allocations Ferrolua makes, so the same run gives the same
+13. The counted bytes depend only on the allocations Lunaferra makes, so the same run gives the same
     collection log, counted bytes included, on every target.
 14. Each charge is no smaller than `size_of` of the type it stands for.
 15. The finalizers one collection queues run only in the call that ran it, or at the start of a
@@ -335,7 +335,7 @@ frees every value left.
 
 ## Tests
 
-- Invariant 1: a test allocator in `ferrolua-vm`'s integration tests counts bytes and checks they
+- Invariant 1: a test allocator in `lunaferra-vm`'s integration tests counts bytes and checks they
   return to zero after the state is dropped, for every conformance script.
 - Invariants 2 and 10: tests read the heap's object count before and after creating and dropping
   values, including 100,000 recursive local functions.
@@ -355,12 +355,12 @@ frees every value left.
   same on generated programs (M5.8).
 - Invariant 9: `tests/extensions/gc/` covers resurrection, re-marking, errors in finalizers, the
   order within a collection, and the order at state drop.
-- Invariant 11: the workspace lint `unsafe_code = "forbid"` applies to `ferrolua-vm`.
+- Invariant 11: the workspace lint `unsafe_code = "forbid"` applies to `lunaferra-vm`.
 - Invariant 12: a property test creates, names, and frees objects in generated orders, and
   checks that every ID it saw is distinct.
 - Invariant 13: the conformance runner compares each script's collection log with the log stored
   for it (M2.17), on every target in [`../03-platforms.md`](../03-platforms.md).
-- Invariant 14: a unit test in `ferrolua-vm` compares each charge with `size_of` of its type.
-- Invariant 15: `crates/ferrolua/tests/hostile_sandbox.rs` stops a collection at its instruction
+- Invariant 14: a unit test in `lunaferra-vm` compares each charge with `size_of` of its type.
+- Invariant 15: `crates/lunaferra/tests/hostile_sandbox.rs` stops a collection at its instruction
   limit partway through its finalizers, and checks where the rest run
   ([`sandbox.md`](sandbox.md#tests)).

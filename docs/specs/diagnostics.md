@@ -1,10 +1,10 @@
 # Subsystem: `diagnostics`
 
-This spec is the contract every Ferrolua tool follows when it reports a problem in Lua code: the
+This spec is the contract every Lunaferra tool follows when it reports a problem in Lua code: the
 syntax checker, strict mode, the type checker, the linter, the formatter, and the SAST tool. It
 defines the diagnostic type, the codes, the output formats, suppression comments, and the
-`.ferrolua.lua` configuration file (ADR-0016, proposed: the tools read a data-only Lua file).
-`ferrolua-syntax` defines the type in M1.6, and each tool adds its codes as it lands.
+`.lunaferra.lua` configuration file (ADR-0016, proposed: the tools read a data-only Lua file).
+`lunaferra-syntax` defines the type in M1.6, and each tool adds its codes as it lands.
 
 ## Why one contract
 
@@ -60,29 +60,29 @@ diagnostic adds its row to the registry below, in the same change.
 | SARIF 2.1.0 | `--format sarif` | Code scanning: one Static Analysis Results Interchange Format (SARIF) log, which GitHub accepts as an upload |
 
 Runtime errors from a running script aren't diagnostics. They keep PUC-Rio Lua 5.5.1's wording,
-because scripts match on them. The `ferrolua` command and the debugger still print them in the text
+because scripts match on them. The `lunaferra` command and the debugger still print them in the text
 format: the message, the file, line, and column, the source line with carets under the failing
 expression, and a hint (ADR-0029: runtime errors with their source line, a caret, and a hint).
 
 ## Suppression comments
 
 ```lua
-local unused = 1  --ferrolua:allow L0001
+local unused = 1  --lunaferra:allow L0001
 
---ferrolua:allow L0002, S0004
+--lunaferra:allow L0002, S0004
 risky_call()
 ```
 
-- `--ferrolua:allow <codes>` at the end of a line suppresses those codes on that line, and on a line
-  of its own suppresses them on the next line.
-- `--ferrolua:allow-file <codes>` before the first statement suppresses them in the whole file.
+- `--lunaferra:allow <codes>` at the end of a line suppresses those codes on that line, and on a
+  line of its own suppresses them on the next line.
+- `--lunaferra:allow-file <codes>` before the first statement suppresses them in the whole file.
 - A suppression names its codes; there is no "allow everything". A suppression that suppresses
   nothing is itself reported by the linter.
 - `P` and `C` codes can't be suppressed, because the file doesn't compile.
 
-## Configuration: `.ferrolua.lua`
+## Configuration: `.lunaferra.lua`
 
-The tools read `.ferrolua.lua` from the directory they run in, or the nearest parent that has one.
+The tools read `.lunaferra.lua` from the directory they run in, or the nearest parent that has one.
 The file holds one statement, `return` followed by a table constructor. It may contain table
 constructors, strings, numbers, booleans, and comments, and nothing else; any other expression is
 an error. The tools parse it and never run it.
@@ -115,28 +115,28 @@ return {
 }
 ```
 
-`ferrolua-analysis` reads the file in M6.3; each tool's spec lists the settings it adds.
+`lunaferra-analysis` reads the file in M6.3; each tool's spec lists the settings it adds.
 Command-line flags override the file.
 
 ## Invariants
 
 1. Every code a tool emits is in the registry, and no two rows share a code.
 2. Every diagnostic's span lies inside its file.
-3. JSON Lines output parses with `ferrolua-json`, one object per line, and SARIF output is a valid
+3. JSON Lines output parses with `lunaferra-json`, one object per line, and SARIF output is a valid
    SARIF 2.1.0 log.
 4. A suppression comment removes exactly the codes it names, on exactly the lines it covers.
-5. Reading `.ferrolua.lua` runs no code: a file with a function call, an operator, or a name in an
+5. Reading `.lunaferra.lua` runs no code: a file with a function call, an operator, or a name in an
    expression is rejected.
 
 ## Tests
 
-- Invariant 1: a test in `ferrolua-cli` collects every code each tool can emit and compares the
+- Invariant 1: a test in `lunaferra-cli` collects every code each tool can emit and compares the
   list with the registry table in this file.
 - Invariant 2: a property test runs every tool on generated programs, valid and broken, and checks
   each span.
-- Invariant 3: tests parse the JSON Lines output with `ferrolua-json`, and check SARIF logs for the
+- Invariant 3: tests parse the JSON Lines output with `lunaferra-json`, and check SARIF logs for the
   fields that SARIF 2.1.0 requires.
 - Invariant 4: tests cover each comment form, a suppression of an absent code, and a suppression
   of a `P` code.
-- Invariant 5: hostile-input tests in `ferrolua-analysis` give `.ferrolua.lua` files with calls,
+- Invariant 5: hostile-input tests in `lunaferra-analysis` give `.lunaferra.lua` files with calls,
   operators, and names, and expect each to be rejected with its exact message.

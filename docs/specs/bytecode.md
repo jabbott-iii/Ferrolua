@@ -1,15 +1,15 @@
-# Subsystem: `ferrolua-bytecode`
+# Subsystem: `lunaferra-bytecode`
 
-`ferrolua-bytecode` defines the instructions Ferrolua's compiler emits and its VM runs, the
+`lunaferra-bytecode` defines the instructions Lunaferra's compiler emits and its VM runs, the
 function prototypes that hold them, the binary format of precompiled chunks, and the verifier that
-checks a chunk before it runs. The format is Ferrolua's own, and chunks compiled by PUC-Rio's
-`luac` don't load (ADR-0010, proposed: Ferrolua's own register bytecode, with every precompiled
+checks a chunk before it runs. The format is Lunaferra's own, and chunks compiled by PUC-Rio's
+`luac` don't load (ADR-0010, proposed: Lunaferra's own register bytecode, with every precompiled
 chunk verified). It lands in M2.1; the chunk format and the verifier land in M3.12.
 
-## Why a register bytecode of Ferrolua's own
+## Why a register bytecode of Lunaferra's own
 
 A register machine names its operands by slot in the function's frame, as PUC-Rio Lua's has since
-5.0, so `a = b + c` is one instruction instead of the four a stack machine needs. Ferrolua keeps
+5.0, so `a = b + c` is one instruction instead of the four a stack machine needs. Lunaferra keeps
 that design but not PUC-Rio's encoding: its VM needs instructions PUC-Rio lacks, for reference
 counting, class fields, strict arity checks, and JIT hints, and PUC-Rio's format changes with
 each release. A precompiled chunk can come from anywhere, so the verifier treats it as hostile.
@@ -54,7 +54,7 @@ pub struct Prototype {
 
 ## Chunk format
 
-A precompiled chunk starts with the bytes `\x1bFerrolua`, then a format version, then the main
+A precompiled chunk starts with the bytes `\x1bLunaferra`, then a format version, then the main
 prototype, written depth first. Every integer is little-endian on every platform; every count is
 checked against the bytes left before anything is allocated, so a chunk can't ask for more memory
 than its own length justifies.

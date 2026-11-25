@@ -1,6 +1,6 @@
-# Ferrolua
+# Lunaferra
 
-Ferrolua is a virtual machine with a just-in-time (JIT) compiler for a language derived from Lua
+Lunaferra is a virtual machine with a just-in-time (JIT) compiler for a language derived from Lua
 5.5, with Python's operators and indexes that start at 0, written in Rust with no third-party code,
 for Rust programs that embed a scripting language. It frees memory deterministically, by reference
 counting and a loop collector that runs at points the program fixes, and adds optional types,
@@ -16,8 +16,8 @@ commits. Read the rule for each kind of file you touch.
 
 Design and the first test tools: the documents in `docs/` exist, and the Cargo workspace has every
 crate of the crate map in `docs/01-architecture.md`. Each crate holds only its crate docs, except
-`ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
-`ferrolua-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
+`lunaferra-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
+`lunaferra-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
 `cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and `cargo xtask record` (M0.5).
 `tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin with the twin's recorded
 `hello.out`. The next task is M0.6, which adds the CI workflow.
@@ -34,7 +34,7 @@ crate of the crate map in `docs/01-architecture.md`. Each crate holds only its c
 | The language: syntax, semantics, operators, indexes, and extensions | [`docs/specs/language.md`](docs/specs/language.md), which says where it differs from the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) |
 | Memory, reference counting, the loop collector, `__gc`, weak tables | [`docs/specs/memory.md`](docs/specs/memory.md) |
 | Libraries a host grants, limits, untrusted input | [`docs/specs/sandbox.md`](docs/specs/sandbox.md) |
-| Diagnostics, codes, `.ferrolua.lua` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
+| Diagnostics, codes, `.lunaferra.lua` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
 | `crates/syntax` | [`docs/specs/syntax.md`](docs/specs/syntax.md) |
 | `crates/bytecode` | [`docs/specs/bytecode.md`](docs/specs/bytecode.md) |
 | `crates/math` | [`docs/specs/math.md`](docs/specs/math.md) and [`docs/03-platforms.md`](docs/03-platforms.md) |
@@ -42,7 +42,7 @@ crate of the crate map in `docs/01-architecture.md`. Each crate holds only its c
 | `crates/vm` | [`docs/specs/vm.md`](docs/specs/vm.md) and [`docs/specs/memory.md`](docs/specs/memory.md) |
 | `crates/jit`, or any `unsafe` | [`docs/specs/jit.md`](docs/specs/jit.md), and ADR-0013 in [`docs/decisions.md`](docs/decisions.md) |
 | `crates/stdlib` | [`docs/specs/stdlib.md`](docs/specs/stdlib.md) |
-| `crates/ferrolua` | [`docs/specs/ferrolua.md`](docs/specs/ferrolua.md) |
+| `crates/lunaferra` | [`docs/specs/lunaferra.md`](docs/specs/lunaferra.md) |
 | `crates/analysis` | [`docs/specs/analysis.md`](docs/specs/analysis.md) |
 | `crates/types` | [`docs/specs/types.md`](docs/specs/types.md) |
 | `crates/lint` | [`docs/specs/lint.md`](docs/specs/lint.md) |
@@ -53,7 +53,7 @@ crate of the crate map in `docs/01-architecture.md`. Each crate holds only its c
 | `crates/dap` | [`docs/specs/dap.md`](docs/specs/dap.md) |
 | `crates/cli` | [`docs/specs/cli.md`](docs/specs/cli.md) |
 | `crates/testkit`, `fuzz/`, `xtask/` | [`docs/04-quality.md`](docs/04-quality.md#the-projects-own-test-tools) |
-| Ferrolua scripts and their Lua 5.5 twins in `tests/` and `benches/` | [`docs/04-quality.md`](docs/04-quality.md#conformance-scripts) |
+| Lunaferra scripts and their Lua 5.5 twins in `tests/` and `benches/` | [`docs/04-quality.md`](docs/04-quality.md#conformance-scripts) |
 | Documents, prose, commits | `.claude/rules/roadmap-and-docs.md`, `.claude/rules/writing.md`, and `.claude/rules/commits.md` |
 
 ## Definition of done
@@ -73,7 +73,7 @@ A task is done when every step below passes.
 3. `cargo xtask coverage` reports 100% of lines and regions, and the steps in "Before finishing" in
    `.claude/rules/testing.md` find no weakened test.
 4. `cargo tree --workspace --edges normal,build,dev --target all --prefix none` lists only
-   Ferrolua's own crates, and the steps in "Before finishing" in `.claude/rules/dependencies.md`
+   Lunaferra's own crates, and the steps in "Before finishing" in `.claude/rules/dependencies.md`
    pass.
 5. Every document the change affects is updated in the same change, as "Documentation" in
    [`CONTRIBUTING.md`](CONTRIBUTING.md#documentation) lists, and the steps in "Before finishing" in

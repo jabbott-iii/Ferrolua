@@ -282,7 +282,7 @@ mod tests {
 
     /// A new, empty folder for one test.
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = env::temp_dir().join(format!("ferrolua-xtask-{}-{name}", std::process::id()));
+        let dir = env::temp_dir().join(format!("lunaferra-xtask-{}-{name}", std::process::id()));
         // The folder is left from an earlier run only if that run stopped early.
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();

@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-math"
+name = "lunaferra-math"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

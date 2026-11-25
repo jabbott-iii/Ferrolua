@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-fmt"
+name = "lunaferra-fmt"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

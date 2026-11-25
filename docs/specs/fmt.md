@@ -1,14 +1,14 @@
-# Subsystem: `ferrolua-fmt`
+# Subsystem: `lunaferra-fmt`
 
-`ferrolua-fmt` formats Lua and Ferrolua source into one consistent layout. It works on the lossless
-tree, keeps every comment, never changes what a program does, and gives the same output when run
-twice. `ferrolua fmt` rewrites files, and `ferrolua fmt --check` reports `F` diagnostics for files
-that aren't formatted, so CI can enforce the style. It lands in M7.4–M7.5.
+`lunaferra-fmt` formats Lua and Lunaferra source into one consistent layout. It works on the
+lossless tree, keeps every comment, never changes what a program does, and gives the same output
+when run twice. `lunaferra fmt` rewrites files, and `lunaferra fmt --check` reports `F` diagnostics
+for files that aren't formatted, so CI can enforce the style. It lands in M7.4–M7.5.
 
 ## Why a formatter with few options
 
 A formatter ends arguments about layout by making one choice for everyone, and each option
-reopens an argument. Ferrolua's formatter has only the options that projects genuinely differ on:
+reopens an argument. Lunaferra's formatter has only the options that projects genuinely differ on:
 indentation, line width, and quote style. Everything else, such as spacing around operators and
 where long calls break, follows one style.
 
@@ -30,7 +30,7 @@ optional line break in it when it doesn't.
 
 ## Options
 
-| Setting in `.ferrolua.lua` | Values | Default |
+| Setting in `.lunaferra.lua` | Values | Default |
 | :- | :- | :- |
 | `format.indent_style` | `"spaces"`, `"tabs"` | `"spaces"` |
 | `format.indent_width` | 1 to 16 | 2 |

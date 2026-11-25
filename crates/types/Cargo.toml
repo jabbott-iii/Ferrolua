@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-types"
+name = "lunaferra-types"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

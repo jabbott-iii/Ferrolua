@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-json"
+name = "lunaferra-json"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

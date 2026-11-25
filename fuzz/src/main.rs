@@ -1,8 +1,8 @@
-//! `ferrolua-fuzz` is Ferrolua's fuzzer: it feeds its targets, such as the parser and the VM,
+//! `lunaferra-fuzz` is Lunaferra's fuzzer: it feeds its targets, such as the parser and the VM,
 //! inputs mutated from a fixed seed, and saves every input that makes one panic, crash, or hang, as
-//! the [quality document] describes. ADR-0002 (Ferrolua uses no third-party code) rules out
+//! the [quality document] describes. ADR-0002 (Lunaferra uses no third-party code) rules out
 //! cargo-fuzz and libFuzzer, so this program takes their place. It uses only the standard library
-//! and the seeded generator of `ferrolua-testkit`.
+//! and the seeded generator of `lunaferra-testkit`.
 //!
 //! `cargo xtask fuzz` builds and runs it, passing on its arguments; [`cli::usage`] gives them.
 //!
@@ -32,7 +32,7 @@
 //! usage, when it isn't given a command it knows. `--replay` exits with status 101 when the input
 //! panics, as Rust does for any program that a panic ends.
 //!
-//! [quality document]: https://github.com/jabbott-iii/Ferrolua/blob/main/docs/04-quality.md#ferrolua-fuzz
+//! [quality document]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/04-quality.md#lunaferra-fuzz
 
 mod batch;
 mod campaign;
@@ -140,5 +140,5 @@ fn run(args: &[OsString]) -> Outcome {
 /// The work folder of this process's runner, in the system's temporary folder. It is named after
 /// the process, so two fuzzers that run at the same time don't share one.
 fn work() -> PathBuf {
-    env::temp_dir().join(format!("ferrolua-fuzz-{}", process::id()))
+    env::temp_dir().join(format!("lunaferra-fuzz-{}", process::id()))
 }

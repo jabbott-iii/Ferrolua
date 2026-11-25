@@ -1,7 +1,7 @@
-# Subsystem: `ferrolua-compiler`
+# Subsystem: `lunaferra-compiler`
 
-`ferrolua-compiler` turns the compact tree from `ferrolua-syntax` into a `Prototype` in
-`ferrolua-bytecode`'s format. It resolves every name as a local, an upvalue, or a global under Lua
+`lunaferra-compiler` turns the compact tree from `lunaferra-syntax` into a `Prototype` in
+`lunaferra-bytecode`'s format. It resolves every name as a local, an upvalue, or a global under Lua
 5.5's `global` rules; applies strict mode where it is on (ADR-0008, proposed: `--!strict` or a host
 option); compiles self-recursion without an upvalue, so it makes no loop for the collector to find
 (ADR-0018: reference counting plus a deterministic loop collector); folds constants; and allocates
@@ -10,7 +10,7 @@ assignment, classes, and strict mode land in M4.
 
 ## Why a separate compiler pass
 
-PUC-Rio Lua parses and emits code in one pass, with no tree. Ferrolua compiles from a tree because
+PUC-Rio Lua parses and emits code in one pass, with no tree. Lunaferra compiles from a tree because
 the parser is shared with the tools (ADR-0009), and because some decisions need the whole
 function first: whether a local function is ever reassigned, which locals a closure captures, and
 which constants are never written. The cost is the compact tree's memory during `load`, which
@@ -88,7 +88,7 @@ Hints never change what the bytecode does.
 2. Compiling the same source twice gives the same bytes.
 3. A self-recursive local function that isn't reassigned has no upvalue for its own name.
 4. Folding a constant gives the value the VM would compute, or isn't done.
-5. Every compile error in code Ferrolua shares with Lua 5.5, Ferrolua reports with PUC-Rio
+5. Every compile error in code Lunaferra shares with Lua 5.5, Lunaferra reports with PUC-Rio
    Lua 5.5.1's message and line.
 
 ## Tests

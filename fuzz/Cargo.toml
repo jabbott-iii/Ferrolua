@@ -1,11 +1,11 @@
 [package]
-name = "ferrolua-fuzz"
+name = "lunaferra-fuzz"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-ferrolua-testkit.workspace = true
+lunaferra-testkit.workspace = true
 
 [lints]
 workspace = true

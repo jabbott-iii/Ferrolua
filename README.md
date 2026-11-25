@@ -1,6 +1,6 @@
-# Ferrolua
+# Lunaferra
 
-Ferrolua is a virtual machine with a just-in-time (JIT) compiler for a scripting language derived
+Lunaferra is a virtual machine with a just-in-time (JIT) compiler for a scripting language derived
 from Lua 5.5, written in Rust, for Rust programs that embed one. It is designed to keep memory safe
 whatever a script does, to use no third-party code, and to free memory deterministically: by
 reference counting, with a loop collector that runs at points the program fixes, so every run frees
@@ -36,7 +36,7 @@ recorded, and waits for the conformance runner that M2.14 builds. The next task 
 - **Six platforms:** Linux, Windows, macOS, Android, iOS, and the web, with the JIT on every one
   that allows it and the same results on each, as [`docs/03-platforms.md`](docs/03-platforms.md)
   plans.
-- **Tools in one binary:** `ferrolua run`, `check` (types), `lint`, `fmt`, and `sast` (security),
+- **Tools in one binary:** `lunaferra run`, `check` (types), `lint`, `fmt`, and `sast` (security),
   plus a language server for editor auto complete and a debug adapter for editor debugging.
 
 [`docs/00-overview.md`](docs/00-overview.md) lists the goals, budgets, and risks, and
@@ -49,4 +49,4 @@ security vulnerabilities privately, as [`SECURITY.md`](SECURITY.md) describes.
 
 ## License
 
-Ferrolua is released under the [MIT License](LICENSE).
+Lunaferra is released under the [MIT License](LICENSE).

@@ -1,12 +1,12 @@
-# Subsystem: `ferrolua-vm`
+# Subsystem: `lunaferra-vm`
 
-`ferrolua-vm` runs bytecode. It owns the heap of reference-counted values and the deterministic
+`lunaferra-vm` runs bytecode. It owns the heap of reference-counted values and the deterministic
 loop collector ([`memory.md`](memory.md)), the tables, the interpreter loop, metamethods, error
 handling, coroutines, the limits of [`sandbox.md`](sandbox.md), and the hooks the debugger uses.
 Where the language keeps Lua 5.5's behavior, it matches PUC-Rio Lua 5.5.1's results and error
 messages, and it contains no `unsafe` code (ADR-0011, proposed: the heap is safe Rust with
 generational handles). It doesn't depend on the JIT: it defines a trait
-that a compiled tier implements, and the `ferrolua` crate plugs the JIT in. It lands in M2.2–M2.12.
+that a compiled tier implements, and the `lunaferra` crate plugs the JIT in. It lands in M2.2–M2.12.
 
 ## Why an interpreter in safe Rust
 
@@ -23,7 +23,7 @@ copy of each, in a table keyed by content, so comparing two short strings compar
 Longer strings are compared by content, and their hash is computed on first use. The hash is
 seeded per state: from the standard library's `RandomState` by default, so a script can't choose
 keys that collide, or from `Options::hash_seed` when a host needs runs to repeat exactly
-([`ferrolua.md`](ferrolua.md)).
+([`lunaferra.md`](lunaferra.md)).
 
 `s = s + t` and `s += t` on a local append to `s` in place when its count shows that nothing else
 holds it and it is longer than 40 bytes, so it isn't interned (ADR-0032: strings and lists grow in
@@ -47,7 +47,7 @@ hash part uses open addressing with the seeded hash. Float keys with integer val
   fallback structure for keys that share a full hash, and more code in every table operation.
 
 - `#t` returns a border: an n where `t[n - 1]` isn't `nil` and `t[n]` is, or 0 when `t[0]` is
-  `nil`. When a table has several borders, Ferrolua returns the one PUC-Rio Lua 5.5.1's algorithm
+  `nil`. When a table has several borders, Lunaferra returns the one PUC-Rio Lua 5.5.1's algorithm
   returns for the same table with every integer key one higher, so `#{1, nil, 3}` gives what
   PUC-Rio gives for its own `{1, nil, 3}`.
 - `next` visits the array part in order, then the hash part, and continues correctly while the
@@ -110,7 +110,7 @@ records here. A chain of `__call` stops after 15 objects, as §8.1 of the manual
 
 A Lua error is a value carried in `Err` back through each frame, never a panic. Each frame on the
 way closes its `<close>` variables. `pcall` and `xpcall` catch errors, except the limit errors of
-[`sandbox.md`](sandbox.md). Runtime messages for the errors Ferrolua shares with Lua 5.5 match
+[`sandbox.md`](sandbox.md). Runtime messages for the errors Lunaferra shares with Lua 5.5 match
 PUC-Rio Lua 5.5.1's, including the variable description the bytecode allows, as in
 `attempt to index a nil value (global 'config')` and `attempt to call a nil value (method 'draw')`.
 An error with a `nil` value becomes a string, as Lua 5.5 does.

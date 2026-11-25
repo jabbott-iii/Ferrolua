@@ -1,4 +1,4 @@
-# Version updates for what Ferrolua uses. Cargo has no entry, because the dependency rule
+# Version updates for what Lunaferra uses. Cargo has no entry, because the dependency rule
 # (`.claude/rules/dependencies.md`) allows no third-party crates.
 version: 2
 updates:

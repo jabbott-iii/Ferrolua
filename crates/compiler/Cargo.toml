@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-compiler"
+name = "lunaferra-compiler"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

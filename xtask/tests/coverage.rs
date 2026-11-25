@@ -1,6 +1,6 @@
 //! Runs `cargo xtask coverage` on small workspaces that each test writes, and checks what it
 //! reports. Each workspace is a Cargo workspace of its own, in a folder of its own under the
-//! target folder, so its build never touches Ferrolua's.
+//! target folder, so its build never touches Lunaferra's.
 
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -1,8 +1,8 @@
-# Subsystem: `ferrolua-analysis`
+# Subsystem: `lunaferra-analysis`
 
-`ferrolua-analysis` builds the semantic model that the type checker, the linter, the SAST tool, and
+`lunaferra-analysis` builds the semantic model that the type checker, the linter, the SAST tool, and
 the language server share. For each file, it resolves every name, builds each function's control
-flow graph, and computes which definitions reach each use. For a project, it reads `.ferrolua.lua`
+flow graph, and computes which definitions reach each use. For a project, it reads `.lunaferra.lua`
 (ADR-0016, proposed: a data-only Lua file) and links files through `require` calls. It works on the
 lossless tree, so files with syntax errors still get a model. It lands in M6.1–M6.3.
 
@@ -33,7 +33,7 @@ edges.
 ## Modules
 
 A call `require("name")` with a literal string resolves through the `package.path` patterns in
-`.ferrolua.lua`, or Lua's default `./?.lua;./?/init.lua`. The returned value of the required file
+`.lunaferra.lua`, or Lua's default `./?.lua;./?/init.lua`. The returned value of the required file
 becomes the call's value. Calls with a computed name resolve to `any`.
 
 ## Invariants

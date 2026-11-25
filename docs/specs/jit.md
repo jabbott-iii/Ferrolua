@@ -1,14 +1,14 @@
-# Subsystem: `ferrolua-jit`
+# Subsystem: `lunaferra-jit`
 
-`ferrolua-jit` compiles hot Lua functions to x86-64 or AArch64 machine code while they run, on
+`lunaferra-jit` compiles hot Lua functions to x86-64 or AArch64 machine code while they run, on
 Linux, Windows, macOS, and Android (ADR-0027: a JIT wherever the platform allows one; iOS and the
 web run interpreted). It has an encoder for each processor, executable memory that is never
 writable and executable at once, a
 baseline tier that translates bytecode instruction by instruction, and an optimizing tier that
 works on SSA form (ADR-0012, proposed: a method JIT with tiers). It is the only crate that may use
 `unsafe`, and only in `jit::memory` and `jit::entry`, under the seven invariants of ADR-0013
-(proposed). A host links it only by turning on the `ferrolua` crate's `jit` feature, which is off
-by default (ADR-0022: the JIT is an optional feature of `ferrolua`, off by default). Generated code
+(proposed). A host links it only by turning on the `lunaferra` crate's `jit` feature, which is off
+by default (ADR-0022: the JIT is an optional feature of `lunaferra`, off by default). Generated code
 always produces what the interpreter produces, and exits to the interpreter whenever a guard fails.
 The baseline tier lands in M5 for x86-64 on Linux and in M13 for every other target, and the
 optimizing tier in M11.
@@ -18,7 +18,7 @@ optimizing tier in M11.
 A method JIT compiles a whole function at a time. It handles code with no loops, such as event
 callbacks, as well as code with loops, and its output is straightforward to compare with the
 interpreter's. A tracing JIT, like LuaJIT's, reaches higher speeds on loops, but recording and
-stitching traces is harder to make correct. Ferrolua chose correctness first. Every compiled
+stitching traces is harder to make correct. Lunaferra chose correctness first. Every compiled
 function can stop at any guard and continue in the interpreter, so the JIT only compiles the cases
 it has seen and leaves the rest to the interpreter. The cost is peak loop speed.
 
@@ -34,7 +34,7 @@ Architectures Software Developer's Manual, or from Arm's Architecture Reference 
 Calls follow each target's convention: System V on x86-64 Linux, macOS, and Android; Windows x64
 on x86-64 Windows; and the AArch64 procedure call standard, with Apple's and Microsoft's variants,
 on AArch64. Generated code never calls a platform's math library: `**` and the `math` functions
-call `ferrolua-math`, so compiled code gives the interpreter's bits (ADR-0028).
+call `lunaferra-math`, so compiled code gives the interpreter's bits (ADR-0028).
 
 ## Executable memory
 
@@ -45,7 +45,7 @@ before any code runs, with each operating system's calls, which ADR-0013 lists: 
 running on AArch64. On AArch64 it flushes the instruction cache before a buffer first runs, and on
 Windows it registers unwind tables for each buffer. Code is never changed in place: patching
 compiled code means writing a new buffer. A buffer is freed only when no prototype and no frame
-refers to it. This module and `jit::entry` hold every `unsafe` block in Ferrolua, each with a
+refers to it. This module and `jit::entry` hold every `unsafe` block in Lunaferra, each with a
 `// SAFETY:` comment that names the ADR-0013 invariant it relies on.
 
 ## Baseline tier
@@ -86,15 +86,15 @@ where the loop collector can run (ADR-0013, invariant 6).
 
 ## Modes
 
-With the `ferrolua` crate's `jit` feature on, a host chooses `JitMode::Off`, `JitMode::On` (the
+With the `lunaferra` crate's `jit` feature on, a host chooses `JitMode::Off`, `JitMode::On` (the
 default on every target with a backend), or `JitMode::Forced`, which compiles every function on its
 first call.
 Forced mode is for tests: the conformance runner and the differential fuzz target use it. Without
 the feature, `JitMode` still exists, its default is `Off`, and `Lua::new` refuses the other two
-with an error that names the feature ([`ferrolua.md`](ferrolua.md)). The `ferrolua` command turns
+with an error that names the feature ([`lunaferra.md`](lunaferra.md)). The `lunaferra` command turns
 the feature on.
 
-On iOS and the web, `ferrolua-jit` compiles to nothing, so the feature changes nothing there: the
+On iOS and the web, `lunaferra-jit` compiles to nothing, so the feature changes nothing there: the
 default is `Off`, and `Lua::new` refuses the other modes with an error that names the target. Where
 the operating system refuses executable memory at run time, as macOS does for a hardened host
 without the `com.apple.security.cs.allow-jit` entitlement, a state in `JitMode::On` runs
@@ -125,8 +125,8 @@ interpreted and tells the host that its JIT isn't running, and `JitMode::Forced`
   code exists, expecting no mapping with both `w` and `x`; on Windows, a test queries each buffer
   with `VirtualQuery`; on macOS for AArch64, a test checks that a thread can't write a buffer while
   it runs one.
-- Invariant 3: `const` assertions on `size_of` and `offset_of!` for every layout, in `ferrolua-vm`
-  and `ferrolua-jit` alike.
+- Invariant 3: `const` assertions on `size_of` and `offset_of!` for every layout, in `lunaferra-vm`
+  and `lunaferra-jit` alike.
 - Invariant 4: a debug-build check after each exit compares the frame and counts with a shadow run
   in the interpreter.
 - Invariant 5: the conformance runner compares each script's collection log interpreted and in

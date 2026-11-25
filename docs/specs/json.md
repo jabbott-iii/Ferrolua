@@ -1,13 +1,13 @@
-# Subsystem: `ferrolua-json`
+# Subsystem: `lunaferra-json`
 
-`ferrolua-json` reads and writes JSON, as RFC 8259 defines it, and frames the messages of the
+`lunaferra-json` reads and writes JSON, as RFC 8259 defines it, and frames the messages of the
 Language Server Protocol and the Debug Adapter Protocol. The command line uses it for
 `--format json` and SARIF output, and the language and debug servers for every message they send
 and receive. It exists because ADR-0002 rules out JSON crates, and ADR-0015 (proposed: editor
-support through servers of Ferrolua's own) needs JSON. It lands in M6.9; message framing lands in
+support through servers of Lunaferra's own) needs JSON. It lands in M6.9; message framing lands in
 M9.1.
 
-## Why a small JSON crate of Ferrolua's own
+## Why a small JSON crate of Lunaferra's own
 
 The tools need a JSON value type, a parser that rejects bad input with a clear position, and a
 writer that escapes correctly. That is a few hundred lines, with a well-defined specification and a

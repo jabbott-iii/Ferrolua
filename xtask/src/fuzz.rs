@@ -1,4 +1,4 @@
-//! `cargo xtask fuzz`: builds the fuzzer, the `ferrolua-fuzz` program in `fuzz/`, and runs it with
+//! `cargo xtask fuzz`: builds the fuzzer, the `lunaferra-fuzz` program in `fuzz/`, and runs it with
 //! the arguments after `fuzz`. The fuzzer is a program of its own because it links the crates it
 //! targets, which `xtask` doesn't depend on. It prints its own report and usage, and `cargo xtask`
 //! exits with the fuzzer's status.
@@ -22,7 +22,7 @@ use crate::error::Error;
 pub(crate) fn run(args: &[OsString]) -> Result<u8, Error> {
     let cargo = env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
     Command::new(cargo)
-        .args(["run", "--locked", "--package", "ferrolua-fuzz", "--"])
+        .args(["run", "--locked", "--package", "lunaferra-fuzz", "--"])
         .args(args)
         .status()
         .map(|status| {

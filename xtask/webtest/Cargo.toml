@@ -1,5 +1,5 @@
 [package]
-name = "ferrolua-webtest"
+name = "lunaferra-webtest"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

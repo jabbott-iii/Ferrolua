@@ -6,7 +6,7 @@
 //! inputs one after another, and the fuzzer runs a failing input again alone to shrink it.
 //!
 //! The two fixtures fail on purpose, so the fuzzer's own tests can check that it finds, shrinks,
-//! saves, and replays a failure. The targets that check Ferrolua's own code arrive with the code
+//! saves, and replays a failure. The targets that check Lunaferra's own code arrive with the code
 //! they check, starting with the lexer and the parser in task M1.9.
 
 use std::fmt;
@@ -20,7 +20,7 @@ pub(crate) struct Target {
     /// What the target does, for the usage text.
     pub(crate) about: &'static str,
     /// How every saved input of the target must run when it is replayed. For a target that checks
-    /// Ferrolua's code, that is [`Kind::Passed`], because each saved input is a bug since fixed. A
+    /// Lunaferra's code, that is [`Kind::Passed`], because each saved input is a bug since fixed. A
     /// fixture fails on purpose, so its saved inputs must fail as it is built to.
     pub(crate) replays_as: Kind,
     /// Runs the target on one input.

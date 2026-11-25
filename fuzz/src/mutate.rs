@@ -11,7 +11,7 @@
 //! - **Splice:** keep the input up to a random point, and replace the rest with the end of an
 //!   input from the corpus, taken from a random point. The two can be the same input.
 
-use ferrolua_testkit::Xoshiro256StarStar;
+use lunaferra_testkit::Xoshiro256StarStar;
 
 /// The largest number of edits one run makes.
 pub(crate) const MAX_EDITS: u64 = 8;

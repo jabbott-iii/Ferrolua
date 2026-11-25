@@ -13,7 +13,7 @@
 use std::cell::Cell;
 use std::panic;
 
-use ferrolua_testkit::{Config, Failure, Outcome, Source};
+use lunaferra_testkit::{Config, Failure, Outcome, Source};
 
 /// Chooses a number from 0 up to but not including `u64::MAX`.
 fn any_number(source: &mut Source) -> u64 {

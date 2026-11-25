@@ -1,11 +1,11 @@
-# Subsystem: `ferrolua-dap`
+# Subsystem: `lunaferra-dap`
 
-`ferrolua-dap` is Ferrolua's debug adapter. It speaks the Debug Adapter Protocol (DAP) so editors
+`lunaferra-dap` is Lunaferra's debug adapter. It speaks the Debug Adapter Protocol (DAP) so editors
 can set breakpoints in Lua scripts, step through them, and inspect frames and variables (ADR-0015,
-proposed). `ferrolua dap` launches a script under the debugger over standard input and output. A
+proposed). `lunaferra dap` launches a script under the debugger over standard input and output. A
 host can also serve the protocol over a local TCP connection, so a developer can attach to scripts
 running inside a game or a server. It uses the VM's debug hooks ([`vm.md`](vm.md#debug-hooks)) and
-the `ferrolua` crate's debugger interface. It lands in M10.
+the `lunaferra` crate's debugger interface. It lands in M10.
 
 ## Why debugging inside the host matters
 
@@ -48,5 +48,5 @@ on, and listens only on the loopback address.
 ## Tests
 
 - Invariant 1: the `dap` fuzz target and hostile-input tests.
-- Invariants 2–4: end-to-end tests launch `ferrolua dap` as a process, drive it with recorded
+- Invariants 2–4: end-to-end tests launch `lunaferra dap` as a process, drive it with recorded
   message sequences, and compare each response with an expected file.

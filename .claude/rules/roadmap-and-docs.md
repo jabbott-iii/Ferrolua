@@ -30,9 +30,9 @@ so they can fill them in.
 - **Core documents:** `00-overview.md`, `01-architecture.md`, `02-dependency-policy.md`,
   `03-platforms.md`, and `04-quality.md`. `05-release.md` comes before the first crates.io release
   (M12.1)
-- **Specs:** `docs/specs/<name>.md`: one for each crate except the test tools (`ferrolua-testkit`,
-  `ferrolua-fuzz`, `ferrolua-webtest`, and `xtask`), which `docs/04-quality.md` describes, plus one
-  for each contract that spans crates: `language`, `memory`, `sandbox`, and `diagnostics`
+- **Specs:** `docs/specs/<name>.md`: one for each crate except the test tools (`lunaferra-testkit`,
+  `lunaferra-fuzz`, `lunaferra-webtest`, and `xtask`), which `docs/04-quality.md` describes, plus
+  one for each contract that spans crates: `language`, `memory`, `sandbox`, and `diagnostics`
 - **Task IDs:** `M<milestone>.<task>`, with areas taken from the **Scopes** in `commits.md`, for
   example `M1.5 — syntax: expressions and operator precedence`
 - **Environments:** Linux on x86-64 first, where development happens. As of 2026-11-24 this machine

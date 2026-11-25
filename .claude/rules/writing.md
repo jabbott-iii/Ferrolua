@@ -20,7 +20,7 @@ so they can fill them in.
 - **Where text lives:** `README.md`, `docs/`, `CLAUDE.md`, `.claude/`, each crate's `README.md`, the
   doc comments, error messages, and diagnostics in the Rust crates, and the comments in the Lua
   scripts under `tests/` and `benches/`
-- **Project name:** Ferrolua
+- **Project name:** Lunaferra
 - **Names to spell exactly:** Lua (a name, not an acronym, so never "LUA"), PUC-Rio Lua (the
   reference implementation), LuaJIT, Luau, LuaRocks, LuaCATS, lua-language-server, StyLua, luacheck,
   selene, busted, Clippy, rustfmt, rustup, Miri, docs.rs, x86-64, AArch64, and Mermaid
@@ -29,7 +29,7 @@ so they can fill them in.
   linting, type checking, and static application security testing (SAST)
 - **Code block tags:** `bash`, `rust`, `lua`, `toml`, `json`, `asm` for x86-64 assembly, `mermaid`,
   and `text`
-- **Sources of truth:** the code; `docs/specs/language.md` for where Ferrolua's language differs
+- **Sources of truth:** the code; `docs/specs/language.md` for where Lunaferra's language differs
   from Lua 5.5; the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) and what PUC-Rio Lua
   5.5.1 does with a conformance script's Lua 5.5 twin, for the rest; `docs/specs/`;
   `docs/decisions.md`; `docs/roadmap.md`; and a command's real output

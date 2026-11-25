@@ -3,8 +3,9 @@
 `lunaferra-lint` is Lunaferra's linter: rules that find likely bugs, slow code, and code that keeps
 memory alive by accident, in Lunaferra code. Each rule has an `L` code, a default
 severity, and a test, and reads the shared model of [`analysis.md`](analysis.md) and the types of
-[`types.md`](types.md). Users turn rules off or change their severity in `.lunaferra.lua`, or
-suppress one line with a comment ([`diagnostics.md`](diagnostics.md)). It lands in M7.1–M7.3.
+[`types.md`](types.md). Users turn rules off or change their severity in the `tools` table of the
+manifest, `Lunaferra.lua`, or suppress one line with a comment ([`diagnostics.md`](diagnostics.md)).
+It lands in M7.1–M7.3.
 
 ## Why a linter separate from the type checker
 

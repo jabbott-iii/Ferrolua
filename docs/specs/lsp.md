@@ -19,8 +19,8 @@ nodes ([`syntax.md`](syntax.md#lossless-tree)), and treats the token at the curs
 
 | Feature | LSP request | What it uses |
 | :- | :- | :- |
-| Diagnostics as you type | `textDocument/publishDiagnostics` | Syntax, strict mode, types, lint, and SAST |
-| Completion | `textDocument/completion` | Scopes, types, class members, module exports, standard library declarations, keywords, and snippets for `function`, `for`, and `class` |
+| Diagnostics as you type | `textDocument/publishDiagnostics` | Syntax, strict mode, types, lint, SAST, and the `M` diagnostics of a package's manifest |
+| Completion | `textDocument/completion` | Scopes, types, class members, module exports, the module names a package can require (ADR-0038, proposed: packages and modules), standard library declarations, keywords, and snippets for `function`, `for`, and `class` |
 | Hover | `textDocument/hover` | Types and the doc comment of the name |
 | Signature help | `textDocument/signatureHelp` | Parameter names, types, and which are optional |
 | Go to definition and find references | `textDocument/definition`, `textDocument/references` | Symbols from the analysis |

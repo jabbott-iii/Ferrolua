@@ -43,7 +43,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0002 — Use no third-party code
 
-- **Status:** Accepted
+- **Status:** Accepted; ADR-0039, proposed, covers the packages a project's scripts depend
+  on, which this rule doesn't
 - **Date:** 2026-11-24
 - **Context:** Lunaferra runs scripts its hosts didn't write, so every line of code in it is part
   of its attack surface. A dependency brings in code that its owners can change in any release,
@@ -473,7 +474,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0016 — Configure the tools with a data-only Lua file
 
-- **Status:** Proposed
+- **Status:** Proposed; ADR-0038, proposed, moves these settings into the `tools` table of the
+  package manifest, `Lunaferra.lua`
 - **Date:** 2026-11-24
 - **Context:** The linter, formatter, type checker, and SAST tool (static application security
   testing, which finds security problems in source code without running it) need per-project
@@ -1672,7 +1674,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0036 — Let a host add modules that `require` finds, without granting `package`
 
-- **Status:** Accepted
+- **Status:** Accepted; ADR-0038, proposed, adds the modules of packages, which `require` finds
+  after the host's
 - **Date:** 2026-11-24
 - **Context:**
   - `package` and `require` are off by default, and a host grants them with a module loader of its
@@ -1758,3 +1761,165 @@ it is `Proposed`, and no code may depend on it.
     threads would end the determinism of ADR-0018.
 - **Revisit when:** a host needs a pause inside a long library call, or reports a script that a
   pause left half updated in a way pausing between instructions should prevent.
+
+## ADR-0038 — Organize scripts into packages and modules, as Cargo organizes Rust code
+
+- **Status:** Proposed
+- **Date:** 2026-11-25
+- **Context:**
+  - Lua finds a module by trying the patterns in `package.path`, such as `./?.lua`. Any file can
+    `require` any other file those patterns reach, every module name shares one namespace, and
+    nothing records a library's version. Lunaferra keeps that model: hosts add modules by name
+    (ADR-0036), and the tools read `package.path` patterns from `.lunaferra.lua` (ADR-0016,
+    proposed: a data-only configuration file).
+  - Cargo, Rust's build tool, organizes code in packages. Each has a manifest, `Cargo.toml`, that
+    names it, gives its version, and lists its dependencies, and a library crate whose modules are
+    files under `src/`. A crate reaches only the crates its manifest lists, and a module is private
+    unless it is marked `pub`. Rust programmers, who write every host, already know this model.
+  - A package manager reads manifests that other people wrote, so it reads hostile input. npm's
+    install scripts and Cargo's build scripts run a package's own code while it is installed or
+    built, which is how many attacks on package registries work.
+  - On 2026-11-25 the owner asked for a module system based on Cargo, so that package management,
+    dependency management, and the architecture of a project are clear and modular.
+- **Decision:**
+  - **Packages.** A package is a folder whose manifest, `Lunaferra.lua`, has a `package` table
+    with its name and its version. Its modules are the files under `src/`: `src/init.lua` is the
+    root module, as `src/lib.rs` is a Rust library's, and the name `a.b` names `src/a/b.lua` or
+    `src/a/b/init.lua`. `src/main.lua` is the package's program, which no module can require.
+  - **The manifest's format** is ADR-0016's: a data-only Lua file, parsed and never run. The
+    manifest also takes over the job of `.lunaferra.lua`: its `tools` table holds the settings
+    ADR-0016 lists, and a manifest with no `package` table holds settings for loose scripts or
+    lists a workspace's members. Unknown fields are errors.
+  - **Namespaces.** In a package, the first part of a name in `require` must be the package's own
+    name, the name of a dependency its manifest lists, or a module the host added. A package sees
+    no other package, as a Rust crate sees only the crates its manifest names. Two packages that
+    depend on incompatible versions of one package each get the version they asked for.
+  - **Exports.** A package's root module is public. Its other modules are private unless the
+    manifest's `exports` lists them, and requiring a private module of another package raises
+    `module 'x' is private to package 'y'`.
+  - **One cache per state.** Each module loads once per state for each package version, in a
+    cache that scripts can't read or replace.
+  - **Workspaces.** A manifest with `workspace.members` makes a workspace, whose packages share
+    one lock file (ADR-0039) and depend on each other by path.
+  - **No package code runs to build or install it**: no build scripts and no install hooks.
+  - **Hosts and tools.** The `lunaferra` crate installs the resolved packages in a state, reading
+    their files through a loader the host supplies, and the analysis tools resolve every `require`
+    through the same module graph. A new crate, `lunaferra-package`, holds the formats and the
+    graph. [`specs/package.md`](specs/package.md) gives the details.
+- **Consequences:**
+  - Good: each package says in one file what it is, what it uses, and what it offers, and the
+    module graph matches the dependency graph, so a reader can see a project's architecture from
+    its manifests.
+  - Good: private modules can change without breaking any dependent.
+  - Good: installing or building a package runs none of its code, and a script can't swap another
+    package's modules, even with `package` granted.
+  - Good: a host bundles its packages in its binary and runs the same layout on every platform.
+  - Bad: Lua code laid out for `package.path` needs a manifest and a `src/` folder to become a
+    package; it still runs as loose scripts without one.
+  - Bad: the manifest is a public interface, so a released field keeps its meaning, and a field
+    renamed or removed is a breaking change.
+  - Bad: a name in `require` means different modules in different packages, so a tool must read
+    the manifest to know what a `require` loads.
+  - Bad: `.lunaferra.lua` goes away before any tool reads it; ADR-0016 changes only in where its
+    settings live.
+  - Follow-up: M14 builds packages, and M6.3 reads the manifest and links files through the module
+    graph.
+- **Alternatives considered:**
+  - Lua's `package.path` only, as today: nothing to build, but every file can reach every other,
+    module names collide, and no file records a version.
+  - LuaRocks rockspecs, Lua's existing package format: familiar to Lua users, but a rockspec is a
+    Lua program that runs when it is read, many rocks build C modules that ADR-0017 (no Lua C API)
+    rules out, and their code targets Lua's operators and 1-based indexes, not Lunaferra's
+    (ADR-0023).
+  - A TOML manifest, as Cargo's is: familiar to Rust users, but it needs a TOML parser of
+    Lunaferra's own, which is why ADR-0016 chose Lua.
+  - A manifest beside `.lunaferra.lua`: no change to ADR-0016, but two files with almost the same
+    name and overlapping jobs.
+  - Every module public, as in Lua: nothing to declare, but every file in a package becomes part of
+    its interface.
+  - An `import` statement: new syntax for what `require` does, which ADR-0036 also turned down.
+- **Revisit when:** a package needs code that runs when it is built, or users ask for module names
+  relative to the requiring module, such as `require(".lexer")`.
+
+## ADR-0039 — Get dependencies from paths and Git, and pin them in a lock file, as Cargo does
+
+- **Status:** Proposed
+- **Date:** 2026-11-25
+- **Context:**
+  - Packages (ADR-0038) depend on other packages. Cargo gets them from a registry (crates.io), from
+    Git, or from a folder, picks the newest version that meets each Semantic Versioning (SemVer)
+    requirement, and records each choice in `Cargo.lock`, with a checksum for each download.
+  - Downloading from a registry over HTTPS needs a client for Transport Layer Security (TLS), the
+    protocol that encrypts HTTPS. The standard library has none, and
+    `.claude/rules/dependencies.md` treats homemade cryptography as impossible to write safely
+    here, so Lunaferra can't download over HTTPS itself without an exception to ADR-0002 (no
+    third-party code). A checksum of each download needs a cryptographic hash, which runs into the
+    same rule.
+  - Git is part of the platform. It fetches over HTTPS and SSH, and it names each object by a hash
+    of its contents, so a full commit hash pins every file under that commit.
+  - A dependency's manifest and repository come from someone else. A manifest can name a path
+    outside its repository, a URL that Git runs as a command (`ext::`), or a URL that Git reads as
+    one of its options; a repository can hold symbolic links and submodules aimed outside its
+    folder.
+  - On 2026-11-25 the owner asked for dependency management based on Cargo.
+- **Decision:**
+  - **Sources.** A dependency comes from a folder (`path`) or a Git repository (`git`), at a tag,
+    a branch, a full commit hash, or the newest version tag that meets a `version` requirement.
+    `lunaferra` runs the `git` command to fetch, and holds no network code of its own.
+  - **Versions.** Packages use SemVer 2.0.0, and requirements are written as Cargo writes them:
+    `"1.4"` means at least 1.4.0 and below 2.0.0, and `"0.4"` at least 0.4.0 and below 0.5.0.
+  - **Resolution.** For each package and each series of compatible versions, the resolver picks
+    the newest version that meets every requirement in the graph. It backtracks when a later
+    requirement rules out a choice, up to a step limit, and otherwise reports the conflicting
+    requirements and the manifests that made them.
+  - **The lock file.** `Lunaferra.lock`, at the root of a package or workspace, records each
+    package's name, version, source, and, for Git, its full commit hash. It is data-only Lua,
+    sorted, and the same resolution writes the same bytes. `--locked` fails a command that would
+    change it, and `--offline` starts no network operation.
+  - **Integrity from Git.** The commit hash in the lock file is the check that the code is the code
+    that was resolved. Lunaferra writes no checksum of its own, so it needs no hash function.
+  - **Hostile repositories.** Lunaferra starts `git` with no shell and with only the `https`,
+    `ssh`, and `file` protocols allowed, writes `--` before every URL and ref, turns on Git's
+    object checks, and never asks Git to check out files. It reads each commit's files through
+    Git and writes them itself: only regular files, never a link, a submodule, or a path that
+    leaves the package's folder. A path dependency inside a Git dependency must stay in its
+    repository.
+  - **One cache per user**, in `LUNAFERRA_HOME` or `.lunaferra` in the home folder, as Cargo keeps
+    `~/.cargo`, shared by every project on the machine.
+  - **Commands.** `lunaferra new`, `init`, `add`, `remove`, `fetch`, `update`, `tree`, and
+    `vendor`. `add` and `remove` edit the manifest through the lossless syntax tree, so its
+    comments and layout stay.
+  - **A registry later.** A registry that finds packages by name is planned as a Git repository
+    that records each version's Git URL and commit, so it needs no new transport. Running a public
+    one waits in the backlog.
+  - **Scope.** This record covers the packages that a project's scripts depend on. Lunaferra's own
+    Rust crates still follow ADR-0002.
+- **Consequences:**
+  - Good: Lunaferra has no network or cryptography code; Git does both, and the lock file's commit
+    hashes pin every file.
+  - Good: every run of a project uses the same code, and CI with `--locked` fails on a stale lock
+    file.
+  - Good: a hostile repository can't run a command, write outside its folder, or leave a link on
+    the disk.
+  - Bad: Git dependencies need Git installed; path dependencies don't.
+  - Bad: without a registry, a dependency is named by its URL, and a moved repository breaks every
+    manifest that names it.
+  - Bad: a tag's owner can move it to another commit. A locked build keeps its commit, but the
+    next `lunaferra update` follows the tag.
+  - Bad: path and vendored dependencies have no hash to check, because there is no commit.
+  - Follow-up: M14.2 to M14.8 build versions, resolution, the lock file, fetching, and vendoring;
+    the backlog holds the registry, checksums, and HTTPS downloads.
+- **Alternatives considered:**
+  - A registry over HTTPS now, as crates.io is: what Cargo users know, but it needs a TLS client
+    from a third party (ADR-0002).
+  - LuaRocks as a source: many existing packages, but rockspecs run code, many rocks build C
+    modules (ADR-0017), and their code targets Lua, not Lunaferra (ADR-0023).
+  - Minimal version selection, as Go's modules use: it picks the oldest version that meets every
+    requirement, so it never backtracks and repeats without a lock file, but a project gets a
+    dependency's fixes only when someone raises a requirement, and Cargo's users expect the newest
+    compatible version.
+  - Vendoring only, with no fetching: no Git needed, but every update is a copy by hand.
+  - A checksum of Lunaferra's own over each package's files: a check for path and vendored
+    sources too, but it needs a cryptographic hash written here.
+- **Revisit when:** the standard library gains TLS or a cryptographic hash, a user needs a
+  dependency that Git can't fetch, or a public registry for Lunaferra packages is wanted.

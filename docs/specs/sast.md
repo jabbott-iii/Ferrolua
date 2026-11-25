@@ -20,8 +20,8 @@ understand, which a suppression comment documents.
 
 | Kind | Built in | From the host |
 | :- | :- | :- |
-| Sources | `io.read`, `io.lines`, file `read`, `os.getenv`, `arg`, and the parameters of functions the host marks as entry points | `sast.sources` in `.lunaferra.lua` |
-| Sinks | `load`, which runs text as code; `os.execute` and `io.popen`; `io.open`, `dofile`, `loadfile`, `os.remove`, and `os.rename` paths; `require` with a computed name; pattern arguments to `string.find`, `match`, `gmatch`, and `gsub`; counts given to `string.rep` | `sast.sinks` |
+| Sources | `io.read`, `io.lines`, file `read`, `os.getenv`, `arg`, and the parameters of functions the host marks as entry points | `tools.sast.sources` in `Lunaferra.lua` |
+| Sinks | `load`, which runs text as code; `os.execute` and `io.popen`; `io.open`, `dofile`, `loadfile`, `os.remove`, and `os.rename` paths; `require` with a computed name; pattern arguments to `string.find`, `match`, `gmatch`, and `gsub`; counts given to `string.rep` | `tools.sast.sinks` |
 | Sanitizers | `tonumber`, `math.tointeger`, and comparisons against literal strings | `sast.sanitizers` |
 
 ## Rules
@@ -50,7 +50,7 @@ through the `github/codeql-action/upload-sarif` action.
 
 1. Every rule has a test with a flow it reports, and a flow through a sanitizer that it doesn't.
 2. A flow through any number of assignments, calls, returns, and table fields is followed, up to the
-   analysis depth in `.lunaferra.lua`.
+   analysis depth in the manifest's `tools` table.
 3. Analysis finishes in time bounded by the project's size, including recursive functions.
 4. SARIF output is a valid SARIF 2.1.0 log.
 

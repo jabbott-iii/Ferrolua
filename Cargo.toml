@@ -1,5 +1,6 @@
 # The Lunaferra workspace: one member for each crate in the crate map of
-# `docs/01-architecture.md`, in the same order.
+# `docs/01-architecture.md`, in the same order. `lunaferra-package` joins in M14.1, once its
+# decision records are accepted.
 [workspace]
 resolver = "3"
 members = [

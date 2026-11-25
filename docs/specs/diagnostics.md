@@ -1,9 +1,10 @@
 # Subsystem: `diagnostics`
 
 This spec is the contract every Lunaferra tool follows when it reports a problem in Lua code: the
-syntax checker, strict mode, the type checker, the linter, the formatter, and the SAST tool. It
-defines the diagnostic type, the codes, the output formats, suppression comments, and the
-`.lunaferra.lua` configuration file (ADR-0016, proposed: the tools read a data-only Lua file).
+syntax checker, strict mode, the type checker, the linter, the formatter, the SAST tool, and the
+package manager. It defines the diagnostic type, the codes, the output formats, suppression
+comments, and the tool settings in the package manifest, `Lunaferra.lua` (ADR-0016, proposed: the
+tools read a data-only Lua file; ADR-0038, proposed: that file is the package manifest).
 `lunaferra-syntax` defines the type in M1.6, and each tool adds its codes as it lands.
 
 ## Why one contract
@@ -41,6 +42,7 @@ added:
 | `L` | Linter | Warning by default; configurable |
 | `F` | Formatter: a file that isn't formatted | Configurable |
 | `S` | SAST | Warning or error by rule; configurable |
+| `M` | Package manifests and lock files ([`package.md`](package.md)) | Error, except a skipped version tag, which is a warning |
 
 A code is never renamed, and a removed code's number is never reused. Each task that adds a
 diagnostic adds its row to the registry below, in the same change.
@@ -80,43 +82,55 @@ risky_call()
   nothing is itself reported by the linter.
 - `P` and `C` codes can't be suppressed, because the file doesn't compile.
 
-## Configuration: `.lunaferra.lua`
+## Configuration: the manifest's `tools` table
 
-The tools read `.lunaferra.lua` from the directory they run in, or the nearest parent that has one.
-The file holds one statement, `return` followed by a table constructor. It may contain table
-constructors, strings, numbers, booleans, and comments, and nothing else; any other expression is
-an error. The tools parse it and never run it.
+The tools read their settings from the `tools` table of the manifest, `Lunaferra.lua`, in the
+directory they run in or the nearest parent that has one (ADR-0038). A manifest with no `package`
+table holds settings for loose scripts. The manifest is a data-only Lua file: one statement,
+`return` followed by a table constructor, holding table constructors, strings, numbers, booleans,
+and comments, and nothing else; any other expression is an error. The tools parse it and never run
+it. In a workspace, a member with no `tools` table of its own uses the root's
+([`package.md`](package.md#workspaces)).
 
 ```lua
 return {
-  include = { "src/**/*.lua", "scripts/*.lua" },
-  exclude = { "src/vendor/**" },
+  package = { name = "game", version = "0.3.1" },
 
-  -- Names the host defines, for strict mode and the type checker.
-  globals = { "game", "log" },
-  declarations = { "types/game.d.lua" },
-  strict = true,
+  tools = {
+    -- Files for the tools to check; by default, a package's src/, tests/, and examples/.
+    include = { "src/**/*.lua", "scripts/*.lua" },
+    exclude = { "src/vendor/**" },
 
-  rules = {
-    L0001 = "off",
-    S0002 = "error",
-  },
+    -- Where loose scripts find modules; a package's modules follow its module graph instead.
+    package_path = "./?.lua;./?/init.lua",
 
-  format = {
-    indent_width = 2,
-    line_width = 100,
-    quote_style = "double",
-  },
+    -- Names the host defines, for strict mode and the type checker.
+    globals = { "game", "log" },
+    declarations = { "types/game.d.lua" },
+    strict = true,
 
-  sast = {
-    sources = { "game.read_chat", "http.request_body" },
-    sinks = { "game.run_command" },
+    rules = {
+      L0001 = "off",
+      S0002 = "error",
+    },
+
+    format = {
+      indent_width = 2,
+      line_width = 100,
+      quote_style = "double",
+    },
+
+    sast = {
+      sources = { "game.read_chat", "http.request_body" },
+      sinks = { "game.run_command" },
+    },
   },
 }
 ```
 
-`lunaferra-analysis` reads the file in M6.3; each tool's spec lists the settings it adds.
-Command-line flags override the file.
+`lunaferra-package` reads the manifest in M14.1, and `lunaferra-analysis` takes the tool settings
+from it in M6.3; each tool's spec lists the settings it adds. Command-line flags override the
+manifest.
 
 ## Invariants
 
@@ -125,7 +139,7 @@ Command-line flags override the file.
 3. JSON Lines output parses with `lunaferra-json`, one object per line, and SARIF output is a valid
    SARIF 2.1.0 log.
 4. A suppression comment removes exactly the codes it names, on exactly the lines it covers.
-5. Reading `.lunaferra.lua` runs no code: a file with a function call, an operator, or a name in an
+5. Reading a manifest runs no code: a file with a function call, an operator, or a name in an
    expression is rejected.
 
 ## Tests
@@ -138,5 +152,6 @@ Command-line flags override the file.
   fields that SARIF 2.1.0 requires.
 - Invariant 4: tests cover each comment form, a suppression of an absent code, and a suppression
   of a `P` code.
-- Invariant 5: hostile-input tests in `lunaferra-analysis` give `.lunaferra.lua` files with calls,
-  operators, and names, and expect each to be rejected with its exact message.
+- Invariant 5: hostile-input tests in `lunaferra-package` give manifests with calls, operators, and
+  names, and expect each to be rejected with its exact message
+  ([`package.md`](package.md#tests)).

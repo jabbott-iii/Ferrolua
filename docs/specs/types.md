@@ -52,17 +52,18 @@ Classes are nominal: only instances of a class or its subclasses have its type.
 
 Types for the standard library, and for host APIs, come from declaration files: Lunaferra files
 with `declare` statements and no code, such as `declare function print(...: any)`. Lunaferra ships
-declarations for all of its standard library. Projects list their own in `declarations` in
-`.lunaferra.lua` ([`diagnostics.md`](diagnostics.md#configuration-lunaferralua)). M6.6 settles the
+declarations for all of its standard library. Projects list their own in `declarations` in the
+manifest's `tools` table
+([`diagnostics.md`](diagnostics.md#configuration-the-manifests-tools-table)). M6.6 settles the
 declaration syntax. A host writes its declaration file from the same `Api` description that
 registers its bindings, so the two never drift (ADR-0035: the host's API described once; M6.12).
 
 ## Which files are checked
 
 A file is checked when it has at least one annotation, inline or LuaCATS, or starts with
-`--!strict`, or when `.lunaferra.lua` sets `types = { check_all = true }`. Other files get no `T`
-diagnostics, so adding the checker to an untyped project reports nothing until the project opts
-in.
+`--!strict`, or when the manifest's `tools` table sets `types = { check_all = true }`. Other files
+get no `T` diagnostics, so adding the checker to an untyped project reports nothing until the
+project opts in.
 
 ## LuaCATS annotations
 

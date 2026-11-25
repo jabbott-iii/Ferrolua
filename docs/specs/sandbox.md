@@ -29,7 +29,7 @@ a state unless the host registers it.
 | `os` time functions | On | `os.time`, `os.clock`, `os.date`, and `os.difftime` |
 | Rest of `os` | Off | `os.execute`, `os.remove`, `os.rename`, `os.tmpname`, `os.getenv`, `os.setlocale`, and `os.exit` |
 | `io` | Off | Granted with a file access policy, below |
-| `require` | On | Finds only the modules the host added with `add_module` and `add_source_module` (ADR-0036: modules a host adds for `require`) |
+| `require` | On | Finds only the modules the host added with `add_module` and `add_source_module` (ADR-0036: modules a host adds for `require`), and the packages it installed with `add_packages`, each within the namespaces its manifest gives (ADR-0038, proposed: packages and modules) |
 | `package` | Off | Granted with a module loader the host supplies, whose searchers `require` tries after the host's modules; never loads C modules (ADR-0017) |
 | `debug` | Off | Can read and change any local and upvalue, so it breaks every other boundary |
 | Precompiled chunks | Off | `load` with mode `"b"` and `string.dump` (ADR-0010) |
@@ -125,6 +125,8 @@ is.
    the call it runs in.
 9. A state made with `Options::default()` stops an endless loop at the instruction limit and an
    endlessly growing table at the memory limit.
+10. A module in a package reaches only the modules its package's namespaces hold, and no script
+    can read or replace a module another package loaded (ADR-0038, proposed).
 
 ## Tests
 
@@ -150,3 +152,6 @@ is.
   them first, in order.
 - Invariant 9: `hostile_sandbox.rs` runs both scripts in a state made with `Options::default()`,
   and checks each error and the setting it names (M3.20).
+- Invariant 10: in a `SAFE` state, a module requires a private module of a dependency, a package
+  its manifest doesn't list, and a module after changing `package.loaded`, and each fails or
+  changes nothing (M14.5).

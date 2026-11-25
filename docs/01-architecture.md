@@ -3,8 +3,10 @@
 Lunaferra is a Cargo workspace of small crates in two stacks that share a parser. The runtime stack
 turns source into bytecode, runs it, and compiles hot code to machine code. The analysis stack
 turns source into a semantic model that the type checker, linter, and SAST tool read. Front ends,
-the `lunaferra` command and the editor servers, sit on top. The crate map below names the task that
-builds each crate.
+the `lunaferra` command and the editor servers, sit on top. Scripts are organized into packages, as
+Cargo organizes Rust code: a manifest names each package and its dependencies, and both stacks
+follow the same module graph (ADR-0038, proposed: packages and modules, as Cargo has). The crate map
+below names the task that builds each crate.
 
 ## Principles
 
@@ -47,9 +49,10 @@ describes; the `lunaferra` crate's scope is `lunaferra`.
 | `lunaferra-fmt` | Formatter | syntax | Yes | [fmt](specs/fmt.md) | M7.4 |
 | `lunaferra-sast` | Taint analysis and security rules, with SARIF output | analysis, types, json | Yes | [sast](specs/sast.md) | M8.1 |
 | `lunaferra-json` | JSON values, parser, writer, and protocol message framing | — | Yes | [json](specs/json.md) | M6.9 |
+| `lunaferra-package` | Package manifests, lock files, versions, the dependency resolver, and the module graph (ADR-0038, ADR-0039) | syntax | Yes | [package](specs/package.md) | M14.1 |
 | `lunaferra-lsp` | Language server | json, analysis, types, lint, fmt, sast | Yes | [lsp](specs/lsp.md) | M9 |
 | `lunaferra-dap` | Debug adapter | json, lunaferra | Yes | [dap](specs/dap.md) | M10 |
-| `lunaferra-cli` | The `lunaferra` command | all of the above | Yes | [cli](specs/cli.md) | M1.10 |
+| `lunaferra-cli` | The `lunaferra` command, including fetching packages with Git | all of the above | Yes | [cli](specs/cli.md) | M1.10 |
 | `lunaferra-testkit` | Seeded random generator, property tests, Lua source generator | — | No: a dev-dependency only | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.2 |
 | `lunaferra-fuzz` | The fuzzer and its targets, in `fuzz/` | testkit, the crates it targets | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.4 |
 | `lunaferra-webtest` | The WebAssembly test module the browser harness runs, in `xtask/webtest/` | lunaferra | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M3.17 |
@@ -69,7 +72,7 @@ A crate may depend only on crates in lower layers, or on lower crates in its own
 | 3. Front ends | `lunaferra-cli`, `lunaferra-dap` | `lunaferra-cli`, `lunaferra-lsp` |
 | 2. Services | `lunaferra` (embedding API) | `lunaferra-lint`, `lunaferra-sast`, `lunaferra-fmt` |
 | 1. Engines | `lunaferra-compiler`, `lunaferra-vm`, `lunaferra-stdlib`, `lunaferra-jit` | `lunaferra-analysis`, `lunaferra-types` |
-| 0. Foundations | `lunaferra-syntax`, `lunaferra-bytecode`, `lunaferra-json` | `lunaferra-syntax`, `lunaferra-json` |
+| 0. Foundations | `lunaferra-syntax`, `lunaferra-package`, `lunaferra-bytecode`, `lunaferra-json` | `lunaferra-syntax`, `lunaferra-package`, `lunaferra-json` |
 
 - The runtime stack never depends on the analysis stack, so a host that embeds Lunaferra doesn't
   build the type checker. The compiler reads type annotations from the syntax tree and stores them
@@ -77,6 +80,9 @@ A crate may depend only on crates in lower layers, or on lower crates in its own
 - `lunaferra-vm` doesn't depend on `lunaferra-jit`. The VM defines a trait for a compiled tier, and
   the `lunaferra` crate plugs the JIT into it when its `jit` feature is on, so the VM, and a host
   that leaves the feature off, build and run without machine code.
+- `lunaferra-vm` and `lunaferra-stdlib` don't depend on `lunaferra-package`. The standard library's
+  `require` asks a resolver trait it defines, and the `lunaferra` crate implements it with the
+  module graph ([`specs/package.md`](specs/package.md#how-a-state-uses-the-graph)).
 - Nothing depends on a front end.
 
 The diagram shows what depends on what. Every part is drawn dashed because none is built yet; a
@@ -102,6 +108,7 @@ flowchart TB
   bytecode["lunaferra-bytecode<br/>(M2.1)"]:::planned
   syntax["lunaferra-syntax<br/>(M1)"]:::planned
   json["lunaferra-json<br/>(M6.9)"]:::planned
+  pkg["lunaferra-package<br/>(M14.1)"]:::planned
   math["lunaferra-math<br/>(M2.19)"]:::planned
 
   cli -.-> api
@@ -137,6 +144,10 @@ flowchart TB
   types -.-> analysis
   analysis -.-> syntax
   fmt -.-> syntax
+  pkg -.-> syntax
+  api -.-> pkg
+  analysis -.-> pkg
+  cli -.-> pkg
 ```
 
 ## Source layout
@@ -181,14 +192,29 @@ docs/                 these documents
    A limit error passes through `pcall` to the host ([`specs/sandbox.md`](specs/sandbox.md)).
 7. Dropping the state runs the pending finalizers, then frees every value left.
 
+## Building a project from packages
+
+1. `lunaferra fetch`, or any command that runs or checks a package, reads the manifest,
+   `Lunaferra.lua`, of the package or workspace it runs in, with `lunaferra-package`, which parses
+   it and never runs it (ADR-0016: a data-only Lua file).
+2. The resolver picks a version of each dependency that meets every requirement, trying the
+   versions in `Lunaferra.lock` first, and writes the lock file again only if a choice changed
+   (ADR-0039, proposed: dependencies from paths and Git, pinned in a lock file).
+3. `lunaferra-cli` fetches each Git dependency's locked commit into the per-user cache by running
+   `git`, and writes only the commit's regular files
+   ([`specs/package.md`](specs/package.md#fetching-with-git)).
+4. `lunaferra run` creates a state, installs the packages with `Lua::add_packages`, and runs the
+   package's `src/main.lua`. Each `require` resolves in the namespaces of the package that holds
+   the calling function, and each module loads once per state.
+
 ## Checking a script
 
-1. `lunaferra check`, `lint`, or `sast`, or the language server, reads `.lunaferra.lua` (ADR-0016:
-   the tools read a data-only Lua file) and the files it names.
+1. `lunaferra check`, `lint`, or `sast`, or the language server, reads the `tools` table of the
+   nearest manifest, `Lunaferra.lua` (ADR-0016; ADR-0038), and the files it names.
 2. `lunaferra-syntax` builds a lossless tree for each file, with errors marked in place, so a file
    that doesn't parse still gets checked.
 3. `lunaferra-analysis` resolves names, builds each function's control flow graph, and links the
-   files through `require` calls with literal names.
+   files through `require` calls with literal names, following the module graph in a package.
 4. `lunaferra-types` infers and checks types; `lunaferra-lint` and `lunaferra-sast` run their rules
    on the typed model.
 5. Every tool reports the same diagnostic type, which the command line prints as text, JSON, or
@@ -210,8 +236,12 @@ messages inside the VM's debug hook instead of on a thread of its own.
 | Libraries, limits, JIT mode, and strict-mode defaults for a state | `lunaferra::Options` | The host |
 | Chunk name, text or binary mode, and strict mode for one chunk | `lunaferra::ChunkOptions` | The host |
 | Strict mode for one file | A first line of `--!strict` (ADR-0008) | The script's author |
-| Tool settings: paths, rules, format style, taint sources and sinks | `.lunaferra.lua` (ADR-0016) | The project |
-| One run of a tool | Command-line flags, which override `.lunaferra.lua` | The user |
+| A package's name, version, exports, and dependencies | `Lunaferra.lua` (ADR-0038) | The package's author |
+| The exact version and commit of every dependency | `Lunaferra.lock` (ADR-0039), committed with the project | `lunaferra fetch` and `lunaferra update` |
+| Tool settings: paths, rules, format style, taint sources and sinks | The `tools` table of `Lunaferra.lua` (ADR-0016, ADR-0038) | The project |
+| Where fetched packages are kept | `LUNAFERRA_HOME`, or `.lunaferra` in the home folder | The user |
+| One run of a tool | Command-line flags, which override the manifest | The user |
 
 Library crates read no environment variables and no files of their own accord. Only `lunaferra-cli`
-reads them, as [`specs/cli.md`](specs/cli.md) lists.
+reads them, as [`specs/cli.md`](specs/cli.md) lists, and only it starts another program: `git`,
+to fetch packages.

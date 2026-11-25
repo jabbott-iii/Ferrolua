@@ -14,6 +14,10 @@ package. These count as dependencies: a crate from crates.io or a Git URL, every
 brings in, dev-dependencies, build tools, test, lint, and format tools, copied or vendored code, a
 CI action, and any file or service fetched while building or running.
 
+This rule covers Lunaferra's own code. The packages that a project's scripts depend on are that
+project's choice, and `lunaferra`'s package commands fetch them with Git, which is part of the
+platform (ADR-0039, proposed: dependencies from paths and Git, pinned in a lock file).
+
 These don't count, because they are the platform Lunaferra is built on:
 
 - Rust's toolchain from rustup at the version in `rust-toolchain.toml`: rustc, Cargo, the standard
@@ -94,6 +98,8 @@ Each row is something Lunaferra needs, and how it gets it without a third-party 
 | Tests on Android, iOS, and the web | The platforms' own `adb`, `xcrun simctl`, and browsers, driven by `xtask`, with a browser harness of Lunaferra's own | `cargo xtask test` (M3.17, ADR-0027) |
 | JSON, JSON-RPC, and SARIF | A JSON crate of Lunaferra's own | `lunaferra-json` (M6.9) |
 | Command-line arguments | A parser of Lunaferra's own, on `std::env::args_os` | `lunaferra-cli` (M1.10) |
-| Tool configuration | A data-only Lua file, read by Lunaferra's own parser | `.lunaferra.lua` (ADR-0016) |
+| Tool configuration and package manifests | A data-only Lua file, read by Lunaferra's own parser | `Lunaferra.lua` (ADR-0016, ADR-0038) |
+| Semantic Versioning, version resolution, and lock files | Code of Lunaferra's own | `lunaferra-package` (M14.2, M14.3) |
+| Fetching packages, and checking that they are the code that was locked | The `git` command, which fetches over HTTPS and SSH and names every object by a hash of its contents | `lunaferra fetch` (M14.7, ADR-0039) |
 | Editor integration | Lunaferra's own LSP and DAP servers; no editor extension yet | `lunaferra-lsp` and `lunaferra-dap` (ADR-0015) |
 | Lua's official test suite | Not used: it isn't part of the platform as defined above | Backlog |

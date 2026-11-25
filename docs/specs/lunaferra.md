@@ -72,6 +72,12 @@ assert_eq!(result, "hello, world");
 - `Lua::add_module(name, value)` and `Lua::add_source_module(name, source)` add modules that
   `require` finds in every state, even without `package`, and that load once per state (ADR-0036:
   modules a host adds for `require`; M3.23).
+- `Packages` holds the packages of one lock file, read through a loader trait the host implements:
+  from a folder, or from sources compiled into the host's binary. `Lua::add_packages(packages)`
+  installs them, and `ChunkOptions::package` names the package a chunk the host loads belongs to.
+  `require` resolves each name in the namespaces of the package that holds the calling function,
+  after the host's modules (ADR-0038, proposed: packages and modules, as Cargo has; M14.5), as
+  [`package.md`](package.md#how-a-state-uses-the-graph) describes.
 - A Rust function returns `Yield(values)` to suspend the coroutine that called it, and
   `Lua::spawn(function, args)` starts a `Task` that the host runs with `Task::resume`, which gives
   `Poll::Yielded`, `Poll::Done`, `Poll::Failed`, or, for a task spawned with `pause_on_limit`,

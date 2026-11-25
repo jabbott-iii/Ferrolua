@@ -30,7 +30,7 @@ optional line break in it when it doesn't.
 
 ## Options
 
-| Setting in `.lunaferra.lua` | Values | Default |
+| Setting in the manifest's `tools` table | Values | Default |
 | :- | :- | :- |
 | `format.indent_style` | `"spaces"`, `"tabs"` | `"spaces"` |
 | `format.indent_width` | 1 to 16 | 2 |

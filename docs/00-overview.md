@@ -11,7 +11,8 @@ lists, tuples, and sets, and rule for which values are false (ADR-0025). It adds
 programs lack: optional types, classes, compound assignment, and a strict mode that catches wrong
 argument counts and undeclared variables. It also ships the tools that keep Lua code consistent,
 fast, and secure, in one command: a type checker, a linter, a formatter, a static application
-security testing (SAST) tool, a language server for editor auto complete, and a debugger.
+security testing (SAST) tool, a language server for editor auto complete, a debugger, and a
+package manager modeled on Cargo, Rust's (ADR-0038 and ADR-0039, both proposed).
 
 One rule shapes the rest: **a script, however hostile, can't break memory safety or the host.**
 Lunaferra uses no third-party code (ADR-0002), frees memory deterministically, by reference counting
@@ -43,8 +44,9 @@ host allows, within limits the VM enforces (ADR-0014).
    default, lists, tuples, sets, and truth, and can use optional types, classes, compound
    assignment, and strict mode, as [`specs/language.md`](specs/language.md) defines (ADR-0006
    through ADR-0008, and ADR-0023 through ADR-0026).
-7. One binary, `lunaferra`, runs scripts and checks them: `run`, `check` (types), `lint`, `fmt`,
-   and `sast`, with stable diagnostic codes and SARIF output for code scanning.
+7. One binary, `lunaferra`, runs scripts, checks them, and manages packages: `run`, `check`
+   (types), `lint`, `fmt`, and `sast`, with stable diagnostic codes and SARIF output for code
+   scanning, and `new`, `add`, `remove`, `fetch`, `update`, `tree`, and `vendor` for packages.
 8. Editors get type-aware auto complete, live diagnostics, and a debugger through `lunaferra lsp`
    and `lunaferra dap` (ADR-0015).
 9. Lunaferra meets the performance budgets below once they are agreed.
@@ -52,6 +54,12 @@ host allows, within limits the VM enforces (ADR-0014).
     that allows executable memory, and the same script with the same inputs and hash seed gives
     the same output and the same collection log on every target (ADR-0027). CI tests each target
     listed in [`03-platforms.md`](03-platforms.md).
+11. Scripts are organized into packages, as Rust code is in Cargo's: a manifest, `Lunaferra.lua`,
+    gives each package's name, version, exported modules, and dependencies; a lock file,
+    `Lunaferra.lock`, pins the version and Git commit of every dependency; and a module can
+    `require` only its own package, the packages its manifest lists, and its host's modules
+    (ADR-0038: packages and modules; ADR-0039: dependencies from paths and Git, pinned in a lock
+    file; both proposed).
 
 ## Non-goals
 
@@ -66,6 +74,10 @@ host allows, within limits the VM enforces (ADR-0014).
 - Loading chunks compiled by PUC-Rio's `luac` (ADR-0010).
 - A JIT on iOS or the web, where an app can't run machine code it writes (ADR-0027).
 - The Lua C API, and C modules built for PUC-Rio Lua (ADR-0017).
+- Running a package's own code to build or install it, as build scripts and install hooks do
+  (ADR-0038, proposed).
+- Installing packages from LuaRocks, whose package files run code and whose packages are written
+  for Lua (ADR-0039, proposed).
 
 ## Budgets
 
@@ -106,6 +118,8 @@ Revisit these if any turns out to be wrong.
   against the recorded output and doesn't need it.
 - Editors that users choose have built-in clients for the Language Server Protocol (LSP) and the
   Debug Adapter Protocol (DAP), or users accept configuring one.
+- Users who depend on packages in Git repositories have Git installed, and the services that host
+  those repositories serve them over HTTPS or SSH (ADR-0039, proposed).
 
 ## Scope estimate
 
@@ -120,6 +134,7 @@ weeks, L is one to three months, and XL is more than three months.
 | VM core: heap, values, tables, interpreter, metamethods, coroutines (M2) | XL | Lua 5.5's behavior where the language keeps it, Python's results for operators, lists, tuples, sets, and truth, reference counting, a deterministic loop collector, and PUC-Rio's error messages |
 | Standard library (M3) | L | `string.format` and number printing that match PUC-Rio byte for byte, patterns, `string.pack`, every position moved to count from 0, Python's format mini-language, and the `list`, `tuple`, and `set` libraries |
 | Embedding API and sandbox (M3) | M | Rust types that tie values to their state, plus limits counted inside library calls |
+| Packages, modules, and dependencies (M14) | L | A manifest and lock file format, Semantic Versioning, a resolver with a step limit, a namespace for each package in the VM and the tools, and fetching through Git from repositories that may be hostile |
 | Language extensions (M4) | L | Classes with a fixed field layout, and grammar rules that fit around Python's operators |
 | Baseline JIT for x86-64 (M5) | XL | An x86-64 encoder, executable memory, guards, and exits back to the interpreter |
 | Type checker (M6) | XL | Gradual types, inference, narrowing, LuaCATS annotations, and types for the whole standard library |
@@ -145,5 +160,6 @@ weeks, L is one to three months, and XL is more than three months.
 | A platform behaves differently: math results, a NaN's sign, stack sizes, or executable memory | `lunaferra-math` gives the same bits everywhere; every NaN prints as `nan`; nesting tests run on a 256 KB stack; the JIT falls back to the interpreter when a system refuses executable memory (ADR-0028); CI runs every target from M3.18 on |
 | The plan is large for its team | Milestones deliver usable parts in order: a parser, then an interpreter, then embedding, then the extensions, the JIT, and the tools |
 | Users won't port Lua code to Lunaferra's operators, 0-based indexes, scoping, and truth (ADR-0023, ADR-0025) | Lunaferra keeps Lua's statements, tables, and libraries, so porting changes expressions, index arithmetic, and some assignments; `global *` keeps a ported chunk's globals while it moves to local scoping; the linter's porting rules find `x ^ 2`, loops that start at 1, and assignments that hide an outer local (M7.2); the backlog holds a porting tool |
+| A hostile dependency runs a command through Git, writes outside its folder, or makes resolution hang (ADR-0039) | Only the `https`, `ssh`, and `file` protocols, `--` before every URL, and no shell; Lunaferra writes a commit's regular files itself and refuses links, submodules, and paths that leave the package; a step limit on resolution; fuzz targets for manifests, lock files, and versions (M14) |
 | A conformance script and its Lua 5.5 twin drift apart, so a pair passes while testing different things | Twins keep each statement on the same line and make the same calls in the same order; reviews read them side by side; the runner fails on a script without a twin |
 | Without a coverage-guided fuzzer, deep bugs go unfound | Grammar-based generation of valid Lua, mutation of saved inputs, and differential testing between the interpreter and the JIT (see [`04-quality.md`](04-quality.md)) |

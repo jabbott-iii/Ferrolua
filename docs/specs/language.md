@@ -571,6 +571,28 @@ area(2, 3)     --> 6
 area(2, 3, 4)  -- error: bad argument count to 'area' (expected 1 to 2, got 3)
 ```
 
+## Modules and packages (ADR-0038, proposed)
+
+Modules stay Lua's: a module is a file that returns a value, usually a table, and `require` loads
+it once and returns that value. ADR-0038 (packages and modules, as Cargo has) adds packages around
+them, with no new syntax:
+
+- A package is a folder with a manifest, `Lunaferra.lua`, and its modules are the files under its
+  `src/` folder. `src/init.lua` is the root module, and the name `a.b` names `src/a/b.lua`.
+- Inside a package, the first part of a name in `require` is the package's own name, a dependency
+  its manifest lists, or a module the host added. `require("json.stream")` loads the `stream`
+  module of the `json` dependency, and only when `json`'s manifest exports it.
+- A script outside every package uses `require` as Lua 5.5 does, with the host's modules first
+  (ADR-0036).
+
+```lua
+local json = require("json")          -- a dependency's root module
+local rules = require("game.rules")   -- a module of this package
+return { load = function(text) return rules.check(json.decode(text)) end }
+```
+
+[`package.md`](package.md) gives the manifest, the layout, versions, and how names resolve.
+
 ## Invariants
 
 1. **Precedence:** every expression groups as the precedence table says.

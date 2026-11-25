@@ -1027,6 +1027,140 @@ on every target.
 
 ---
 
+## M14 — Build projects from packages, with every dependency pinned
+
+**Goal:** A user creates a package with `lunaferra new`, adds dependencies from a folder or a Git
+repository with `lunaferra add`, and runs it with `lunaferra run`. `Lunaferra.lock` pins the version
+and commit of every dependency, and a module can `require` only its own package, the packages its
+manifest lists, and its host's modules, as [`specs/package.md`](specs/package.md) describes
+(ADR-0038: packages and modules, as Cargo has; ADR-0039: dependencies from paths and Git, pinned in
+a lock file). The milestone was added on 2026-11-25, when the owner asked for a module system
+based on Cargo. It sits after M3, because a state's packages build on `require` (M3.10, M3.23) and
+`lunaferra run` (M3.14), and before M6, whose analysis reads the manifest (M6.3).
+
+- [ ] **M14.1 — package: data-only files and the manifest**
+  - Depends: M1.6, M1.8
+  - Decide first: the owner accepts ADR-0016 (a data-only Lua configuration file) and ADR-0038
+    (packages and modules).
+  - Do:
+    - Add `lunaferra-package` to the workspace, in the crate map's order, with
+      `lunaferra-syntax` as its one dependency.
+    - Build the data-only reader and `Manifest`, with every field, rule, and limit of
+      [`specs/package.md`](specs/package.md#the-manifest-lunaferralua), errors as `M` diagnostics
+      ([`specs/diagnostics.md`](specs/diagnostics.md#codes)), the `manifest` fuzz target, and
+      hostile-input tests in `crates/package/tests/hostile_manifest.rs`.
+  - Accept:
+    - A manifest with a call, an operator, or a name in an expression is rejected with its exact
+      message, and so is one past each limit.
+    - An unknown field, such as `dependancies`, gives its `M` diagnostic with a hint naming
+      `dependencies`.
+    - One million mutated manifests from seed 0 crash nothing.
+  - Verify: `cargo test -p lunaferra-package --locked`;
+    `cargo xtask fuzz manifest --seed 0 --runs 1000000`
+
+- [ ] **M14.2 — package: versions and requirements**
+  - Depends: M14.1
+  - Do:
+    - Build `Version` and `VersionReq` under SemVer 2.0.0, with the requirement forms and series of
+      [`specs/package.md`](specs/package.md#versions-and-requirements), and the `version` fuzz
+      target.
+  - Accept:
+    - The precedence examples of SemVer 2.0.0's section 11 sort in its order.
+    - `"0.4"` matches 0.4.9 and not 0.5.0, and `"1.4"` matches no pre-release of 1.5.0 or 2.0.0.
+    - On generated versions, parsing a version's text gives the same version.
+  - Verify: `cargo test -p lunaferra-package --locked`
+
+- [ ] **M14.3 — package: the resolver and the lock file**
+  - Depends: M14.2
+  - Decide first: the owner accepts ADR-0039 (dependencies from paths and Git, pinned in a lock
+    file).
+  - Do:
+    - Build `resolve` over the `Registry` trait, as
+      [`specs/package.md`](specs/package.md#resolution) describes, with its step limit, and read
+      and write `Lunaferra.lock`, plus the `lock` fuzz target.
+  - Accept:
+    - On generated graphs, every chosen version meets every requirement on its series, and
+      resolving twice writes the same bytes.
+    - A conflict names each requirement on the package and the manifest that made it.
+    - A crafted graph stops at the step limit with its error.
+    - With a lock file, an unchanged manifest gives an unchanged lock file.
+  - Verify: `cargo test -p lunaferra-package --locked`
+
+- [ ] **M14.4 — package: modules, exports, and the module graph**
+  - Depends: M14.3
+  - Do:
+    - Build `ModuleGraph`: module names to files, each package's namespaces, exports, and
+      workspaces, as [`specs/package.md`](specs/package.md#packages-and-modules) describes.
+  - Accept:
+    - From another package, `json.lexer` is refused as private, and an exported `json.stream`
+      resolves.
+    - A name that isn't a namespace gives a hint naming the manifest to change.
+    - A package that holds both `src/a.lua` and `src/a/init.lua` is rejected.
+  - Verify: `cargo test -p lunaferra-package --locked`
+
+- [ ] **M14.5 — lunaferra: packages in a state**
+  - Depends: M14.4, M3.23
+  - Do:
+    - Build `Packages`, its loader trait, `Lua::add_packages`, and `ChunkOptions::package`, and
+      the resolver trait of `lunaferra-stdlib` that `require` asks, as
+      [`specs/package.md`](specs/package.md#how-a-state-uses-the-graph) describes, with tests in
+      `crates/lunaferra/tests/packages.rs`.
+  - Accept:
+    - Two series of one package load side by side, and each module loads once per state.
+    - In a state with `Libraries::SAFE`, a module requires only its own package, its dependencies,
+      and the host's modules, and writing `package.loaded` changes no package's module.
+    - A dependency named after a host module is refused when the packages are installed.
+  - Verify: `cargo test -p lunaferra --test packages --locked`
+
+- [ ] **M14.6 — cli: `new`, `init`, `add`, `remove`, `tree`, and `run` in a package**
+  - Depends: M14.5, M3.14
+  - Do:
+    - Build `lunaferra new`, `init`, `add --path`, `remove`, `fetch` for path dependencies, `tree`,
+      `run` with no script inside a package, and `--locked`, as
+      [`specs/cli.md`](specs/cli.md#commands) lists. `add` and `remove` edit the manifest through
+      the lossless tree.
+  - Accept:
+    - `lunaferra new game`, then `lunaferra run` in `game/`, prints the template's greeting.
+    - `lunaferra add --path ../util` keeps the manifest's comments and layout.
+    - With `--locked`, a command that would change the lock file fails and names the package.
+  - Verify: `cargo test -p lunaferra-cli --locked`
+
+- [ ] **M14.7 — cli: Git dependencies and the package cache**
+  - Depends: M14.6
+  - Do:
+    - Fetch through `git` and keep the cache, as
+      [`specs/package.md`](specs/package.md#fetching-with-git) describes, and build `update` and
+      `--offline`, with hostile-input tests in `crates/cli/tests/hostile_git.rs` on local
+      repositories.
+  - Accept:
+    - A `version` requirement resolves to the newest matching tag, and the lock file records its
+      full commit hash.
+    - An `ext::` URL, a URL that starts with `-`, and a path dependency that leaves its repository
+      are each refused before Git runs.
+    - A commit with a symbolic link, a submodule, a `..` path, or two paths that differ only in
+      case is refused, and nothing of it reaches the cache.
+    - With `--offline` and an empty cache, `lunaferra fetch` fails with a message naming the
+      package.
+  - Verify: `cargo test -p lunaferra-cli --locked`
+
+- [ ] **M14.8 — cli: `lunaferra vendor`, and packages bundled in a host**
+  - Depends: M14.7, M3.17
+  - Do:
+    - Build `lunaferra vendor`, and a `Packages` loader over sources a host compiles into its
+      binary, as [`specs/package.md`](specs/package.md#fetching-with-git) describes.
+  - Accept:
+    - A project vendored on Linux runs with `--offline` and an empty cache.
+    - The web harness runs a vendored package bundled in its test module, with no file system.
+  - Verify: `cargo test -p lunaferra-cli --locked`;
+    `cargo xtask test --target wasm32-unknown-unknown`
+
+**Exit criteria (M14):** A person builds a package that depends on a second package of their own
+by path and a third from a Git repository, runs it, and commits the lock file; a fresh clone runs
+the same versions with `--locked`; a module that requires a package its manifest doesn't list fails
+with a message that names the manifest.
+
+---
+
 ## M4 — Write Lunaferra: compound assignment, types, classes, and strict mode
 
 **Goal:** Scripts can use compound assignment, type annotations, classes, and strict mode, as
@@ -1382,15 +1516,23 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - Unit tests give the expected graph for each statement kind, including `goto` and `break`.
   - Verify: `cargo test -p lunaferra-analysis --locked`
 
-- [ ] **M6.3 — analysis: projects, modules, and `.lunaferra.lua`**
-  - Depends: M6.2
-  - Decide first: the owner accepts ADR-0016 (a data-only Lua configuration file).
+- [ ] **M6.3 — analysis: projects, modules, and the manifest**
+  - Note: 2026-11-25, ADR-0038 (packages and modules, proposed) moves the settings of
+    `.lunaferra.lua` into the `tools` table of the package manifest, `Lunaferra.lua`, and links a
+    package's files through its module graph. This task now reads the manifest through
+    `lunaferra-package` and depends on M14.4; it was "analysis: projects, modules, and
+    `.lunaferra.lua`".
+  - Depends: M6.2, M14.4
+  - Decide first: the owner accepts ADR-0016 (a data-only Lua configuration file) and ADR-0038.
   - Do:
-    - Read `.lunaferra.lua` as [`specs/diagnostics.md`](specs/diagnostics.md#configuration-lunaferralua)
-      describes, and link files through `require`.
+    - Read the manifest's `tools` table as
+      [`specs/diagnostics.md`](specs/diagnostics.md#configuration-the-manifests-tools-table)
+      describes, and link files through `require` as
+      [`specs/analysis.md`](specs/analysis.md#modules) describes.
   - Accept:
-    - A configuration file with a function call is rejected with its message, and a project of
-      three files linked by `require` resolves each module's value.
+    - A manifest with a function call is rejected with its message.
+    - In a workspace of two packages, `require` resolves each module's value across the packages,
+      and a private module of the other package gives its diagnostic.
   - Verify: `cargo test -p lunaferra-analysis --locked`
 
 - [ ] **M6.4 — types: representation and subtyping**
@@ -1487,8 +1629,8 @@ formats files without changing what they do.
 - [ ] **M7.1 — lint: the rule engine, configuration, and suppression**
   - Depends: M6.3, M6.5
   - Do:
-    - Build rule registration, severities from `.lunaferra.lua`, and suppression comments, as
-      [`specs/diagnostics.md`](specs/diagnostics.md#suppression-comments) describes.
+    - Build rule registration, severities from the manifest's `tools` table, and suppression
+      comments, as [`specs/diagnostics.md`](specs/diagnostics.md#suppression-comments) describes.
   - Accept:
     - Each comment form suppresses exactly the codes and lines it names.
   - Verify: `cargo test -p lunaferra-lint --locked`
@@ -1546,9 +1688,9 @@ formats files without changing what they do.
   - Depends: M7.6, M0.6
   - Do:
     - Format the Lunaferra scripts in `tests/` and `benches/`, excluding the Lua 5.5 twins in
-      `reference/` folders in `.lunaferra.lua`, run both commands on them in CI, and add both to the
-      [automated checks](04-quality.md#automated-checks) and to "Definition of done" in
-      [`../CLAUDE.md`](../CLAUDE.md).
+      `reference/` folders in the `tools` table of a manifest at the repository's root, run both
+      commands on them in CI, and add both to the [automated checks](04-quality.md#automated-checks)
+      and to "Definition of done" in [`../CLAUDE.md`](../CLAUDE.md).
   - Accept:
     - CI fails on a pull request that adds an unformatted script.
   - Verify: `lunaferra fmt --check tests benches`; `lunaferra lint tests benches`
@@ -1567,7 +1709,7 @@ reports each flow, in text or as SARIF for code scanning.
   - Depends: M6.3, M6.5
   - Do:
     - Build the built-in lists of [`specs/sast.md`](specs/sast.md#sources-sinks-and-sanitizers) and
-      the `sast` settings in `.lunaferra.lua`.
+      the `sast` settings in the manifest's `tools` table.
   - Accept:
     - A host-declared source and sink are honored like built-in ones.
   - Verify: `cargo test -p lunaferra-sast --locked`
@@ -1824,6 +1966,8 @@ embed Lunaferra and use its language and tools.
   - Verify: `cargo publish --dry-run -p <crate>` for each crate in order
 
 - [ ] **M12.3 — docs: user guide**
+  - Note: 2026-11-25, the guide also covers packages: making one, adding dependencies, and running
+    a package in a host (ADR-0038, ADR-0039, both proposed; M14).
   - Depends: M12.2
   - Do:
     - Write a guide to embedding Lunaferra on each platform, to its language and how it differs from
@@ -1865,3 +2009,9 @@ following the guide, on any of the six platforms.
 | A Visual Studio Code extension (ADR-0015) | The owner decides to publish one, with its client either written here or approved as an exception |
 | Sharing compiled prototypes between states | A host measures the cost of loading the same scripts into many states |
 | Re-recording conformance output for a new Lua 5.5 release | lua.org releases Lua 5.5.2 |
+| A registry that finds packages by name, kept as a Git repository that records each version's Git URL and commit (ADR-0039); today a dependency is named by its URL | Ten public Lunaferra packages exist, or a user asks to find packages by name |
+| Optional dependencies that a package turns on by name, as Cargo's features do (ADR-0038) | A package author asks to make a dependency optional |
+| Module names relative to the requiring module, such as `require(".lexer")`, as Rust's `crate::` and `super::` give (ADR-0038) | A user reports that renaming a package meant editing every `require` inside it |
+| A test runner, `lunaferra test`, that runs each script in a package's `tests/` | A package author asks for one |
+| A checksum over each package's files, to check path and vendored sources too (ADR-0039) | The standard library gains a cryptographic hash, or the owner approves one in a decision record |
+| Downloads over HTTPS without Git (ADR-0039) | The standard library gains TLS, or a user can't install Git |

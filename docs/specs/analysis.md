@@ -2,9 +2,10 @@
 
 `lunaferra-analysis` builds the semantic model that the type checker, the linter, the SAST tool, and
 the language server share. For each file, it resolves every name, builds each function's control
-flow graph, and computes which definitions reach each use. For a project, it reads `.lunaferra.lua`
-(ADR-0016, proposed: a data-only Lua file) and links files through `require` calls. It works on the
-lossless tree, so files with syntax errors still get a model. It lands in M6.1–M6.3.
+flow graph, and computes which definitions reach each use. For a project, it reads the manifest,
+`Lunaferra.lua`, through `lunaferra-package` (ADR-0016, proposed: a data-only Lua file; ADR-0038,
+proposed: packages and modules, as Cargo has), and links files through `require` calls. It works on
+the lossless tree, so files with syntax errors still get a model. It lands in M6.1–M6.3.
 
 ## Why one shared model
 
@@ -32,9 +33,18 @@ edges.
 
 ## Modules
 
-A call `require("name")` with a literal string resolves through the `package.path` patterns in
-`.lunaferra.lua`, or Lua's default `./?.lua;./?/init.lua`. The returned value of the required file
-becomes the call's value. Calls with a computed name resolve to `any`.
+A call `require("name")` with a literal string resolves the way the VM resolves it:
+
+- In a package, through the module graph of `lunaferra-package`: the name's first part picks one of
+  the package's namespaces, and the rest picks a module inside it
+  ([`package.md`](package.md#names-in-require)). A private module of another package, or a
+  namespace the manifest doesn't list, gives an `M` diagnostic at the call, with the hint the VM
+  would give.
+- Outside every package, through the `package_path` patterns in the manifest's `tools` table, or
+  Lua's default `./?.lua;./?/init.lua`.
+
+The returned value of the required file becomes the call's value, so the type checker and the
+language server see a dependency's exports. Calls with a computed name resolve to `any`.
 
 ## Invariants
 

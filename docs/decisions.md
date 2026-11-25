@@ -495,7 +495,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0018 — Free loops with a deterministic collector on top of reference counting
 
-- **Status:** Accepted
+- **Status:** Accepted; ADR-0021 adds that bytes count by fixed charges, alike on every target,
+  and that a collection's finalizers run in the call that ran it
 - **Date:** 2026-11-24
 - **Context:** ADR-0003 freed memory by reference counting alone and left reference loops in memory
   until their state was dropped. Lua code makes loops often: `Class.__index = Class`, trees with
@@ -660,7 +661,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0021 — Count instructions per call, finalizers included, and bytes alike on all targets
 
-- **Status:** Proposed
+- **Status:** Accepted; on 2026-11-24 the owner accepted the agent's proposal for meeting both
+  requirements
 - **Date:** 2026-11-24
 - **Context:**
   - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, keeps
@@ -686,8 +688,8 @@ it is `Proposed`, and no code may depend on it.
     `HashMap` allocates a few more bytes on x86-64, where it scans its control bytes 16 at a time
     with SSE2, than on AArch64, where it scans 8; Rust promises no layout for its own types; and
     how far a `Vec` grows is a detail of the standard library that can change between releases.
-- **Decision** (the owner chose the two requirements on 2026-11-24, with Nadir's ADR-0081; how
-  Ferrolua meets them, below, is the agent's proposal):
+- **Decision** (the owner chose the two requirements on 2026-11-24, with Nadir's ADR-0081, and
+  accepted the agent's proposal below for meeting them the same day):
   - **The instruction limit counts per call.** Its count starts at zero each time the host calls
     into a state that is running nothing: `exec`, `eval`, a call of a Lua function or a resume from
     Rust, and `Lua::collect`. Everything the call runs counts against it, including the finalizers

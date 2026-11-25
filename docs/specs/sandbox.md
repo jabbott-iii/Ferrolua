@@ -68,7 +68,7 @@ built to make the matcher backtrack is stopped like a loop. Table operations cou
 (ADR-0020): each probe step past the first is one unit, so keys crafted to collide are stopped the
 same way.
 
-The instruction limit counts each call from the host on its own (ADR-0021, proposed: instructions
+The instruction limit counts each call from the host on its own (ADR-0021: instructions
 are limited per call, a collection's finalizers included, and bytes are counted alike on every
 target). Its count starts at zero when the host calls into a state that is running nothing:
 `exec`, `eval`, a call of a Lua function or a resume from Rust, or `Lua::collect`. Everything that

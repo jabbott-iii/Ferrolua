@@ -230,9 +230,9 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
   - Verify: `cargo test -p ferrolua-bytecode --locked`
 
 - [ ] **M2.2 — vm: heap of counted slots and generational handles**
+  - Note: 2026-11-24, the owner's choice (ADR-0021): bytes count by fixed charges set in the memory
+    spec, so they are the same on every target.
   - Depends: M0.1
-  - Decide first: the owner accepts ADR-0021 (instructions limited per call, a collection's
-    finalizers included, and bytes counted by fixed charges, alike on every target).
   - Do:
     - Build the arenas, slots, handles, counting, and freeing work list of
       [`specs/memory.md`](specs/memory.md).

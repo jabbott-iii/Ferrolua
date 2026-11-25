@@ -67,7 +67,7 @@ memory and entry modules may use `unsafe`) says to revisit for new system calls.
 - Every limit in [`specs/sandbox.md`](specs/sandbox.md) stops a script that exceeds it.
 - With a fixed hash seed, every conformance script gives the collection log stored for it,
   counted bytes included, interpreted and compiled, so every target collects at the same points
-  (ADR-0021, proposed: bytes are counted by fixed charges, alike on every target;
+  (ADR-0021: bytes are counted by fixed charges, alike on every target;
   [`specs/memory.md`](specs/memory.md#determinism)).
 - Every saved fuzz input in `fuzz/regressions/` runs without a crash.
 - `cargo tree --workspace --edges normal,build,dev --target all --prefix none` lists only

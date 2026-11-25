@@ -7,7 +7,7 @@ plus a loop collector run by allocation count and on request). Values live in pe
 are reached through generational handles, so the heap is safe Rust and a counting bug can't read
 freed memory (ADR-0011, proposed). Bytes are counted by fixed charges, so collections fall at the
 same points on every target, and each collection's finalizers run in the call that ran it
-(ADR-0021, proposed: instructions are limited per call, a collection's finalizers included, and
+(ADR-0021: instructions are limited per call, a collection's finalizers included, and
 bytes are counted alike on every target). `ferrolua-vm` implements it: the counted heap in M2.2,
 and the loop collector in M2.17. `ferrolua-jit` and `ferrolua-stdlib` follow its rules.
 

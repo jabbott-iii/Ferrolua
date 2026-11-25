@@ -18,8 +18,9 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
   and manifests, and the steps in `roadmap-and-docs.md` and `writing.md`
 - **Never commit:** `target/`, `debug/`, `**/*.rs.bk`, `*.pdb`, `**/mutants.out*/`, and
   `rustc-ice-*.txt`, as `.gitignore` lists
-- **Push effect:** none yet: Lunaferra has no GitHub Actions workflows. The repository is public, so
-  a push to `main` publishes the code
+- **Push effect:** a push to `main` runs the CI workflow, `.github/workflows/ci.yml`, and CodeQL,
+  `.github/workflows/codeql.yml`, and a push to a branch with a pull request open against `main`
+  runs both on that pull request. The repository is public, so a push to `main` publishes the code
 - **Scopes:** the crate names in the crate map of `docs/01-architecture.md`, without any
   `lunaferra-` prefix; `workspace` for the root `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`,
   `clippy.toml`, and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for `.claude/` and

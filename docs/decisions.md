@@ -657,3 +657,90 @@ it is `Proposed`, and no code may depend on it.
     order whatever the seed, but a larger redesign of tables. Nadir chose a fixed seed instead.
 - **Revisit when:** a host reports a table operation that runs long under a fixed seed, or M5.1's
   benchmarks show that the bound slows table lookups.
+
+## ADR-0021 — Count instructions per call, finalizers included, and bytes alike on all targets
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, keeps
+    finalizers and weak tables in its scripts (its ADR-0081, which the owner accepted on
+    2026-11-24). It turns the loop collector's automatic runs off and calls `Lua::collect` at the
+    end of each game tick, after every script has run, so each loop's finalizer runs at one known
+    point. It asks two things of Ferrolua:
+    - the finalizers that `Lua::collect` runs count against that call's instruction budget, so one
+      that loops forever stops there and costs no other script;
+    - a state's allocated bytes count the same on all six of Nadir's targets (x86-64 and AArch64,
+      on Windows, macOS, and Linux), so the memory limit, and the collection that runs before it
+      stops a script, fall at the same point on each. Nadir checks that a recorded game replays to
+      the same state on Linux, Windows, and macOS.
+  - [`specs/sandbox.md`](specs/sandbox.md#limits) doesn't say whether the instruction limit counts
+    each call from the host or the state's whole life. Nadir's ADR-0079 asks for a budget for each
+    call (its requirement 5).
+  - Finalizers run at the safe points of whatever call is running
+    ([`specs/memory.md`](specs/memory.md#finalizers)). If a limit stopped `Lua::collect` partway
+    through the finalizers its collection queued, the rest would run in the host's next call, in a
+    script that has nothing to do with them.
+  - The memory spec counts every allocation the state makes, but promises the same collections only
+    on the same target. Sizes taken from Rust can differ by target: the standard library's
+    `HashMap` allocates a few more bytes on x86-64, where it scans its control bytes 16 at a time
+    with SSE2, than on AArch64, where it scans 8; Rust promises no layout for its own types; and
+    how far a `Vec` grows is a detail of the standard library that can change between releases.
+- **Decision** (the owner chose the two requirements on 2026-11-24, with Nadir's ADR-0081; how
+  Ferrolua meets them, below, is the agent's proposal):
+  - **The instruction limit counts per call.** Its count starts at zero each time the host calls
+    into a state that is running nothing: `exec`, `eval`, a call of a Lua function or a resume from
+    Rust, and `Lua::collect`. Everything the call runs counts against it, including the finalizers
+    that run during it and the Lua code that the host's Rust functions call in turn. The host can
+    change the limits between calls, so a collection can have a budget other than its scripts'. The
+    memory limit still counts the bytes the state holds, across calls.
+  - **A collection's finalizers run in the call that ran it,** whether `Lua::collect`,
+    `collectgarbage`, the schedule by allocation count, or the run before a memory error started
+    it. If a limit stops that call first, the rest stay queued in their order and run at the start
+    of the next collection, before its own. They never run at another call's safe point, and
+    `Lua::collect` returns the limit error.
+  - **Bytes count by fixed charges.** The memory spec sets a charge for each kind of object and for
+    each element of each kind of buffer, such as 16 bytes for each slot of a table's array part.
+    The count never comes from `size_of`, `Vec::capacity`, or the allocator. Ferrolua sizes every
+    buffer by its own growth rules and reserves exactly that capacity, and the tables that index
+    objects, such as the string intern table and the object-ID side table, charge a fixed amount
+    for each entry. The same allocations therefore count the same bytes on every target and with
+    every allocator, so the schedule by allocation count, the memory limit, the collection before
+    it, and `collectgarbage("count")` fall at the same points everywhere.
+  - **Stored collection logs.** The collection log records the counted bytes at each collection,
+    and the conformance runner compares each script's log with the one stored for it, so a target
+    that counts differently fails.
+- **Consequences:**
+  - Good: a host that collects at a point of its choosing knows where every loop's finalizer runs
+    and what it may cost, and a finalizer that loops forever stops at that collection's limit.
+  - Good: with a fixed hash seed, a run repeats on every target, not only on one, which hosts that
+    replay runs or keep machines in lockstep need.
+  - Good: a host bounds each call without tracking what earlier calls used.
+  - Bad: no limit covers a state's total work across calls; a host that wants one keeps its own
+    total.
+  - Bad: the finalizers a stopped collection left wait for the next collection, and hold their
+    objects' memory until then; with automatic runs off, that is the host's next `Lua::collect`.
+  - Bad: the count models the memory rather than measuring it. It leaves out the allocator's own
+    overhead and the free slots an arena keeps for reuse, and each charge must stay no smaller than
+    the type it stands for, which a test checks.
+  - Bad: every change to what Ferrolua allocates, or to a charge, changes the stored logs, which
+    are recorded again and reviewed in the same change, and a host's recordings from an earlier
+    release may diverge.
+  - Follow-up: M2.2 builds the charges and records them in the memory spec; M2.17 stores the
+    collection logs and compares them; M3.1 makes `Lua::collect` a call like any other and lets the
+    host change the limits between calls; M3.2 counts the instruction limit per call, keeps a
+    stopped collection's remaining finalizers for the next one, and decides under what limit the
+    finalizers that run when a state is dropped run; each target that joins
+    [`03-platforms.md`](03-platforms.md) compares the stored logs.
+- **Alternatives considered:**
+  - One limit for the state's whole life, which the host raises before each call: the host must
+    know what each call used, and a collection's finalizers share whatever budget the calls before
+    them left.
+  - A stopped collection's remaining finalizers run at the next safe point, as other pending
+    finalizers do: they would run, and be charged, in a call that has nothing to do with them.
+  - Count what the allocator returns, or `size_of` and `Vec::capacity`: closer to the real memory,
+    but it differs by target, allocator, and Rust release, so runs would repeat on one target only.
+  - Promise the same count on one target only, as the memory spec did: each of Nadir's targets
+    would collect at its own points, and its recordings wouldn't replay on the others.
+- **Revisit when:** a host measures a state whose real memory is more than twice its counted bytes,
+  or needs a limit on a state's total work across calls.

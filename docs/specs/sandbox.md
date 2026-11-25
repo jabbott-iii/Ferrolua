@@ -55,7 +55,7 @@ status to the host, which the command-line tool turns into the process's exit st
 | Limit | Counts | Default without a host limit |
 | :- | :- | :- |
 | Memory | Bytes the state has allocated ([`memory.md`](memory.md)) | None; a failed allocation runs the loop collector, then raises a catchable `not enough memory` |
-| Instructions | Bytecode instructions run, plus work units inside library calls and table operations | None |
+| Instructions | Bytecode instructions one call from the host runs, plus work units inside library calls and table operations | None |
 | Call depth | Nested calls, Lua and native | PUC-Rio Lua 5.5.1's limits on nested native calls and stack slots, which M3.2 records |
 | String size | Bytes in one string | `2^63 - 1`, limited by memory in practice |
 | Source size | Bytes of one chunk passed to `load` | None |
@@ -68,15 +68,29 @@ built to make the matcher backtrack is stopped like a loop. Table operations cou
 (ADR-0020): each probe step past the first is one unit, so keys crafted to collide are stopped the
 same way.
 
+The instruction limit counts each call from the host on its own (ADR-0021, proposed: instructions
+are limited per call, a collection's finalizers included, and bytes are counted alike on every
+target). Its count starts at zero when the host calls into a state that is running nothing:
+`exec`, `eval`, a call of a Lua function or a resume from Rust, or `Lua::collect`. Everything that
+call runs counts against it, including the finalizers that run during it and the Lua code that the
+host's Rust functions call in turn. The host can change the limits between calls, so a collection
+can have a budget other than its scripts'. The memory limit counts the bytes the state holds,
+across calls.
+
 ### When a limit is reached
 
 Before the memory limit stops a script, the VM runs the loop collector once, so garbage loops
 never cause a limit error. The VM then stops the script and returns `Error::Limit` to the host,
-naming the limit. `pcall` and
-`xpcall` don't catch it, so a script can't catch the error and keep going. Pending finalizers and
-`<close>` variables still need to run; M3.2 decides, before work starts, whether they run with a
-small reserve of instructions or are skipped. After a limit error, the host may raise the limit and
-call into the state again.
+naming the limit. `pcall` and `xpcall` don't catch it, so a script can't catch the error and keep
+going.
+
+- When a limit stops a call while it runs the finalizers that one of its collections queued, the
+  rest wait for the next collection ([`memory.md`](memory.md#finalizers)).
+- Other pending finalizers and `<close>` variables still need to run. M3.2 decides, before work
+  starts, whether they run with a small reserve of instructions or are skipped, and under what
+  limit the finalizers that run when a state is dropped run.
+
+After a limit error, the host may call into the state again, with the same limits or others.
 
 ## Isolation
 
@@ -98,6 +112,8 @@ is.
 5. `os.exit` never ends the host process.
 6. A change to one state's globals, metatables, or modules is invisible to every other state.
 7. Nothing a script can print or compute contains a memory address.
+8. Each call from the host starts its instruction count at zero, and a finalizer counts against
+   the call it runs in.
 
 ## Tests
 
@@ -116,3 +132,7 @@ is.
 - Invariant 7: scripts pass every kind of object to `tostring`, `print`, `string.format` with
   `%p` and `%s`, `debug.upvalueid`, and error messages, and check that no result contains an
   address of the test process, read from `/proc/self/maps`.
+- Invariant 8: a script that runs just under the limit in each of several calls; and a
+  `Lua::collect` whose finalizers pass its limit, one of them looping forever, which stops at the
+  limit, after which the host's next call runs none of the rest and the next `Lua::collect` runs
+  them first, in order.

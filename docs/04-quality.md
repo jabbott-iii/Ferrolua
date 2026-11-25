@@ -16,7 +16,7 @@ pass and sets coverage at 100% of lines and regions.
 | Conformance scripts | `tests/conformance/` | Lua 5.5 behavior, against output recorded from PUC-Rio Lua 5.5.1, interpreted and with the JIT forced on |
 | Extension scripts | `tests/extensions/` | Ferrolua-only behavior: the language extensions and the intended differences, against output written from the spec |
 | Differential tests | `crates/ferrolua/tests/` and a fuzz target | The interpreter and the JIT print the same output, raise the same errors, and give the same collection log |
-| Determinism tests | `crates/ferrolua/tests/` | Two runs with a fixed hash seed give the same collection log ([`specs/memory.md`](specs/memory.md#determinism)) |
+| Determinism tests | `crates/ferrolua/tests/` | Two runs with a fixed hash seed give the same collection log, which matches the log stored for the script, on every target ([`specs/memory.md`](specs/memory.md#determinism)) |
 | Property tests | Beside the code, using `ferrolua-testkit` | Laws that hold for every input, such as "formatting doesn't change the bytecode" |
 | Hostile-input tests | `tests/hostile_*.rs` in each crate that reads outside data | Empty, oversized, malformed, truncated, and deeply nested input, and each limit one past its value |
 | Fuzzing | `fuzz/`, with crashes saved in `fuzz/regressions/` | Every parser and loader of outside data, for crashes and hangs |

@@ -48,7 +48,12 @@ assert_eq!(result, "hello, world");
   for numbers, strings, booleans, `Option`, `Vec`, `HashMap`, and tuples for multiple values.
 - `UserData` lets a Rust type become userdata with methods, fields, and metamethods.
 - `Lua::collect` runs the loop collector and the finalizers it queues, at a point the host
-  chooses ([`memory.md`](memory.md#schedule)).
+  chooses ([`memory.md`](memory.md#schedule)). It is a call like any other: its finalizers count
+  against the instruction limit, and if the limit stops them, it returns the limit error and the
+  rest run first in the next collection (ADR-0021, proposed: instructions are limited per call, a
+  collection's finalizers included, and bytes are counted alike on every target).
+- `Lua::set_limits` changes a state's limits between calls. The instruction limit applies to each
+  call from the host on its own ([`sandbox.md`](sandbox.md#limits)).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests
   from `os.exit`, and internal errors.
 

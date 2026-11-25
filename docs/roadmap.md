@@ -231,13 +231,20 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
 
 - [ ] **M2.2 — vm: heap of counted slots and generational handles**
   - Depends: M0.1
+  - Decide first: the owner accepts ADR-0021 (instructions limited per call, a collection's
+    finalizers included, and bytes counted by fixed charges, alike on every target).
   - Do:
     - Build the arenas, slots, handles, counting, and freeing work list of
       [`specs/memory.md`](specs/memory.md).
+    - Count bytes by the fixed charges of
+      [`specs/memory.md`](specs/memory.md#memory-accounting), with each buffer sized by Ferrolua's
+      own growth rules, and record the charges this task sets there (ADR-0021).
   - Accept:
     - A stale handle returns the internal error.
     - Dropping a 10,000,000-node list doesn't overflow the stack.
     - A dropped heap has freed every byte.
+    - Each charge is no smaller than `size_of` of the type it stands for, and a fixed sequence of
+      allocations counts exactly the bytes its charges add up to.
   - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.3 — vm: values, strings, and interning**
@@ -337,6 +344,11 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
       rule, and the collection log, as [`specs/memory.md`](specs/memory.md#the-loop-collector)
       describes, plus the `collectgarbage` options in
       [`specs/memory.md`](specs/memory.md#collectgarbage).
+    - Run each collection's finalizers in the call that ran it, as
+      [`specs/memory.md`](specs/memory.md#finalizers) describes (ADR-0021).
+    - Store each conformance script's collection log, counted bytes included, make the runner
+      compare each run with it, and describe where the logs live and how they are recorded again in
+      [`04-quality.md`](04-quality.md#conformance-scripts) (ADR-0021).
     - Add `tests/conformance/gc.lua`, which builds loops, drops them, calls `collectgarbage()`, and
       prints what weak tables still hold, and the ordering scripts in `tests/extensions/gc/`.
   - Accept:
@@ -344,7 +356,8 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
       the heap returns to its size before.
     - No object a register, the registry, or the host can reach is ever freed, in the property test
       of the memory spec.
-    - Two runs of every conformance script with a fixed hash seed give the same collection log.
+    - Two runs of every conformance script with a fixed hash seed give the same collection log,
+      which matches the log stored for the script.
     - `gc.lua` prints its recorded output.
   - Verify: `cargo test -p ferrolua-vm --locked`; `cargo test -p ferrolua --test conformance --locked`
 
@@ -429,8 +442,8 @@ scripts within limits, and gets every Lua 5.5 library it grants.
     describes.
   - Do:
     - Build values tied to their state, `IntoLua` and `FromLua`, Rust functions, `UserData`, the
-      registry, `Lua::collect`, the collector's options and `hash_seed`, and `Error`, then update
-      the spec with the names the code settled.
+      registry, `Lua::collect`, the collector's options and `hash_seed`, a way to change the limits
+      between calls (ADR-0021), and `Error`, then update the spec with the names the code settled.
   - Accept:
     - `Lua::collect` frees a loop the host dropped, and never a value the host still holds.
     - Using a value after its state is dropped fails to compile, in a `compile_fail` doc test.
@@ -440,10 +453,13 @@ scripts within limits, and gets every Lua 5.5 library it grants.
 - [ ] **M3.2 — vm: limits**
   - Depends: M3.1
   - Decide first: the owner accepts ADR-0014 (the VM is the sandbox), and decides whether pending
-    finalizers and `<close>` variables run with a reserve after a limit stops a script.
+    finalizers and `<close>` variables run with a reserve after a limit stops a script, and under
+    what limit the finalizers that run when a state is dropped run.
   - Do:
     - Enforce every limit of [`specs/sandbox.md`](specs/sandbox.md#limits), including work units
       inside library calls, with hostile-input tests in `crates/ferrolua/tests/hostile_sandbox.rs`.
+    - Count the instruction limit for each call from the host, finalizers included, and keep the
+      finalizers a stopped collection didn't run for the next collection (ADR-0021).
     - Run the loop collector once before the memory limit stops a script.
   - Accept:
     - A script whose only garbage is loops runs within a memory limit it would pass without the
@@ -452,6 +468,9 @@ scripts within limits, and gets every Lua 5.5 library it grants.
       coroutines alike.
     - A set of keys crafted to collide under a known seed stops at the instruction limit
       (ADR-0020).
+    - A script that runs just under the instruction limit runs in each of several calls in a row.
+    - A `Lua::collect` whose finalizers pass its limit stops at the limit; the host's next call
+      runs none of the rest, and the next `Lua::collect` runs them first, in order.
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
 
 - [ ] **M3.3 — stdlib: strings and patterns**

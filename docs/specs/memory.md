@@ -5,8 +5,11 @@ counted and freed when its count reaches zero. A deterministic loop collector fr
 only reference loops keep alive, at points the program itself fixes (ADR-0018: reference counting
 plus a loop collector run by allocation count and on request). Values live in per-state arenas and
 are reached through generational handles, so the heap is safe Rust and a counting bug can't read
-freed memory (ADR-0011, proposed). `ferrolua-vm` implements it: the counted heap in M2.2, and the
-loop collector in M2.17. `ferrolua-jit` and `ferrolua-stdlib` follow its rules.
+freed memory (ADR-0011, proposed). Bytes are counted by fixed charges, so collections fall at the
+same points on every target, and each collection's finalizers run in the call that ran it
+(ADR-0021, proposed: instructions are limited per call, a collection's finalizers included, and
+bytes are counted alike on every target). `ferrolua-vm` implements it: the counted heap in M2.2,
+and the loop collector in M2.17. `ferrolua-jit` and `ferrolua-stdlib` follow its rules.
 
 ## Why reference counting with a loop collector
 
@@ -129,6 +132,17 @@ of the order they were marked, as PUC-Rio does. A finalizer never runs in the mi
 instruction or inside a library function, so library code never sees Lua code run while it holds a
 half-updated table.
 
+Each finalizer runs in the call from the host that queued it, and counts against that call's
+instruction limit ([`sandbox.md`](sandbox.md#limits); ADR-0021):
+
+- An object freed by counting is finalized at the next safe point of the call that freed it.
+- The objects one loop collection queues are finalized in the call that ran the collection,
+  whether `Lua::collect`, `collectgarbage`, the schedule, or the run before a memory error started
+  it. If a limit stops that call first, the rest stay queued in their order and run at the start of
+  the next collection, before its own, and never at another call's safe point.
+
+Two more rules hold for every finalizer:
+
 - A finalizer that stores its object somewhere brings it back; the object's count rises, and the
   finalizer doesn't run again unless `setmetatable` marks the object again.
 - An error in a finalizer becomes a warning, as in Lua 5.5, with PUC-Rio Lua 5.5.1's wording,
@@ -208,12 +222,16 @@ turns them back on. A collection with no candidates does nothing.
 ### Determinism
 
 Given the same script, the same inputs, the same calls from the host, the same options, and the same
-hash seed, on the same target, every collection runs after the same instruction, and every value is
+hash seed, on any target, every collection runs after the same instruction, and every value is
 freed and finalized in the same order.
 
 - The threshold counts only the bytes the state allocates for Lua values. Machine code from the JIT
   and the compiler's working memory don't count, so a script collects at the same points interpreted
   and compiled.
+- Bytes are counted by fixed charges, never by the target or the allocator (see "Memory accounting"
+  below), so the schedule, the host's memory limit, and `collectgarbage("count")` agree on every
+  target. Only an allocation that the system itself refuses, below the host's limit, can fail at a
+  point that differs between machines.
 - Candidates are processed in the order they were recorded, collected objects are freed in slot
   order, and slots are reused last in, first out, so no order depends on an address or a hash.
 - The string hash seed is random by default, so the order `pairs` visits keys changes between runs,
@@ -221,7 +239,7 @@ freed and finalized in the same order.
   `Options::hash_seed`. Tables, functions, threads, and userdata used as keys hash by their
   handles, which slots reused in a fixed order make the same in every run (ADR-0020).
 - In tests, the VM can record a collection log: each collection's position in the instruction
-  count, and the handles it freed, in order.
+  count, the counted bytes before and after it, and the handles it freed, in order.
 
 ## Weak tables
 
@@ -239,8 +257,22 @@ table next resizes, whichever comes first.
 ## Memory accounting
 
 Every allocation the state makes, from an arena slot to a table's array part, is counted in bytes.
-Each one grows its buffer with `try_reserve`, so a failed allocation returns an error instead of
-aborting the process. After the collection that runs before a memory error:
+The count is a charge this section sets, never `size_of`, `Vec::capacity`, or what the allocator
+returns (ADR-0021), so the same allocations count the same bytes on every target and with every
+allocator:
+
+- An object counts its kind's charge, which covers its slot, from its allocation until it is freed.
+- A buffer counts its capacity times a charge for each element: 16 bytes, the size of a `Value`, for
+  each slot of a table's array part or a thread's stack, and 1 for each byte of a string.
+- Ferrolua sizes each buffer by its own growth rules and reserves exactly that capacity with
+  `try_reserve_exact`, so a failed allocation returns an error instead of aborting the process.
+- The tables that index objects, such as the string intern table and the object-ID side table,
+  charge a fixed amount for each entry.
+
+The task that builds each kind of object or buffer, such as hash nodes, call frames, and
+instructions, records its charges here. A test checks that each charge is no smaller than
+`size_of` of the type it stands for. The count leaves out the allocator's own overhead and the free
+slots an arena keeps for reuse. After the collection that runs before a memory error:
 
 - without a host limit, a failed allocation raises `not enough memory`, which `pcall` can catch, as
   in PUC-Rio Lua;
@@ -288,6 +320,11 @@ frees every value left.
 11. `ferrolua-vm` contains no `unsafe` code.
 12. No two objects in a state ever get the same ID, and no ID is reused after its object is
     freed.
+13. The counted bytes depend only on the allocations Ferrolua makes, so the same run gives the same
+    collection log, counted bytes included, on every target.
+14. Each charge is no smaller than `size_of` of the type it stands for.
+15. The finalizers one collection queues run only in the call that ran it, or at the start of a
+    later collection.
 
 ## Tests
 
@@ -314,3 +351,9 @@ frees every value left.
 - Invariant 11: the workspace lint `unsafe_code = "forbid"` applies to `ferrolua-vm`.
 - Invariant 12: a property test creates, names, and frees objects in generated orders, and
   checks that every ID it saw is distinct.
+- Invariant 13: the conformance runner compares each script's collection log with the log stored
+  for it (M2.17), on every target in [`../03-platforms.md`](../03-platforms.md).
+- Invariant 14: a unit test in `ferrolua-vm` compares each charge with `size_of` of its type.
+- Invariant 15: `crates/ferrolua/tests/hostile_sandbox.rs` stops a collection at its instruction
+  limit partway through its finalizers, and checks where the rest run
+  ([`sandbox.md`](sandbox.md#tests)).

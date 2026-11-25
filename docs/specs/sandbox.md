@@ -29,7 +29,8 @@ a state unless the host registers it.
 | `os` time functions | On | `os.time`, `os.clock`, `os.date`, and `os.difftime` |
 | Rest of `os` | Off | `os.execute`, `os.remove`, `os.rename`, `os.tmpname`, `os.getenv`, `os.setlocale`, and `os.exit` |
 | `io` | Off | Granted with a file access policy, below |
-| `package` and `require` | Off | Granted with a module loader the host supplies; never loads C modules (ADR-0017). ADR-0036 (proposed) would make `require` present in every state, finding only the modules the host added unless `package` is granted |
+| `require` | On | Finds only the modules the host added with `add_module` and `add_source_module` (ADR-0036: modules a host adds for `require`) |
+| `package` | Off | Granted with a module loader the host supplies, whose searchers `require` tries after the host's modules; never loads C modules (ADR-0017) |
 | `debug` | Off | Can read and change any local and upvalue, so it breaks every other boundary |
 | Precompiled chunks | Off | `load` with mode `"b"` and `string.dump` (ADR-0010) |
 

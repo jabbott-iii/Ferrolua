@@ -1579,7 +1579,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0034 — Give the host's handles no lifetime, and check their state when used
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - Every handle a host holds, such as `Value<'lua>`, `Table<'lua>`, or `Function<'lua>`, carries
@@ -1594,8 +1594,8 @@ it is `Proposed`, and no code may depend on it.
   - Ferrolua's handles are already checked: a handle names a slot and its generation (ADR-0011),
     and using a value with the wrong state already returns an error.
   - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
-    embedding.
-- **Decision:**
+    embedding, and accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - `Value`, `Table`, `Function`, `Thread`, `UserDataRef`, `LuaString`, `List`, `Tuple`, and `Set`
     have no lifetime parameter. Each holds its object's handle, a counted reference that keeps the
     object alive, and a weak link to its state, built on the standard library's `Rc` and `Weak`.
@@ -1621,11 +1621,12 @@ it is `Proposed`, and no code may depend on it.
   - Both, a handle with a lifetime and an owned one for storing: the strongest checks where a host
     wants them, but two of every type to learn.
   - Registry keys only: no new type, but every stored value becomes a lookup.
-- **Revisit when:** the owner accepts or changes this record, which M2.14 needs first.
+- **Revisit when:** a host reports a bug that a lifetime would have caught at compile time, or the
+  check on each use shows above 2% of a host call's time in M5.1's benchmarks.
 
 ## ADR-0035 — Describe the host's API once, for its bindings, its declarations, and strict mode
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - A host registers each function with `lua.globals().set(name, lua.create_function(...))`
@@ -1636,8 +1637,8 @@ it is `Proposed`, and no code may depend on it.
   - `ferrolua.md` leaves open how a host lists the globals it registers, so that strict mode and
     the type checker know them, and M4.6 must decide it.
   - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
-    embedding.
-- **Decision:**
+    embedding, and accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - A host describes the functions, constants, modules, and userdata types it gives scripts with an
     `Api` builder: each one's name, doc comment, and, for a function, its parameter names.
   - The types come from the Rust signature. A `TypeInfo` trait, which every `FromLua` and `IntoLua`
@@ -1665,11 +1666,12 @@ it is `Proposed`, and no code may depend on it.
     procedural macro needs a Rust parser, which Ferrolua would have to write itself (ADR-0002).
   - Reading the host's doc comments from rustdoc's JSON output: no builder, but that output needs a
     nightly compiler.
-- **Revisit when:** the owner accepts or changes this record, which M3.21 needs first.
+- **Revisit when:** hosts often describe a function as `any` because its Rust signature can't say
+  more, or Ferrolua gets a Rust parser of its own that a macro could use.
 
 ## ADR-0036 — Let a host add modules that `require` finds, without granting `package`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - `package` and `require` are off by default, and a host grants them with a module loader of its
@@ -1679,12 +1681,12 @@ it is `Proposed`, and no code may depend on it.
     own inside its binary, which matters most on iOS, Android, and the web, where scripts may have
     no file system to load from.
   - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
-    embedding.
-- **Decision:**
+    embedding, and accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - `require` exists in every state. Without `package`, it finds only the modules the host added;
     with `package`, it searches those first and then `package`'s searchers.
   - `Lua::add_module(name, value)` registers a value, usually a table or one an `Api` built
-    (ADR-0035, proposed), as the module `name`.
+    (ADR-0035), as the module `name`.
   - `Lua::add_source_module(name, source)` registers Ferrolua source that `require` compiles and
     runs on first use, as it does a file, so a host can ship scripts with `include_str!`.
   - A module loads once per state. Without `package`, scripts can't read or replace the cache of
@@ -1704,11 +1706,12 @@ it is `Proposed`, and no code may depend on it.
   - `package` with a loader the host writes, which already works: no new API, but every host
     writes the same loader, and granting `package` grants its searchers too.
   - An `import` statement, as Python has: familiar, but new syntax for what `require` already does.
-- **Revisit when:** the owner accepts or changes this record, which M3.23 needs first.
+- **Revisit when:** a host asks to hide which modules it added, or to load modules from somewhere
+  `add_module` and `package` don't reach.
 
 ## ADR-0037 — Let scripts wait on the host, and let a budget pause a script instead of stopping it
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - Game and server scripts often wait: `wait(1.0)` until a later frame, or `await_input()` until
@@ -1718,15 +1721,15 @@ it is `Proposed`, and no code may depend on it.
     script with an error that `pcall` can't catch (ADR-0014, proposed). A host that wants to spread
     a long script over several frames can't pause it.
   - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
-    embedding.
-- **Decision:**
+    embedding, and accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - **Host functions that yield.** A Rust function can return `Yield(values)`, which suspends the
     coroutine that called it with those values, as `coroutine.yield` would. Called outside a
     coroutine, it raises `attempt to yield from outside a coroutine`, as Lua's yield does.
   - **Tasks.** `Lua::spawn(function, args)` starts a function in a new coroutine and returns a
     `Task`. `Task::resume(values)` runs it until it yields, returns, or fails, and gives
     `Poll::Yielded(values)`, `Poll::Done(values)`, or `Poll::Failed(error)`. A host keeps tasks
-    wherever it likes (ADR-0034, proposed), and dropping one closes its coroutine, running its
+    wherever it likes (ADR-0034), and dropping one closes its coroutine, running its
     pending `<close>` variables.
   - **Pause on budget.** A task spawned with `pause_on_limit` pauses instead of failing when a call
     runs out of instructions inside it, and `resume` gives `Poll::OutOfBudget`. The next `resume`
@@ -1752,4 +1755,5 @@ it is `Proposed`, and no code may depend on it.
     same scheduler code.
   - A thread for each script: real parallelism, but a state runs on one thread at a time, and
     threads would end the determinism of ADR-0018.
-- **Revisit when:** the owner accepts or changes this record, which M3.22 needs first.
+- **Revisit when:** a host needs a pause inside a long library call, or reports a script that a
+  pause left half updated in a way pausing between instructions should prevent.

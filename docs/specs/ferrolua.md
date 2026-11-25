@@ -9,18 +9,20 @@ default). It adds no third-party crate to the host's build. Its API holds Rust's
 value can't outlive its state or be used with another state. A minimal API lands in M2.14, and the
 full one in M3.1.
 
-## Why handles tied to the state by lifetime
+## Why handles with no lifetime, checked against their state
 
 Every Lua value a host holds is a reference into one state's heap, counted like any other
-([`memory.md`](memory.md)). Tying each handle to its state with a Rust lifetime makes using a value
-after its state is dropped a compile error, and using it with the wrong state a checked error.
-Hosts that need to keep a value across calls without a lifetime store it in the state's registry
-and keep the registry key. The cost is lifetimes in the host's code.
+([`memory.md`](memory.md)). A handle has no lifetime parameter (ADR-0034: handles with no
+lifetime, checked against their state), so a host stores values and callbacks in its own types,
+such as an entity's `on_hit` handler, as it would any other field. Each handle keeps a weak link to
+its state, built on the standard library's `Rc` and `Weak`. Using a handle after its state is
+dropped returns `Error::StateDropped`, and using it with another state returns an error, so a
+mistake is caught when the handle is used instead of when the host compiles. The registry stays,
+for hosts that want keys.
 
-ADR-0034 (proposed: handles with no lifetime, checked against their state) would drop the lifetime
-parameter from every handle. Each handle would keep a weak link to its state, and using one after
-its state is dropped would return `Error::StateDropped` instead of failing to compile, so a host
-could store values and callbacks in its own types. M2.14 waits for the decision.
+A handle kept inside a userdata's Rust data is a reference the loop collector can't see, so a loop
+through it lives until the state is dropped. A userdata holds Lua values in its user values
+instead, which the collector sees.
 
 ## The API
 
@@ -50,8 +52,8 @@ assert_eq!(result, "hello, world");
 
 - `Lua::load` returns a chunk builder with `name`, `mode` (text or binary), `strict`, and `env`,
   then `exec`, `eval`, or `into_function`.
-- `Value<'lua>` and typed handles such as `Table<'lua>` and `Function<'lua>` count their
-  references, and release them when dropped.
+- `Value` and typed handles such as `Table`, `Function`, `List`, and `Thread` count their
+  references, and release them when dropped; dropping one after its state is gone does nothing.
 - Conversions between Rust and Lua values go through `IntoLua` and `FromLua` traits, implemented
   for numbers, strings, booleans, `Option`, `Vec`, `HashSet`, `HashMap`, and tuples for multiple
   values. A `Vec` converts to and from a list and a `HashSet` to and from a set, with `v[i]` as the
@@ -59,16 +61,22 @@ assert_eq!(result, "hello, world");
   tuples, and sets beside tables; ADR-0026). `FromLua` also reads a `Vec` from a table's
   keys 0 to `#t - 1`. None converts between strings and numbers.
 - `UserData` lets a Rust type become userdata with methods, fields, and metamethods.
-- ADR-0035 (proposed: the host's API described once) would add an `Api` builder: the host names
-  each function, module, and userdata type once, with doc comments and parameter names, the types
-  come from the Rust signatures through a `TypeInfo` trait, `lua.install(&api)` registers the
-  bindings, and `api.declarations()` writes the declaration file the type checker and the language
-  server read (M3.21, M6.12).
-- ADR-0036 (proposed: modules a host adds for `require`) would add `Lua::add_module` and
-  `Lua::add_source_module`, which `require` finds in every state, even without `package` (M3.23).
-- ADR-0037 (proposed: scripts that wait on the host) would let a Rust function return
-  `Yield(values)` to suspend its calling coroutine, and add `Lua::spawn`, which returns a `Task`
-  the host resumes, optionally pausing it when a call's instruction budget runs out (M3.22).
+- An `Api` builder describes the functions, modules, and userdata types a host gives scripts, each
+  once, with its doc comment and parameter names (ADR-0035: the host's API described once). The
+  types come from the Rust signatures through a `TypeInfo` trait, which every `FromLua` and
+  `IntoLua` type implements: `String` is `string`, `Vec<T>` is `list<T>`, and `Option<T>` is `T?`.
+  `lua.install(&api)` registers the bindings, and `api.declarations()` writes the declaration file
+  that the type checker and the language server read (M3.21, M6.12). Strict mode and the type
+  checker take the host's globals from the names an installed `Api` defines. `create_function`
+  stays, for functions a host makes on the fly.
+- `Lua::add_module(name, value)` and `Lua::add_source_module(name, source)` add modules that
+  `require` finds in every state, even without `package`, and that load once per state (ADR-0036:
+  modules a host adds for `require`; M3.23).
+- A Rust function returns `Yield(values)` to suspend the coroutine that called it, and
+  `Lua::spawn(function, args)` starts a `Task` that the host runs with `Task::resume`, which gives
+  `Poll::Yielded`, `Poll::Done`, `Poll::Failed`, or, for a task spawned with `pause_on_limit`,
+  `Poll::OutOfBudget` when a call's instruction budget runs out (ADR-0037: scripts that wait on the
+  host; M3.22). Dropping a task closes its coroutine.
 - `Lua::collect` runs the loop collector and the finalizers it queues, at a point the host
   chooses ([`memory.md`](memory.md#schedule)). It is a call like any other: its finalizers count
   against the instruction limit, and if the limit stops them, it returns the limit error and the
@@ -101,17 +109,31 @@ assert_eq!(result, "hello, world");
   from `os.exit`, a JIT mode asked for without the `jit` feature or on a target without a JIT, and
   internal errors.
 
+A host function that makes a script wait, and the task that runs it, look like this:
+
+```rust
+use ferrolua::{Api, Lua, Options, Poll, Yield};
+
+let api = Api::new()
+    .function("wait", |seconds: f64| Yield((seconds,)))
+    .doc("Pauses the script until the host resumes it.")
+    .params(["seconds"]);
+let lua = Lua::new(Options::default())?;
+lua.install(&api)?;
+let task = lua.spawn(lua.load("wait(1.0) print('later')").into_function()?, ())?;
+assert!(matches!(task.resume(())?, Poll::Yielded(_)));   // the script waits
+assert!(matches!(task.resume(())?, Poll::Done(_)));      // the host resumed it
+```
+
 ## Open questions
 
 - Whether `Lua` implements `Send`, so a host can move a state to another thread between calls;
   it requires every registered function to be `Send` too. M3.1 decides.
-- How a host lists the globals it registers, so strict mode and the type checker know them: a call
-  on `Lua`, or the same `globals` list `.ferrolua.lua` uses. M4.6 decides, and ADR-0035
-  (proposed) would answer it with the names an installed `Api` defines.
 
 ## Invariants
 
-1. No sequence of API calls lets a value be used after its state is dropped; it doesn't compile.
+1. Using a value after its state is dropped returns `Error::StateDropped`, and never reads freed
+   memory.
 2. Using a value with a state other than its own returns an error.
 3. No API call panics on any input.
 4. A host that adds only `ferrolua` builds no third-party crate.
@@ -120,8 +142,8 @@ assert_eq!(result, "hello, world");
 
 ## Tests
 
-- Invariant 1: compile-fail examples in the doc comments, marked `compile_fail`, which `cargo test`
-  checks.
+- Invariant 1: an integration test keeps a value, a table, a function, and a task, drops their
+  state, and checks that each use returns `Error::StateDropped` and each drop does nothing.
 - Invariant 2: an integration test with two states.
 - Invariant 3: the `api` fuzz target calls API functions with generated values and scripts.
 - Invariant 4: the `cargo tree` check in [`../04-quality.md`](../04-quality.md#automated-checks).

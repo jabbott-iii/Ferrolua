@@ -55,7 +55,7 @@ status to the host, which the command-line tool turns into the process's exit st
 | Limit | Counts | Default without a host limit |
 | :- | :- | :- |
 | Memory | Bytes the state has allocated ([`memory.md`](memory.md)) | None; a failed allocation runs the loop collector, then raises a catchable `not enough memory` |
-| Instructions | Bytecode instructions run, plus work units inside library calls | None |
+| Instructions | Bytecode instructions run, plus work units inside library calls and table operations | None |
 | Call depth | Nested calls, Lua and native | PUC-Rio Lua 5.5.1's limits on nested native calls and stack slots, which M3.2 records |
 | String size | Bytes in one string | `2^63 - 1`, limited by memory in practice |
 | Source size | Bytes of one chunk passed to `load` | None |
@@ -64,8 +64,9 @@ status to the host, which the command-line tool turns into the process's exit st
 Library functions that can run long count their work against the instruction limit: one unit per
 byte that `string.rep`, `table.concat`, and `string.format` produce, and one per step of the
 pattern matcher in `string.find`, `string.match`, `string.gmatch`, and `string.gsub`. A pattern
-built to make the matcher backtrack is stopped like a loop. Table operations are bounded too
-(ADR-0020): if M2.4 chooses to count them, each probe step past the first is one unit.
+built to make the matcher backtrack is stopped like a loop. Table operations count too
+(ADR-0020): each probe step past the first is one unit, so keys crafted to collide are stopped the
+same way.
 
 ### When a limit is reached
 
@@ -83,9 +84,10 @@ States share nothing. Each has its own registry, globals, string metatable, load
 string hash seed, so one script changing `getmetatable("").__index` affects only its own state.
 By default the seed comes from the standard library's `RandomState`, so a script can't predict hash
 collisions to slow its table lookups. A host that fixes the seed with `Options::hash_seed` keeps
-that defense through the probe bound of ADR-0020: no set of keys makes one table operation run
-long. No output reveals a memory address: objects print as IDs
-(ADR-0019), so a script learns nothing about where the host's memory is.
+that defense as long as it sets an instruction limit: each probe step past the first counts against
+it (ADR-0020), so no set of keys makes one table operation run long. No output reveals a memory
+address: objects print as IDs (ADR-0019), so a script learns nothing about where the host's memory
+is.
 
 ## Invariants
 

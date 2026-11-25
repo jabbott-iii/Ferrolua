@@ -251,19 +251,20 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
   - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.4 — vm: tables**
+  - Note: 2026-11-24, the owner's choice (ADR-0020): probe steps count against the instruction
+    limit, not a cap.
   - Depends: M2.3
-  - Decide first: whether a table operation's probe steps count against the instruction limit or
-    are capped (ADR-0020).
   - Do:
     - Build tables with array and hash parts, key normalization, `#` borders, `next`, reference
-      keys hashed by handle, and the probe bound, as [`specs/vm.md`](specs/vm.md#tables) describes.
+      keys hashed by handle, and each probe step past the first counted as a work unit, as
+      [`specs/vm.md`](specs/vm.md#tables) describes.
   - Accept:
     - `#t` returns the border PUC-Rio Lua 5.5.1 returns for each table in
       `tests/conformance/length.lua`, once M2.14 can run it.
     - Two states given the same seed that build the same table, with strings, tables, and
       functions as keys, visit its keys in the same order.
-    - With a cap, a set of keys crafted to collide under a known seed never takes more probe steps
-      per operation than the cap; with counting, M3.2 checks the bound.
+    - Each table operation reports one work unit for each probe step past the first, for a set of
+      keys crafted to collide under a known seed as for any other; M3.2 enforces the limit.
   - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.5 — compiler: names, upvalues, globals, and self-recursion**
@@ -449,8 +450,8 @@ scripts within limits, and gets every Lua 5.5 library it grants.
       collector.
     - Each limit stops a script one unit past it, inside `pcall`, `xpcall`, metamethods, and
       coroutines alike.
-    - If M2.4 chose counting, a set of keys crafted to collide under a known seed stops at the
-      instruction limit (ADR-0020).
+    - A set of keys crafted to collide under a known seed stops at the instruction limit
+      (ADR-0020).
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
 
 - [ ] **M3.3 — stdlib: strings and patterns**

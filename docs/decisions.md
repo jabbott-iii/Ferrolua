@@ -602,7 +602,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0020 — Bound the probe steps of table operations, and hash reference keys by handle
 
-- **Status:** Accepted
+- **Status:** Accepted; on 2026-11-24 the owner chose counting over a cap for the bound, which
+  [`specs/vm.md`](specs/vm.md#tables) records
 - **Date:** 2026-11-24
 - **Context:**
   - A table's hash part uses open addressing on the state's hash seed

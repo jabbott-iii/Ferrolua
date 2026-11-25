@@ -33,10 +33,11 @@ hash part uses open addressing with the seeded hash. Float keys with integer val
 - A table, a function, a thread, or a userdata used as a key is hashed from its handle, its slot
   and generation, mixed with the seed, never from an address. Under a fixed seed, `next` then
   visits every kind of key in the same order in every run (ADR-0020).
-- No set of keys makes one table operation run long, even under a seed a script knows (ADR-0020).
-  Either each probe step past the first counts as a work unit against the instruction limit of
-  [`sandbox.md`](sandbox.md#limits), or a probe's steps are capped, with a fallback for keys that
-  share a full hash. M2.4 decides which before work starts, and records it here.
+- No set of keys makes one table operation run long, even under a seed a script knows (ADR-0020):
+  each probe step past the first, in a lookup, an insertion, or `next`, counts as one work unit
+  against the instruction limit of [`sandbox.md`](sandbox.md#limits). The owner chose counting
+  over a cap on 2026-11-24. A cap would also bound a host that sets no limit, but it needs a
+  fallback structure for keys that share a full hash, and more code in every table operation.
 
 - `#t` returns a border: an n where `t[n]` isn't `nil` and `t[n + 1]` is, or 0 when `t[1]` is
   `nil`. When a table has several borders, Ferrolua returns the one PUC-Rio Lua 5.5.1's algorithm

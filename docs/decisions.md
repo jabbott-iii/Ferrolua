@@ -1576,3 +1576,180 @@ it is `Proposed`, and no code may depend on it.
     `unsafe`, which ADR-0013 rules out.
 - **Revisit when:** the standard library gains a way to set the terminal's raw mode, or a user
   reports being misled because a line behaves differently at the prompt than in a file.
+
+## ADR-0034 — Give the host's handles no lifetime, and check their state when used
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - Every handle a host holds, such as `Value<'lua>`, `Table<'lua>`, or `Function<'lua>`, carries
+    its state's lifetime, so using one after its state is dropped doesn't compile
+    ([`specs/ferrolua.md`](specs/ferrolua.md)). A host that keeps a value across calls stores it in
+    the state's registry and keeps the key instead.
+  - Game hosts keep script callbacks in their own structures, such as an entity's `on_hit`
+    handler. A lifetime parameter then spreads to every type that holds one, or the host goes
+    through registry keys for each.
+  - mlua, the most used Rust binding to Lua, dropped its `'lua` lifetime in version 0.10 for this
+    reason, and checks a handle's state when it is used.
+  - Ferrolua's handles are already checked: a handle names a slot and its generation (ADR-0011),
+    and using a value with the wrong state already returns an error.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
+    embedding.
+- **Decision:**
+  - `Value`, `Table`, `Function`, `Thread`, `UserDataRef`, `LuaString`, `List`, `Tuple`, and `Set`
+    have no lifetime parameter. Each holds its object's handle, a counted reference that keeps the
+    object alive, and a weak link to its state, built on the standard library's `Rc` and `Weak`.
+  - Using a handle checks that its state still exists and is the state it is used with. If the
+    state is gone, the call returns `Error::StateDropped`; if it is another state, the error it
+    returns today. Dropping a handle after its state is gone does nothing.
+  - The registry stays, for hosts that want keys, but a host no longer needs it to keep a value.
+- **Consequences:**
+  - Good: a host's types hold Ferrolua values with no lifetime parameters, and a callback lives in
+    an entity as any other field does.
+  - Good: examples and documentation lose most of their lifetime annotations, which new Rust
+    users find hard.
+  - Bad: using a value after its state is dropped is an error at run time instead of a compile
+    error, so one invariant of [`specs/ferrolua.md`](specs/ferrolua.md) changes.
+  - Bad: each handle carries a link to its state, and each use checks it.
+  - Bad: a handle kept inside a userdata's Rust data is a reference the loop collector can't see,
+    so a loop through it lives until the state is dropped. A userdata's user values, which the
+    collector sees, are the way to hold Lua values in one.
+  - Follow-up: M2.14 builds the minimal API's handles this way, and M3.1 the rest.
+- **Alternatives considered:**
+  - Keep the lifetimes: the compiler catches every use after drop, at the cost of lifetimes in
+    every host type.
+  - Both, a handle with a lifetime and an owned one for storing: the strongest checks where a host
+    wants them, but two of every type to learn.
+  - Registry keys only: no new type, but every stored value becomes a lookup.
+- **Revisit when:** the owner accepts or changes this record, which M2.14 needs first.
+
+## ADR-0035 — Describe the host's API once, for its bindings, its declarations, and strict mode
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - A host registers each function with `lua.globals().set(name, lua.create_function(...))`
+    ([`specs/ferrolua.md`](specs/ferrolua.md)). The type checker and the language server learn the
+    host's API only from declaration files written by hand
+    ([`specs/types.md`](specs/types.md#declarations)), which drift from the Rust code they
+    describe.
+  - `ferrolua.md` leaves open how a host lists the globals it registers, so that strict mode and
+    the type checker know them, and M4.6 must decide it.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
+    embedding.
+- **Decision:**
+  - A host describes the functions, constants, modules, and userdata types it gives scripts with an
+    `Api` builder: each one's name, doc comment, and, for a function, its parameter names.
+  - The types come from the Rust signature. A `TypeInfo` trait, which every `FromLua` and `IntoLua`
+    type implements, gives each Rust type its Ferrolua type: `String` is `string`, `i64` is
+    `integer`, `Vec<T>` is `list<T>`, and `Option<T>` is `T?`.
+  - `lua.install(&api)` registers the bindings, and `api.declarations()` writes the same API as a
+    declaration file, in the syntax M6.6 settles, which `ferrolua check`, the linter, and the
+    language server read through `declarations` in `.ferrolua.lua`.
+  - Strict mode takes the names an installed `Api` defines as the host's globals, which answers
+    the open question in `ferrolua.md`.
+  - `create_function` stays, for functions a host makes on the fly.
+- **Consequences:**
+  - Good: one description gives the bindings, the documentation on hover, completion, type
+    checks, and strict mode's list of names.
+  - Good: a host's tests can compare `api.declarations()` with the file it ships, so the two never
+    drift.
+  - Bad: a second way to register functions beside `create_function`.
+  - Bad: a host function's types are only as precise as its Rust signature; a function that takes
+    a `Value` shows as `any` unless the host says more.
+  - Follow-up: M3.21 builds `Api`, `TypeInfo`, and `install`; M6.12 writes declarations from an
+    `Api`; M4.6 reads the names.
+- **Alternatives considered:**
+  - Declaration files by hand: nothing to build, but they drift from the code.
+  - An attribute macro such as `#[ferrolua::export]` on Rust functions: the tidiest syntax, but a
+    procedural macro needs a Rust parser, which Ferrolua would have to write itself (ADR-0002).
+  - Reading the host's doc comments from rustdoc's JSON output: no builder, but that output needs a
+    nightly compiler.
+- **Revisit when:** the owner accepts or changes this record, which M3.21 needs first.
+
+## ADR-0036 — Let a host add modules that `require` finds, without granting `package`
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - `package` and `require` are off by default, and a host grants them with a module loader of its
+    own ([`specs/sandbox.md`](specs/sandbox.md#libraries)). A sandboxed state that wants a `game`
+    API therefore gets a global, and the globals of every API share one namespace.
+  - Python and Lua programs organize code in modules, and a host often wants to ship scripts of its
+    own inside its binary, which matters most on iOS, Android, and the web, where scripts may have
+    no file system to load from.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
+    embedding.
+- **Decision:**
+  - `require` exists in every state. Without `package`, it finds only the modules the host added;
+    with `package`, it searches those first and then `package`'s searchers.
+  - `Lua::add_module(name, value)` registers a value, usually a table or one an `Api` built
+    (ADR-0035, proposed), as the module `name`.
+  - `Lua::add_source_module(name, source)` registers Ferrolua source that `require` compiles and
+    runs on first use, as it does a file, so a host can ship scripts with `include_str!`.
+  - A module loads once per state. Without `package`, scripts can't read or replace the cache of
+    loaded modules, because `package.loaded` doesn't exist.
+  - An unknown name raises `module 'x' not found`, with a hint naming the closest added module
+    (ADR-0029).
+- **Consequences:**
+  - Good: APIs live in modules instead of globals, and a script says what it uses with
+    `local game = require("game")`.
+  - Good: a host bundles its scripts in its binary, on every platform.
+  - Bad: `require` exists in sandboxed states, so a script can test which module names its host
+    added.
+  - Bad: two places modules come from when `package` is granted, which the order above settles.
+  - Follow-up: M3.23 builds host modules, after M3.10.
+- **Alternatives considered:**
+  - Globals only, as today: nothing to build, but every API shares one namespace.
+  - `package` with a loader the host writes, which already works: no new API, but every host
+    writes the same loader, and granting `package` grants its searchers too.
+  - An `import` statement, as Python has: familiar, but new syntax for what `require` already does.
+- **Revisit when:** the owner accepts or changes this record, which M3.23 needs first.
+
+## ADR-0037 — Let scripts wait on the host, and let a budget pause a script instead of stopping it
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - Game and server scripts often wait: `wait(1.0)` until a later frame, or `await_input()` until
+    the player acts. Lua's coroutines can yield, but a Rust function can't make the coroutine that
+    called it yield ([`specs/vm.md`](specs/vm.md#coroutines)).
+  - The instruction limit counts each call from the host (ADR-0021), and reaching it stops the
+    script with an error that `pcall` can't catch (ADR-0014, proposed). A host that wants to spread
+    a long script over several frames can't pause it.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of four improvements to
+    embedding.
+- **Decision:**
+  - **Host functions that yield.** A Rust function can return `Yield(values)`, which suspends the
+    coroutine that called it with those values, as `coroutine.yield` would. Called outside a
+    coroutine, it raises `attempt to yield from outside a coroutine`, as Lua's yield does.
+  - **Tasks.** `Lua::spawn(function, args)` starts a function in a new coroutine and returns a
+    `Task`. `Task::resume(values)` runs it until it yields, returns, or fails, and gives
+    `Poll::Yielded(values)`, `Poll::Done(values)`, or `Poll::Failed(error)`. A host keeps tasks
+    wherever it likes (ADR-0034, proposed), and dropping one closes its coroutine, running its
+    pending `<close>` variables.
+  - **Pause on budget.** A task spawned with `pause_on_limit` pauses instead of failing when a call
+    runs out of instructions inside it, and `resume` gives `Poll::OutOfBudget`. The next `resume`
+    continues it at the next instruction, with that call's fresh budget. A pause falls only between
+    instructions: a library call that runs out partway, such as a long `string.rep`, still stops
+    the task with the limit error, and so does the memory limit.
+  - Compiled code hands the last instructions before the limit to the interpreter, so a task
+    pauses at the same instruction interpreted and compiled, and the same run pauses at the same
+    points every time (ADR-0018).
+- **Consequences:**
+  - Good: the `wait()` pattern that game scripts use works, with the host deciding when each task
+    goes on.
+  - Good: a host can run a long script a slice per frame, with no change to the script.
+  - Bad: a paused script may stop between any two instructions, so state it shares with other
+    scripts can be half updated; a host turns pausing on only for tasks that can bear it.
+  - Bad: a task the host never resumes or drops holds its memory, until the state is dropped.
+  - Follow-up: M3.22 builds yielding host functions, tasks, and pausing in the interpreter; M5.7
+    and M13.3 pause compiled code at the same instruction.
+- **Alternatives considered:**
+  - Rust `async` functions as host functions: idiomatic Rust, but they need an executor, which
+    Ferrolua would write itself, and every host would have to drive it.
+  - Waiting written in Lua with `coroutine.wrap`: no API, but every host's scripts would carry the
+    same scheduler code.
+  - A thread for each script: real parallelism, but a state runs on one thread at a time, and
+    threads would end the determinism of ADR-0018.
+- **Revisit when:** the owner accepts or changes this record, which M3.22 needs first.

@@ -128,6 +128,11 @@ stack of its own. A native function that calls back into Lua, such as `pcall`, `
 comparator, or a `string.gsub` callback, may let the callback yield only where PUC-Rio allows it.
 `pcall` and `xpcall` allow it; the others raise `attempt to yield across a C-call boundary`.
 
+ADR-0037 (proposed: scripts that wait on the host) would let a Rust function suspend the coroutine
+that called it, as `coroutine.yield` does, and let a coroutine the host started pause between two
+instructions when a call's instruction budget runs out, to go on in the next call. A library call
+that runs out partway would still stop with the limit error (M3.22).
+
 ## Debug hooks
 
 The VM can call a hook on each new line, each call, each return, and every n instructions, as

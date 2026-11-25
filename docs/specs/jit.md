@@ -64,7 +64,9 @@ instruction:
   candidates for the loop collector, and the collector runs only at safe points, where every
   count is exact.
 - Instruction counting for the instruction limit and debug hooks are kept by decrementing a
-  counter at each loop's back edge and at each function's entry.
+  counter at each loop's back edge and at each function's entry. Under ADR-0037 (proposed), code
+  that can't finish its next stretch within the budget would hand it to the interpreter, so a
+  task pauses at the same instruction compiled or not.
 - A loop that gets hot while the interpreter runs it enters compiled code at the loop's head,
   through on-stack replacement.
 

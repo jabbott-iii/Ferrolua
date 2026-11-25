@@ -54,7 +54,9 @@ Types for the standard library, and for host APIs, come from declaration files: 
 with `declare` statements and no code, such as `declare function print(...: any)`. Ferrolua ships
 declarations for all of its standard library. Projects list their own in `declarations` in
 `.ferrolua.lua` ([`diagnostics.md`](diagnostics.md#configuration-ferrolualua)). M6.6 settles the
-declaration syntax.
+declaration syntax. ADR-0035 (proposed: the host's API described once) would let a host write its
+declaration file from the same description that registers its bindings, so the two never drift
+(M6.12).
 
 ## Which files are checked
 

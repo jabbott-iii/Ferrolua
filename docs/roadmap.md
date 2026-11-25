@@ -522,6 +522,8 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 
 - [ ] **M2.14 — ferrolua: a minimal embedding API and the conformance runner**
   - Depends: M2.13, M2.17, M2.18
+  - Decide first: the owner accepts or rejects ADR-0034 (handles with no lifetime, checked against
+    their state), which sets the shape of every handle.
   - Do:
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
       [`specs/ferrolua.md`](specs/ferrolua.md) sketches.
@@ -589,6 +591,19 @@ scripts within limits, and gets every standard library it grants.
     - `Lua::collect` frees a loop the host dropped, and never a value the host still holds.
     - Using a value after its state is dropped fails to compile, in a `compile_fail` doc test.
     - Using a value with another state returns an error.
+  - Verify: `cargo test -p ferrolua --locked`
+
+- [ ] **M3.21 — ferrolua: the host's API described once**
+  - Note: added on 2026-11-24, when the owner asked for four embedding improvements to draft
+    (ADR-0035). It is listed where it is to be done, after M3.1.
+  - Depends: M3.1
+  - Decide first: the owner accepts ADR-0035 (the host's API described once).
+  - Do:
+    - Build `Api`, the `TypeInfo` trait for every `FromLua` and `IntoLua` type, and
+      `lua.install(&api)`, as [`specs/ferrolua.md`](specs/ferrolua.md#the-api) describes.
+  - Accept:
+    - An `Api` with a function, a module, and a userdata type installs bindings that scripts call,
+      and `TypeInfo` gives the Ferrolua type of every type `FromLua` and `IntoLua` support.
   - Verify: `cargo test -p ferrolua --locked`
 
 - [ ] **M3.2 — vm: limits**
@@ -705,6 +720,22 @@ scripts within limits, and gets every standard library it grants.
     - The script prints its recorded output, including `close` with pending `<close>` variables.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
+- [ ] **M3.22 — ferrolua: host functions that yield, and tasks**
+  - Note: added on 2026-11-24, when the owner asked for four embedding improvements to draft
+    (ADR-0037). It is listed where it is to be done, after M3.8.
+  - Depends: M3.1, M3.2, M3.8
+  - Decide first: the owner accepts ADR-0037 (scripts that wait on the host).
+  - Do:
+    - Build `Yield` for Rust functions, `Lua::spawn`, `Task::resume`, and `pause_on_limit`, as
+      [`specs/vm.md`](specs/vm.md#coroutines) describes.
+  - Accept:
+    - A script that calls a host `wait()` three times yields three times, and the host resumes it
+      to its end.
+    - A task with `pause_on_limit` that loops past one call's budget pauses, goes on in the next
+      call from the same instruction, and gives the same output as a run with no limit.
+    - A `string.rep` that runs out partway stops the task with the limit error.
+  - Verify: `cargo test -p ferrolua --locked`
+
 - [ ] **M3.16 — ferrolua: a clock and a hash seed from the host**
   - Note: added on 2026-11-24, when the owner chose the web as a platform (ADR-0027). It is listed
     where it is to be done, before M3.9, whose time functions use it.
@@ -738,6 +769,20 @@ scripts within limits, and gets every standard library it grants.
     - Modules load once, circular `require` behaves as in PUC-Rio Lua 5.5.1, and `package.loadlib`
       returns `nil` and a message.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
+
+- [ ] **M3.23 — ferrolua: modules a host adds for `require`**
+  - Note: added on 2026-11-24, when the owner asked for four embedding improvements to draft
+    (ADR-0036). It is listed where it is to be done, after M3.10.
+  - Depends: M3.10
+  - Decide first: the owner accepts ADR-0036 (modules a host adds for `require`).
+  - Do:
+    - Build `Lua::add_module`, `Lua::add_source_module`, and `require` in every state, as
+      [`specs/sandbox.md`](specs/sandbox.md#libraries) describes.
+  - Accept:
+    - In a state without `package`, `require("game")` returns the host's module, loads a source
+      module once, and raises `module 'x' not found` with a hint for an unknown name.
+    - With `package` granted, host modules are found before its searchers.
+  - Verify: `cargo test -p ferrolua --locked`
 
 - [ ] **M3.11 — stdlib: the `debug` library**
   - Depends: M2.12
@@ -926,6 +971,8 @@ on every target.
   - Verify: `cargo test -p ferrolua -p ferrolua-vm --locked`
 
 - [ ] **M4.6 — compiler: strict mode and undeclared-variable errors**
+  - Note: 2026-11-24: if the owner accepts ADR-0035, the host's globals are the names its installed
+    `Api` defines.
   - Depends: M4.1
   - Decide first: the owner accepts ADR-0008 (strict mode with `--!strict` or a host option), and
     decides how a host lists its globals.
@@ -1062,6 +1109,8 @@ output with the JIT on or forced, and the agreed budgets are checked.
   - Verify: `cargo test -p ferrolua --features jit --test conformance --locked`
 
 - [ ] **M5.7 — jit: limits and debug hooks in compiled code**
+  - Note: 2026-11-24: if the owner accepts ADR-0037, compiled code hands the last instructions
+    before the limit to the interpreter, so a task pauses at the same instruction.
   - Depends: M5.6
   - Do:
     - Count instructions and check memory in compiled code, and run functions with breakpoints or
@@ -1237,6 +1286,18 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - With `check_all` on, the conformance scripts give no `T` diagnostics beyond their marked
       lines.
   - Verify: `cargo test -p ferrolua-types --locked`
+
+- [ ] **M6.12 — types: declarations from a host's API**
+  - Note: added on 2026-11-24 with M3.21 (ADR-0035).
+  - Depends: M6.6, M3.21
+  - Decide first: the owner accepts ADR-0035.
+  - Do:
+    - Build `api.declarations()`, which writes an installed `Api` as a declaration file in the
+      syntax of [`specs/types.md`](specs/types.md#declarations).
+  - Accept:
+    - `ferrolua check` reports a wrong argument type in a script that calls a host function
+      declared this way, and the language server completes the host's names.
+  - Verify: `cargo test -p ferrolua -p ferrolua-types --locked`
 
 - [ ] **M6.7 — types: LuaCATS annotations**
   - Depends: M6.5

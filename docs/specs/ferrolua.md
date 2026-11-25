@@ -17,6 +17,11 @@ after its state is dropped a compile error, and using it with the wrong state a 
 Hosts that need to keep a value across calls without a lifetime store it in the state's registry
 and keep the registry key. The cost is lifetimes in the host's code.
 
+ADR-0034 (proposed: handles with no lifetime, checked against their state) would drop the lifetime
+parameter from every handle. Each handle would keep a weak link to its state, and using one after
+its state is dropped would return `Error::StateDropped` instead of failing to compile, so a host
+could store values and callbacks in its own types. M2.14 waits for the decision.
+
 ## The API
 
 The sketch below shows the shape; M3.1 settles the names, and the crate's documentation on docs.rs
@@ -54,6 +59,16 @@ assert_eq!(result, "hello, world");
   tuples, and sets beside tables; ADR-0026). `FromLua` also reads a `Vec` from a table's
   keys 0 to `#t - 1`. None converts between strings and numbers.
 - `UserData` lets a Rust type become userdata with methods, fields, and metamethods.
+- ADR-0035 (proposed: the host's API described once) would add an `Api` builder: the host names
+  each function, module, and userdata type once, with doc comments and parameter names, the types
+  come from the Rust signatures through a `TypeInfo` trait, `lua.install(&api)` registers the
+  bindings, and `api.declarations()` writes the declaration file the type checker and the language
+  server read (M3.21, M6.12).
+- ADR-0036 (proposed: modules a host adds for `require`) would add `Lua::add_module` and
+  `Lua::add_source_module`, which `require` finds in every state, even without `package` (M3.23).
+- ADR-0037 (proposed: scripts that wait on the host) would let a Rust function return
+  `Yield(values)` to suspend its calling coroutine, and add `Lua::spawn`, which returns a `Task`
+  the host resumes, optionally pausing it when a call's instruction budget runs out (M3.22).
 - `Lua::collect` runs the loop collector and the finalizers it queues, at a point the host
   chooses ([`memory.md`](memory.md#schedule)). It is a call like any other: its finalizers count
   against the instruction limit, and if the limit stops them, it returns the limit error and the
@@ -91,7 +106,8 @@ assert_eq!(result, "hello, world");
 - Whether `Lua` implements `Send`, so a host can move a state to another thread between calls;
   it requires every registered function to be `Send` too. M3.1 decides.
 - How a host lists the globals it registers, so strict mode and the type checker know them: a call
-  on `Lua`, or the same `globals` list `.ferrolua.lua` uses. M4.6 decides.
+  on `Lua`, or the same `globals` list `.ferrolua.lua` uses. M4.6 decides, and ADR-0035
+  (proposed) would answer it with the names an installed `Api` defines.
 
 ## Invariants
 

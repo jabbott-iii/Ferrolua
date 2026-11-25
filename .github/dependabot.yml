@@ -1,8 +1,19 @@
 # Version updates for what Ferrolua uses. Cargo has no entry, because the dependency rule
-# (`.claude/rules/dependencies.md`) allows no third-party crates. Add a `rust-toolchain` entry once
-# `rust-toolchain.toml` exists, so toolchain updates arrive as pull requests too.
+# (`.claude/rules/dependencies.md`) allows no third-party crates.
 version: 2
 updates:
+  # New Rust releases for `rust-toolchain.toml`. Review each one as a change of its own: update the
+  # version where the documents name it, such as `CONTRIBUTING.md`, and decide whether
+  # `rust-version` in `Cargo.toml` moves with it.
+  - package-ecosystem: "rust-toolchain"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "build(workspace)"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

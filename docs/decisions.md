@@ -599,3 +599,60 @@ it is `Proposed`, and no code may depend on it.
     the output would pass for an address and mislead readers.
 - **Revisit when:** a widely used Lua library breaks on Ferrolua because it parses `tostring`'s
   output.
+
+## ADR-0020 — Bound the probe steps of table operations, and hash reference keys by handle
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:**
+  - A table's hash part uses open addressing on the state's hash seed
+    ([`specs/vm.md`](specs/vm.md#tables)). Keys chosen to land on the same slots make each lookup
+    walk a long chain, checking one slot per probe step, so inserting n of them takes on the order
+    of n² probe steps. This attack is called hash flooding.
+  - By default the seed comes from the standard library's `RandomState`, so a script can't predict
+    collisions ([`specs/sandbox.md`](specs/sandbox.md#isolation)). A host that needs runs to repeat
+    fixes the seed with `Options::hash_seed` ([`specs/ferrolua.md`](specs/ferrolua.md)), and then
+    the defense is gone: under a seed known in advance, a script, or data that a script uses as
+    keys, can make one table operation run for seconds.
+  - The instruction limit counts bytecode instructions and the work units inside library calls, but
+    not the probe steps inside one instruction ([`specs/sandbox.md`](specs/sandbox.md#limits)), so
+    it never sees that stall.
+  - The specs don't say how a table, a function, a thread, or a userdata used as a key is hashed.
+    PUC-Rio Lua hashes them by address, so the order in which `pairs` visits them changes between
+    runs whatever the seed. ADR-0018 and ADR-0019 promise runs that repeat exactly under a fixed
+    hash seed.
+  - [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, needs both.
+    Its ADR-0080 sets each state's seed from the game's seed, so that recordings replay, and asks
+    Ferrolua to bound probe steps and to hash reference keys by handle.
+- **Decision** (the owner chose both points on 2026-11-24, with Nadir's ADR-0080):
+  - **Bounded probes.** No set of keys, under any seed, makes one table operation run long. Either
+    each probe step past the first counts as one work unit against the instruction limit, as
+    library work already does, or a probe's steps are capped, with a fallback that keeps lookups
+    bounded when keys share a full hash. M2.4 decides which before work starts, and records it in
+    [`specs/vm.md`](specs/vm.md#tables).
+  - **Reference keys hashed by handle.** A table, a function, a thread, or a userdata used as a key
+    is hashed from its handle (its slot and generation, [`specs/memory.md`](specs/memory.md)) mixed
+    with the state's seed, never from an address. Slots are reused in a fixed order (ADR-0018), so
+    the same script, inputs, host calls, options, and seed give the same handles and the same
+    `pairs` order.
+- **Consequences:**
+  - Good: under a fixed seed, `pairs` visits every kind of key in the same order in every run, so a
+    host that replays runs, or keeps machines in lockstep, can use `Options::hash_seed`.
+  - Good: a host that fixes the seed doesn't open itself to hash flooding.
+  - Bad: counting gives no bound to a host that sets no instruction limit, and stops a script that
+    PUC-Rio would run slowly to its end; a cap needs a fallback structure, more memory, and more
+    code in every table operation.
+  - Bad: the order of reference keys depends on how the state reused its slots, so a script that
+    allocates differently gets another order, as strings do under another seed.
+  - Follow-up: M2.3 takes a seed from its caller; M2.4 hashes reference keys by handle, builds the
+    bound, and decides between counting and a cap; M3.1 passes `Options::hash_seed` through; M3.2
+    tests the bound against a crafted set of keys if M2.4 chose counting.
+- **Alternatives considered:**
+  - Leave probes unbounded and rely on the random seed: a host that fixes the seed loses the
+    defense.
+  - Hash reference keys by their object IDs (ADR-0019): stable, but every key would need an ID and
+    its entry in the side table.
+  - Tables that keep their keys in the order they were added, as Python's dictionaries do: a stable
+    order whatever the seed, but a larger redesign of tables. Nadir chose a fixed seed instead.
+- **Revisit when:** a host reports a table operation that runs long under a fixed seed, or M5.1's
+  benchmarks show that the bound slows table lookups.

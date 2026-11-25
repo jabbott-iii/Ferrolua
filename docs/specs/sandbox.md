@@ -64,7 +64,8 @@ status to the host, which the command-line tool turns into the process's exit st
 Library functions that can run long count their work against the instruction limit: one unit per
 byte that `string.rep`, `table.concat`, and `string.format` produce, and one per step of the
 pattern matcher in `string.find`, `string.match`, `string.gmatch`, and `string.gsub`. A pattern
-built to make the matcher backtrack is stopped like a loop.
+built to make the matcher backtrack is stopped like a loop. Table operations are bounded too
+(ADR-0020): if M2.4 chooses to count them, each probe step past the first is one unit.
 
 ### When a limit is reached
 
@@ -80,8 +81,10 @@ call into the state again.
 
 States share nothing. Each has its own registry, globals, string metatable, loaded modules, and
 string hash seed, so one script changing `getmetatable("").__index` affects only its own state.
-The seed comes from the standard library's `RandomState`, so a script can't predict hash
-collisions to slow its table lookups. No output reveals a memory address: objects print as IDs
+By default the seed comes from the standard library's `RandomState`, so a script can't predict hash
+collisions to slow its table lookups. A host that fixes the seed with `Options::hash_seed` keeps
+that defense through the probe bound of ADR-0020: no set of keys makes one table operation run
+long. No output reveals a memory address: objects print as IDs
 (ADR-0019), so a script learns nothing about where the host's memory is.
 
 ## Invariants

@@ -218,7 +218,8 @@ freed and finalized in the same order.
   order, and slots are reused last in, first out, so no order depends on an address or a hash.
 - The string hash seed is random by default, so the order `pairs` visits keys changes between runs,
   as it does in PUC-Rio Lua 5.5. A host that needs runs to repeat exactly fixes the seed with
-  `Options::hash_seed`.
+  `Options::hash_seed`. Tables, functions, threads, and userdata used as keys hash by their
+  handles, which slots reused in a fixed order make the same in every run (ADR-0020).
 - In tests, the VM can record a collection log: each collection's position in the instruction
   count, and the handles it freed, in order.
 

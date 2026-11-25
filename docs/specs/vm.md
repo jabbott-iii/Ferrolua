@@ -20,14 +20,23 @@ once on entry.
 Strings are immutable byte strings. Strings of 40 bytes or fewer are interned: the state keeps one
 copy of each, in a table keyed by content, so comparing two short strings compares their handles.
 Longer strings are compared by content, and their hash is computed on first use. The hash is
-seeded per state from the standard library's `RandomState`, so a script can't choose keys that
-collide.
+seeded per state: from the standard library's `RandomState` by default, so a script can't choose
+keys that collide, or from `Options::hash_seed` when a host needs runs to repeat exactly
+([`ferrolua.md`](ferrolua.md)).
 
 ## Tables
 
 A table has an array part for keys 1 to n and a hash part for the rest, as in PUC-Rio Lua. The
 hash part uses open addressing with the seeded hash. Float keys with integer values, such as
 `2.0`, are stored as integers, and `nil` and NaN keys raise PUC-Rio's errors.
+
+- A table, a function, a thread, or a userdata used as a key is hashed from its handle, its slot
+  and generation, mixed with the seed, never from an address. Under a fixed seed, `next` then
+  visits every kind of key in the same order in every run (ADR-0020).
+- No set of keys makes one table operation run long, even under a seed a script knows (ADR-0020).
+  Either each probe step past the first counts as a work unit against the instruction limit of
+  [`sandbox.md`](sandbox.md#limits), or a probe's steps are capped, with a fallback for keys that
+  share a full hash. M2.4 decides which before work starts, and records it here.
 
 - `#t` returns a border: an n where `t[n]` isn't `nil` and `t[n + 1]` is, or 0 when `t[1]` is
   `nil`. When a table has several borders, Ferrolua returns the one PUC-Rio Lua 5.5.1's algorithm

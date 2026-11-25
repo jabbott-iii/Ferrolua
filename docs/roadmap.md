@@ -243,20 +243,27 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
 - [ ] **M2.3 — vm: values, strings, and interning**
   - Depends: M2.2
   - Do:
-    - Build `Value`, strings, interning of short strings, and the per-state hash seed, as
-      [`specs/vm.md`](specs/vm.md#strings) describes.
+    - Build `Value`, strings, interning of short strings, and the per-state hash seed, random
+      unless the caller gives one (ADR-0020), as [`specs/vm.md`](specs/vm.md#strings) describes.
   - Accept:
     - Two short strings with the same bytes share one handle, and two states get different seeds.
+    - Two states given the same seed hash every string alike.
   - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.4 — vm: tables**
   - Depends: M2.3
+  - Decide first: whether a table operation's probe steps count against the instruction limit or
+    are capped (ADR-0020).
   - Do:
-    - Build tables with array and hash parts, key normalization, `#` borders, and `next`, as
-      [`specs/vm.md`](specs/vm.md#tables) describes.
+    - Build tables with array and hash parts, key normalization, `#` borders, `next`, reference
+      keys hashed by handle, and the probe bound, as [`specs/vm.md`](specs/vm.md#tables) describes.
   - Accept:
     - `#t` returns the border PUC-Rio Lua 5.5.1 returns for each table in
       `tests/conformance/length.lua`, once M2.14 can run it.
+    - Two states given the same seed that build the same table, with strings, tables, and
+      functions as keys, visit its keys in the same order.
+    - With a cap, a set of keys crafted to collide under a known seed never takes more probe steps
+      per operation than the cap; with counting, M3.2 checks the bound.
   - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.5 — compiler: names, upvalues, globals, and self-recursion**
@@ -442,6 +449,8 @@ scripts within limits, and gets every Lua 5.5 library it grants.
       collector.
     - Each limit stops a script one unit past it, inside `pcall`, `xpcall`, metamethods, and
       coroutines alike.
+    - If M2.4 chose counting, a set of keys crafted to collide under a known seed stops at the
+      instruction limit (ADR-0020).
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
 
 - [ ] **M3.3 — stdlib: strings and patterns**

@@ -47,7 +47,8 @@ branches".
   dependencies
 - **CI:** none yet: Ferrolua has no GitHub Actions workflows. The first, `.github/workflows/ci.yml`,
   will run the **Check commands**, the **Test commands**, and the **Coverage command** on x86-64
-  Linux, with every job required before a merge to `main`
+  Linux, and from M3.18 on the tests on every target in `docs/03-platforms.md`, with coverage on
+  Linux, Windows, and macOS, and every job required before a merge to `main`
 
 ## A failing test means the code is wrong
 

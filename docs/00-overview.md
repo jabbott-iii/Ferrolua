@@ -48,6 +48,10 @@ host allows, within limits the VM enforces (ADR-0014).
 8. Editors get type-aware auto complete, live diagnostics, and a debugger through `ferrolua lsp`
    and `ferrolua dap` (ADR-0015).
 9. Ferrolua meets the performance budgets below once they are agreed.
+10. Ferrolua runs on Linux, Windows, macOS, Android, iOS, and the web, with the JIT on every one
+    that allows executable memory, and the same script with the same inputs and hash seed gives
+    the same output and the same collection log on every target (ADR-0027). CI tests each target
+    listed in [`03-platforms.md`](03-platforms.md).
 
 ## Non-goals
 
@@ -60,6 +64,7 @@ host allows, within limits the VM enforces (ADR-0014).
 - Checking types at run time (ADR-0006).
 - Printing memory addresses, from `tostring`, `%p`, or anything else (ADR-0019).
 - Loading chunks compiled by PUC-Rio's `luac` (ADR-0010).
+- A JIT on iOS or the web, where an app can't run machine code it writes (ADR-0027).
 - The Lua C API, and C modules built for PUC-Rio Lua (ADR-0017).
 
 ## Budgets
@@ -93,8 +98,10 @@ Revisit these if any turns out to be wrong.
   per thread.
 - A host that can't accept a collection pause at an allocation-driven point turns those runs off
   and collects at points it chooses, such as between frames (ADR-0018).
-- Linux on x86-64 is where Ferrolua's first users run it. Other platforms follow the order in
-  [`03-platforms.md`](03-platforms.md).
+- Hosts on all six platforms embed Ferrolua as a Rust crate built for their target, and iOS and
+  web hosts accept the interpreter's speed (ADR-0027).
+- GitHub's runners, the Android emulator, and the iOS simulator stay available to CI for every
+  target in [`03-platforms.md`](03-platforms.md).
 - Contributors who record conformance output install PUC-Rio Lua 5.5.1 themselves. CI compares
   against the recorded output and doesn't need it.
 - Editors that users choose have built-in clients for the Language Server Protocol (LSP) and the
@@ -120,7 +127,10 @@ weeks, L is one to three months, and XL is more than three months.
 | SAST (M8) | L | Taint analysis across functions and files, and SARIF output |
 | Language server (M9) | L | JSON, JSON-RPC, incremental analysis, and completion on code that doesn't parse yet |
 | Debugger (M10) | M | VM hooks, the debug protocol, and debugging inside a running host |
-| Optimizing JIT (M11) | XL | SSA form, register allocation, inline caches, and removing redundant counts |
+| Optimizing JIT (M11) | XL | SSA form, register allocation, inline caches, and removing redundant counts, for both backends |
+| Math functions with the same bits everywhere (M2.19) | M | Sine, exponent, logarithm, and power within one unit in the last place, from IEEE 754's exact operations only |
+| Six platforms in CI (M3.16–M3.18) | M | Test runners for the Android emulator, the iOS simulator, and a browser harness of Ferrolua's own, plus eleven CI jobs |
+| JIT on every platform that allows it (M13) | L | An AArch64 encoder and baseline tier, and executable memory, calling conventions, and unwind tables for Windows, macOS, and Android |
 | First release (M12) | S | Release documents, API review by hand, and package checks |
 
 ## Top risks and mitigations
@@ -129,9 +139,10 @@ weeks, L is one to three months, and XL is more than three months.
 | :- | :- |
 | A loop collection pauses a script longer than its host accepts (ADR-0018) | Self-recursion and classes make no loops; strings and prototypes are never visited; the linter flags loop patterns (M7.2); hosts can turn off collections by allocation count and collect between frames; a proposed budget caps the pause; the backlog holds an incremental collector |
 | Something makes collections happen at different points between runs, between targets, or between the interpreter and the JIT | Only Lua heap bytes count toward the threshold, by fixed charges that no target or allocator changes (ADR-0021); nothing orders by address or hash; the conformance runner compares each script's collection log with the one stored for it, and a fuzz target compares the interpreter's with the JIT's (M5.8) |
-| A bug in generated code breaks memory safety | `unsafe` stays in two modules under six invariants (ADR-0013); every conformance script also runs with the JIT forced on; a fuzz target compares the interpreter with the JIT (M5.8) |
+| A bug in generated code breaks memory safety | `unsafe` stays in two modules under seven invariants (ADR-0013); every conformance script also runs with the JIT forced on; a fuzz target compares the interpreter with the JIT (M5.8) |
 | Ferrolua's output differs from PUC-Rio's in details, such as float printing, `string.format`, or error messages | Conformance scripts compare with PUC-Rio's exact output for their Lua 5.5 twins; Ferrolua ports PUC-Rio's behavior, never its code; differences are fixed or recorded in a decision |
 | Counting references makes the interpreter slower than PUC-Rio's | Benchmarks from M5.1 measure the cost; the optimizing JIT removes redundant counts (M11.2); ADR-0018 names the threshold that reopens the decision |
+| A platform behaves differently: math results, a NaN's sign, stack sizes, or executable memory | `ferrolua-math` gives the same bits everywhere; every NaN prints as `nan`; nesting tests run on a 256 KB stack; the JIT falls back to the interpreter when a system refuses executable memory (ADR-0028); CI runs every target from M3.18 on |
 | The plan is large for its team | Milestones deliver usable parts in order: a parser, then an interpreter, then embedding, then the extensions, the JIT, and the tools |
 | Users won't port Lua code to Ferrolua's operators, 0-based indexes, scoping, and truth (ADR-0023, ADR-0025) | Ferrolua keeps Lua's statements, tables, and libraries, so porting changes expressions, index arithmetic, and some assignments; `global *` keeps a ported chunk's globals while it moves to local scoping; the linter's porting rules find `x ^ 2`, loops that start at 1, and assignments that hide an outer local (M7.2); the backlog holds a porting tool |
 | A conformance script and its Lua 5.5 twin drift apart, so a pair passes while testing different things | Twins keep each statement on the same line and make the same calls in the same order; reviews read them side by side; the runner fails on a script without a twin |

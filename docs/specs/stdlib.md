@@ -79,9 +79,9 @@ Pattern capture numbers, stack levels, line numbers, `file:seek` offsets, and th
 | `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, `dump` in Ferrolua's chunk format, and `join` (ADR-0026) |
 | `utf8` | Every function, with Lua 5.5's `lax` argument and the end position from `utf8.offset` |
 | `table` | `create`, `concat`, `insert`, `move`, `pack`, `remove`, `sort`, and `unpack`; `sort` uses PUC-Rio's algorithm, so equal elements end up in the same order and `invalid order function for sorting` is raised in the same cases |
-| `math` | `math.random` uses xoshiro256**, seeded as PUC-Rio seeds it, so `math.randomseed(42)` gives the same sequence; `math.randomseed()` with no argument takes its seed from `RandomState` |
+| `math` | Every function IEEE 754 doesn't define exactly comes from `ferrolua-math`, with the same bits on every target (ADR-0027: six platforms, the same results everywhere); `math.random` uses xoshiro256**, seeded as PUC-Rio seeds it, so `math.randomseed(42)` gives the same sequence; `math.randomseed()` with no argument takes its seed from `RandomState`, or from the host's seed where the standard library has no source of randomness |
 | `io` | File handles as userdata with `__close` and `__gc`, shown by their IDs; opened only under the file access policy |
-| `os` | Time functions always; the rest only when granted; `os.exit` returns an exit error to the host |
+| `os` | Time functions always, from the host's clock where the standard library has none, as on the web ([`ferrolua.md`](ferrolua.md)); the rest only when granted; `os.exit` returns an exit error to the host |
 | `debug` | Every function in §6.10, working on Ferrolua's frames, locals, and upvalues; `upvalueid` returns an integer ID |
 
 | `list`, `tuple`, and `set` | The methods of [Lists, tuples, and sets](#lists-tuples-and-sets) |
@@ -139,7 +139,10 @@ spec ::= [[fill]align][sign]['z']['#']['0'][width][grouping]['.' precision][type
 `tostring` on a float, `string.format` with `%a`, `%e`, `%f`, and `%g`, and `%q` all print the
 exact characters PUC-Rio prints, which comes from the C library's `printf` on Linux. Ferrolua
 formats floats itself, with exact decimal conversion so rounding matches in every case, including
-subnormal numbers, `inf`, `-inf`, `nan`, and `-nan`.
+subnormal numbers, `inf`, and `-inf`. Every NaN prints as `nan`, whatever its sign, because
+processors give a new NaN different signs and the same script must print the same text on every
+target (ADR-0028, proposed). PUC-Rio prints `-nan` for a NaN whose sign is set, so conformance
+scripts don't print NaN.
 
 ## Object IDs in output
 

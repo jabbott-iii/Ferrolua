@@ -58,6 +58,9 @@ repeat:
   objects print as IDs, never addresses) but an address on PUC-Rio, so conformance scripts never
   print one, while extension scripts may;
 - the time, and `math.random` without a fixed seed;
+- the sign of a NaN, which PUC-Rio prints as `-nan` or `nan` by processor while Ferrolua always
+  prints `nan`, and the last digits of `math` functions, which come from the C library on PUC-Rio
+  and from `ferrolua-math` on Ferrolua (ADR-0027), so scripts print those with `%.12g`;
 - when a value outside a loop is freed, which is earlier on Ferrolua by design (ADR-0018:
   reference counting plus a deterministic loop collector). A script that observes freeing only
   after calling `collectgarbage()` behaves as on PUC-Rio and stays in `tests/conformance/`;
@@ -103,6 +106,16 @@ replay it. `cargo test` replays every saved input.
 cargo xtask fuzz <target> --seed 0 --runs 100000
 ```
 
+### `ferrolua-webtest`
+
+The WebAssembly test module of the browser harness, in `xtask/webtest/` (M3.17). Rust's test harness
+can't run in a browser, so this module, built for `wasm32-unknown-unknown`, runs the conformance and
+extension scripts, the saved fuzz inputs, and the stored collection logs through `ferrolua`'s API,
+and reports each result to the page that loaded it.
+`cargo xtask test --target wasm32-unknown-unknown` serves the module and the page from a local HTTP
+server written with the standard library, opens the page in a headless browser, and collects the
+results (ADR-0027: a browser harness of Ferrolua's own).
+
 ### `xtask`
 
 Build tasks run with `cargo xtask`, written with the standard library alone:
@@ -116,6 +129,9 @@ Build tasks run with `cargo xtask`, written with the standard library alone:
   interpreter whose `lua -v` doesn't report 5.5.1. It reads the interpreter's path from
   `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`.
 - `cargo xtask fuzz` (M0.4): runs the fuzzer.
+- `cargo xtask test --target <triple>` (M3.17): runs the tests on any target in
+  [`03-platforms.md`](03-platforms.md#how-tests-run-on-each-target), natively, in the Android
+  emulator, in the iOS simulator, or in a headless browser through a harness of Ferrolua's own.
 - `cargo xtask bench` (M5.1): runs each script in `benches/lua/` on Ferrolua, and its Lua 5.5
   twin in `benches/lua/reference/` on PUC-Rio Lua 5.5.1, and reports the median of several runs.
 
@@ -140,7 +156,10 @@ twins in `reference/` folders.
 
 CodeQL already scans the workflows on every push and pull request to `main`
 (`.github/workflows/codeql.yml`). The CI workflow, `.github/workflows/ci.yml`, lands in M0.6. It
-runs every automated check above on `ubuntu-latest`, plus a short fuzz run from a fixed seed. The
+runs every automated check above on `ubuntu-latest`, plus a short fuzz run from a fixed seed. From
+M3.18 on, a job for each target in [`03-platforms.md`](03-platforms.md#targets) runs
+`cargo xtask test` there, and coverage runs on Linux, Windows, and macOS (ADR-0027: six platforms);
+from M13.6 on, each JIT target also runs the forced pass and a short differential fuzz run. The
 owner then makes each job required before a merge to `main`. CI never installs PUC-Rio Lua: it
 compares against the recorded `.out` files.
 

@@ -341,7 +341,7 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** benchmarks show that handle checks cost more than 10% of the interpreter's run
   time after the JIT removes the ones it can.
 
-## ADR-0012 — Build a method JIT for x86-64 with an assembler of Ferrolua's own
+## ADR-0012 — Build a method JIT for x86-64 and AArch64 with assemblers of Ferrolua's own
 
 - **Status:** Proposed
 - **Date:** 2026-11-24
@@ -350,7 +350,8 @@ it is `Proposed`, and no code may depend on it.
   - A method JIT compiles whole functions.
   - A tracing JIT, like LuaJIT's, records the path a loop takes and compiles that path.
   Tracing JITs reach high speeds on loops, but they are harder to make correct and to debug. ADR-0002
-  rules out assembler libraries, so Ferrolua writes its own x86-64 encoder.
+  rules out assembler libraries, so Ferrolua writes its own encoders. ADR-0027 asks for a JIT on
+  every platform that allows one: Linux, Windows, macOS, and Android, on x86-64 and AArch64.
 - **Decision:** Ferrolua's JIT works in tiers:
   - The interpreter counts calls and loop iterations.
   - A hot function goes to a baseline tier, which translates each instruction into machine code,
@@ -359,12 +360,16 @@ it is `Proposed`, and no code may depend on it.
     optimizes it (M11).
   - When a guard fails, generated code exits to the interpreter at the same instruction, so the
     interpreter is always the reference.
-  - The first backend is x86-64 with the System V calling convention, the one Linux uses.
+  - Two backends: x86-64, with the System V calling convention on Linux, macOS, and Android and
+    the Windows x64 convention on Windows; and AArch64, with the AArch64 procedure call standard
+    and Apple's and Microsoft's variants of it. x86-64 on Linux comes first (M5), and the rest in
+    M13.
   [`specs/jit.md`](specs/jit.md) gives the details.
 - **Consequences:**
   - Good: each tier can be tested against the interpreter on the same scripts.
   - Good: a method JIT handles code without loops, such as callbacks, as well as loops.
-  - Bad: the encoder is a large piece of work, which the overview sizes as L.
+  - Bad: each encoder is a large piece of work, which the overview sizes as L for x86-64, and the
+    AArch64 backend repeats the baseline tier's templates for a second instruction set.
   - Bad: peak loop speed may stay below LuaJIT's.
 - **Alternatives considered:**
   - A tracing JIT: faster on loops, harder to build correctly.
@@ -380,12 +385,21 @@ it is `Proposed`, and no code may depend on it.
   Running generated machine code needs `unsafe`: Ferrolua must map memory, make it executable, and
   call into it. With the heap in safe Rust (ADR-0011), nothing else needs it.
 - **Decision:** Only `ferrolua-jit` may use `unsafe`, and only in two modules:
-  - `jit::memory` maps, protects, and unmaps executable memory with Linux's `mmap`, `mprotect`, and
-    `munmap`, declared in an `extern "C"` block against the C library the standard library already
-    links.
+  - `jit::memory` maps, protects, and unmaps executable memory with each operating system's own
+    calls (ADR-0027: a JIT on Linux, Windows, macOS, and Android), declared in `extern` blocks
+    against the libraries the standard library already links:
+    - Linux and Android: `mmap`, `mprotect`, and `munmap`;
+    - Windows: `VirtualAlloc`, `VirtualProtect`, `VirtualFree`, `FlushInstructionCache`, and
+      `RtlAddFunctionTable` for the unwind tables of generated code;
+    - macOS: `mmap` with `MAP_JIT`, `munmap`, `sys_icache_invalidate`, and, on AArch64,
+      `pthread_jit_write_protect_np`.
+    On Linux and Android for AArch64, it also flushes the instruction cache with the AArch64 cache
+    maintenance instructions, through inline assembly, because no system call does.
   - `jit::entry` calls generated code.
   The code relies on these invariants:
-  1. A page is writable or executable, never both (W^X).
+  1. A page is writable or executable, never both (W^X). On macOS for AArch64, where `MAP_JIT`
+     memory is both to the system, `pthread_jit_write_protect_np` keeps each thread on one side,
+     and no thread runs code from memory it can write.
   2. Generated code runs only from a buffer that `jit::memory` finalized, and the buffer lives as
      long as any function or frame refers to it.
   3. Generated code reads and writes VM state only through `#[repr(C)]` layouts that `ferrolua-vm`
@@ -396,8 +410,10 @@ it is `Proposed`, and no code may depend on it.
   5. Generated code reloads every arena address after any operation that can allocate or free.
   6. At every exit to the interpreter, and at every safe point where the loop collector can run,
      reference counts match what the interpreter would hold (ADR-0018).
+  7. On AArch64, every byte of a buffer reaches the instruction cache before the buffer first
+     runs.
 - **Consequences:**
-  - Good: one crate, two modules, and six invariants hold all of Ferrolua's `unsafe` code.
+  - Good: one crate, two modules, and seven invariants hold all of Ferrolua's `unsafe` code.
   - Bad: generated code itself can't be checked by the Rust compiler. Differential tests, which run
     each script interpreted and with the JIT forced on, and fuzzing stand in (M5.8).
   - Follow-up: `ferrolua-jit` repeats the workspace lints with `unsafe_code` at `deny`, and each
@@ -1173,3 +1189,166 @@ it is `Proposed`, and no code may depend on it.
   - A set literal `{1, 2}`, as Python writes it: `{1, 2}` already builds a table.
 - **Revisit when:** a format spec that Python accepts fails in an f-string because of the
   method-call rule, or a host needs an empty table with a metatable to be false.
+
+## ADR-0027 — Support Linux, Windows, macOS, Android, iOS, and the web
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:**
+  - [`03-platforms.md`](03-platforms.md) planned four targets in order: Linux on x86-64 first, then
+    Linux on AArch64, macOS on AArch64, and Windows on x86-64, all three in the backlog until the
+    first release. The platform that `.claude/rules/dependencies.md` defines included only Linux on
+    x86-64. ADR-0021 already promises that bytes count alike on the six targets
+    [Nadir](https://github.com/jabbott-iii/Nadir) builds for: x86-64 and AArch64 on Windows, macOS,
+    and Linux.
+  - On 2026-11-24 the owner asked for a plan to support Windows, macOS, Linux, Android, iOS, and
+    the web.
+  - An iOS app can't make memory executable without an entitlement Apple doesn't give ordinary
+    apps, and a browser runs WebAssembly, not native machine code, so neither can run what
+    Ferrolua's JIT writes.
+  - Rust's `f64::sin`, `f64::exp`, and similar methods call each platform's math library, and those
+    libraries can differ in a result's last bit. A script that uses `math.sin` can then print
+    different digits on two targets, and a run recorded on one can replay differently on another.
+  - Rust's test harness doesn't run in a browser, and the programs that run WebAssembly outside
+    one, such as Node.js and Wasmtime, are third party (ADR-0002).
+  - Asked the same day, the owner chose a JIT wherever the platform allows one, all six platforms
+    by the first release, a browser test harness of Ferrolua's own, and math functions of
+    Ferrolua's own that give the same bits everywhere.
+- **Decision** (the owner chose the first of the options for each of four questions on
+  2026-11-24):
+  - **Six platforms.** Ferrolua runs on Linux, Windows, macOS, Android, iOS, and the web
+    (WebAssembly in a browser), on the Rust targets [`03-platforms.md`](03-platforms.md) lists.
+    The platform in `.claude/rules/dependencies.md` widens to each one's own tools: Microsoft's
+    compiler tools and SDK for Windows, Apple's Xcode for macOS and iOS, Google's Android SDK and
+    NDK, and the browsers that run WebAssembly.
+  - **A JIT wherever allowed.** An x86-64 backend and an AArch64 backend give a JIT on Linux,
+    Windows, macOS, and Android. iOS and the web run the interpreter only.
+  - **All six by the first release.** The interpreter builds and passes its tests on every
+    platform in CI from M3 on. A new milestone, M13, after M5, adds the AArch64 backend and the
+    executable memory of Windows, macOS, and Android, and the first release (M12) ships all six.
+  - **A browser test harness of Ferrolua's own.** An `xtask` command builds the tests to
+    WebAssembly, serves them from a local server written with the standard library, and runs them
+    in the headless browser on the CI runner. The browser is the web platform itself, so the
+    harness adds no third-party code.
+  - **The same math everywhere.** Ferrolua computes the functions that IEEE 754, the
+    floating-point standard, doesn't define exactly, such as `math.sin`, `math.exp`, `math.log`,
+    and `**` on floats, with code of its own, so every target gives the same bits.
+  - [`03-platforms.md`](03-platforms.md) gives the targets, what each needs, and the invariants
+    each passes. ADR-0028 (proposed) settles the details.
+- **Consequences:**
+  - Good: a host on any of the six embeds the same crate, and a recorded run replays on every
+    target, which Nadir's replays across Linux, Windows, and macOS need.
+  - Good: testing the interpreter on every platform from M3 on finds platform bugs while the code
+    is young.
+  - Good: hosts on iOS and the web, where no JIT can run, still get the whole language, its
+    limits, and the same results.
+  - Bad: a second JIT backend, for AArch64, and executable memory for three more operating
+    systems, each with `unsafe` code under ADR-0013 (proposed).
+  - Bad: CI builds and tests eleven Rust targets, including an Android emulator and an iOS
+    simulator, which costs runner time on every pull request.
+  - Bad: a math library of Ferrolua's own, whose last bit can differ from the C library's that
+    PUC-Rio uses, so conformance scripts print math results with fewer digits than a float holds.
+  - Bad: iOS and web hosts run only interpreted, far from the JIT's budgets.
+  - Follow-up: M2.19 builds the math functions; M3.16 lets a host give a clock and a hash seed
+    where the standard library has none; M3.17 builds the test runners for Android, iOS, and the
+    web; M3.18 runs CI on every target; M13 builds the AArch64 backend and the executable memory of
+    each operating system; M11's optimizing tier targets both backends; this change widens the
+    platform in `.claude/rules/dependencies.md`.
+- **Alternatives considered:**
+  - A JIT on desktop only: less `unsafe` code, but Android hosts, many of them games, would lose
+    it.
+  - A WebAssembly JIT for the web: hot code would compile there too, at the cost of a third
+    backend.
+  - Desktop first, or Linux first, with the rest after the first release: less work before M12,
+    but platform bugs would surface late, in code written without them in mind.
+  - A WebAssembly runtime such as Node.js or Wasmtime: less code to write, but an exception to
+    ADR-0002 (no third-party code).
+  - The platform's math: no work, but outputs and replays would differ by target.
+- **Revisit when:** a platform starts or stops letting apps make memory executable, or a host needs
+  a platform beyond these six.
+
+## ADR-0028 — Settle the targets, host services, math, and tests of the six platforms
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:** ADR-0027 records the owner's choices. Writing them into
+  [`03-platforms.md`](03-platforms.md) raised questions they don't answer: which processors each
+  platform gets, what the JIT does where the operating system refuses executable memory, what a
+  browser lacks that the standard library expects, how processors differ in the bits of a NaN (a
+  float that isn't a number), and how tests and coverage run on platforms with no test harness.
+  The agent proposed these answers on 2026-11-24.
+- **Decision:**
+  - **Targets.** Linux on `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`; Windows on
+    `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`; macOS on `aarch64-apple-darwin` and
+    `x86_64-apple-darwin`; Android on `aarch64-linux-android` and `x86_64-linux-android`, which
+    emulators and Chromebooks run; iOS on `aarch64-apple-ios`, with `aarch64-apple-ios-sim` for the
+    simulator; and the web on `wasm32-unknown-unknown`. The library targets all eleven; the
+    `ferrolua` command, the language server, and the debug adapter target Linux, Windows, and macOS.
+  - **The JIT where it can't run.** On iOS and the web, `ferrolua-jit` compiles to nothing, so a
+    host can turn the `jit` feature on for every target. There the default mode is `JitMode::Off`,
+    and `Lua::new` refuses `On` and `Forced` with an error that names the target, as ADR-0022's
+    refusal names the missing feature.
+  - **The JIT where the system refuses.** Where the operating system refuses executable memory at
+    run time, such as macOS for a hardened host without the `com.apple.security.cs.allow-jit`
+    entitlement, a state in `JitMode::On` runs interpreted, and the host can ask the state whether
+    its JIT is running. `JitMode::Forced` returns the error instead.
+  - **Executable memory.** `mmap` and `mprotect` on Linux and Android; `VirtualAlloc`,
+    `VirtualProtect`, `FlushInstructionCache`, and unwind tables registered with
+    `RtlAddFunctionTable` on Windows; `mmap` with `MAP_JIT`, `pthread_jit_write_protect_np` on
+    AArch64, and `sys_icache_invalidate` on macOS; and on Linux and Android for AArch64, the cache
+    maintenance instructions, through inline assembly in `jit::memory`. ADR-0013 (proposed) lists
+    them with its invariants.
+  - **Services a browser lacks.** On `wasm32-unknown-unknown` the standard library has no clock
+    and no source of randomness. `Options::clock` gives a state its wall clock and its processor
+    clock; without one there, `os.time`, `os.clock`, and `os.date` with no time are absent.
+    `Options::hash_seed` gives the seed; without one there, the state uses a fixed seed, and a host
+    that runs untrusted scripts sets an instruction limit, which bounds hash flooding (ADR-0020).
+    `io` and file-based `require` exist there only through a host's loader.
+  - **Math.** A new crate, `ferrolua-math`, holds the functions, so constant folding, the VM's
+    `**`, the JIT, and the `math` library share one implementation. Each result is within one unit
+    in the last place of the exact value, and is computed with only addition, subtraction,
+    multiplication, division, and square root, which IEEE 754 defines exactly, never with fused
+    multiply-add or a platform's library. A stored file of inputs and result bits is checked on
+    every target.
+  - **NaN.** Every NaN prints as `nan`, as Python prints it, because processors give a new NaN
+    different signs: x86-64 sets the sign bit in `math.huge - math.huge`, and AArch64 doesn't.
+    `string.pack` still writes a NaN's bits as the processor made them, the one place they can
+    differ.
+  - **Tests.**
+    - Rust's tests run natively on Linux, Windows, and macOS, on both processors. An x86-64 macOS
+      build runs under Rosetta 2, Apple's translator, on an AArch64 runner if GitHub offers no
+      Intel one.
+    - On Android, `xtask` links the tests with the NDK's linker and runs them in the Android
+      emulator through `adb`. On iOS, it runs them in the simulator through `xcrun simctl spawn`.
+      The owner runs both on a device before each release.
+    - On the web, the harness runs the conformance and extension scripts, the saved fuzz inputs,
+      and the stored collection logs through `ferrolua`'s API. Rust's own unit tests, which its
+      test harness can't run in a browser, run natively.
+    - Coverage is measured on Linux, Windows, and macOS, and the floor holds on each, so code only
+      one operating system compiles is covered there.
+    - The hostile-input tests at the nesting limit also run on a thread with a 256 KB stack, so the
+      parser and compiler fit the smaller stacks of mobile threads and browsers.
+    - The file access policy's hostile-input tests include Windows paths: drive letters,
+      backslashes, `..\`, and `\\?\` prefixes.
+- **Consequences:**
+  - Good: a host that builds for every target with one feature set and the default mode gets the
+    JIT wherever one exists, with no code of its own per target.
+  - Good: a hardened macOS host without the entitlement still runs, interpreted.
+  - Good: a web host supplies the two services a browser lacks, and nothing else changes.
+  - Bad: `JitMode::On` no longer guarantees compiled code; a host that needs it checks the state.
+  - Bad: `string.pack` can still tell processors apart through a NaN's bits.
+  - Bad: within one unit in the last place, not correctly rounded, so Ferrolua's math can differ
+    from another correct library in the last bit.
+  - Follow-up: M2.19 builds `ferrolua-math` and its stored results; M3.16 adds `Options::clock`;
+    M3.4 prints NaN as `nan`; M3.17 builds the runners; M13.2 builds the executable memory of each
+    operating system; M13.5 builds the fallback and the question the host asks.
+- **Alternatives considered:**
+  - Refusing `JitMode::On` where the system refuses executable memory: a host learns at once, but
+    a hardened macOS host without the entitlement couldn't run at all.
+  - Printing `-nan` and `nan` from the sign, as PUC-Rio does: matches PUC-Rio on each processor,
+    but the same script would print differently on two targets.
+  - Correctly rounded math, the closest float to the exact value every time: it would match every
+    other correct library, but it takes longer to write and to run.
+  - `wasm32-wasip1`, the WebAssembly System Interface, for the web: Rust's test harness runs there,
+    but browsers don't provide it, and running it needs a third-party runtime.
+- **Revisit when:** the owner accepts or changes this record, which M2.19 needs first.

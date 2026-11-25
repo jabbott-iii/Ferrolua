@@ -35,10 +35,11 @@ describes; the `ferrolua` crate's scope is `ferrolua`.
 | :- | :- | :- | :- | :- | :- |
 | `ferrolua-syntax` | Lexer, parser, syntax trees, spans, and the shared diagnostic type | — | Yes | [syntax](specs/syntax.md) | M1 |
 | `ferrolua-bytecode` | Instruction set, function prototypes, chunk format, and verifier | — | Yes | [bytecode](specs/bytecode.md) | M2.1 |
-| `ferrolua-compiler` | Compact tree to bytecode: scopes, registers, strict mode | syntax, bytecode | Yes | [compiler](specs/compiler.md) | M2.5 |
-| `ferrolua-vm` | Heap and loop collector, values, tables, interpreter, metamethods, coroutines, limits, debug hooks | bytecode, compiler | Yes | [vm](specs/vm.md) | M2.2 |
-| `ferrolua-jit` | x86-64 encoder, executable memory, baseline and optimizing tiers | vm, bytecode | Yes | [jit](specs/jit.md) | M5 |
-| `ferrolua-stdlib` | The standard libraries, Lua 5.5's with positions from 0 | vm | Yes | [stdlib](specs/stdlib.md) | M2.13 |
+| `ferrolua-math` | Floating-point functions with the same bits on every target (ADR-0027) | — | Yes | [math](specs/math.md) | M2.19 |
+| `ferrolua-compiler` | Compact tree to bytecode: scopes, registers, strict mode | syntax, bytecode, math | Yes | [compiler](specs/compiler.md) | M2.5 |
+| `ferrolua-vm` | Heap and loop collector, values, tables, interpreter, metamethods, coroutines, limits, debug hooks | bytecode, compiler, math | Yes | [vm](specs/vm.md) | M2.2 |
+| `ferrolua-jit` | x86-64 and AArch64 encoders, executable memory, baseline and optimizing tiers | vm, bytecode, math | Yes | [jit](specs/jit.md) | M5 |
+| `ferrolua-stdlib` | The standard libraries, Lua 5.5's with positions from 0 | vm, math | Yes | [stdlib](specs/stdlib.md) | M2.13 |
 | `ferrolua` | The embedding API that hosts depend on | vm, compiler, stdlib; jit with its `jit` feature | Yes | [ferrolua](specs/ferrolua.md) | M2.14 |
 | `ferrolua-analysis` | Semantic model: scopes, symbols, control flow, data flow, modules | syntax | Yes | [analysis](specs/analysis.md) | M6.1 |
 | `ferrolua-types` | Gradual type checker | analysis, syntax | Yes | [types](specs/types.md) | M6.4 |
@@ -51,7 +52,8 @@ describes; the `ferrolua` crate's scope is `ferrolua`.
 | `ferrolua-cli` | The `ferrolua` command | all of the above | Yes | [cli](specs/cli.md) | M1.10 |
 | `ferrolua-testkit` | Seeded random generator, property tests, Lua source generator | — | No: a dev-dependency only | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.2 |
 | `ferrolua-fuzz` | The fuzzer and its targets, in `fuzz/` | testkit, the crates it targets | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.4 |
-| `xtask` | `cargo xtask coverage`, `record`, and `bench` | — | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.3 |
+| `ferrolua-webtest` | The WebAssembly test module the browser harness runs, in `xtask/webtest/` | ferrolua | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M3.17 |
+| `xtask` | `cargo xtask coverage`, `record`, `test`, and `bench` | — | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.3 |
 
 Four specs cover contracts that span crates: [`language.md`](specs/language.md) (Ferrolua's
 language), [`memory.md`](specs/memory.md) (reference counting and the heap),
@@ -100,6 +102,7 @@ flowchart TB
   bytecode["ferrolua-bytecode<br/>(M2.1)"]:::planned
   syntax["ferrolua-syntax<br/>(M1)"]:::planned
   json["ferrolua-json<br/>(M6.9)"]:::planned
+  math["ferrolua-math<br/>(M2.19)"]:::planned
 
   cli -.-> api
   cli -.-> lsp
@@ -124,6 +127,10 @@ flowchart TB
   vm -.-> bytecode
   compiler -.-> syntax
   compiler -.-> bytecode
+  compiler -.-> math
+  vm -.-> math
+  stdlib -.-> math
+  jit -.-> math
   lint -.-> types
   sast -.-> types
   sast -.-> json
@@ -142,7 +149,8 @@ clippy.toml
 .cargo/config.toml    the `cargo xtask` alias
 crates/<name>/        one folder per crate in the crate map
 fuzz/                 ferrolua-fuzz, with corpus/ and regressions/
-xtask/                coverage, conformance recording, and benchmarks
+xtask/                coverage, conformance recording, test runners, and benchmarks
+  webtest/            ferrolua-webtest, and the page the browser harness opens
 tests/conformance/    Ferrolua scripts for behavior kept from Lua 5.5
   reference/          their Lua 5.5 twins, each with the .out file PUC-Rio Lua 5.5.1 printed
 tests/extensions/     scripts for Ferrolua's own behavior, with .out files written from the specs

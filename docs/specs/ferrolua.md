@@ -31,6 +31,7 @@ let lua = Lua::new(Options {
     jit: JitMode::On,                         // needs the `jit` feature
     gc: Gc { pause: 100, automatic: true },   // the loop collector's schedule
     hash_seed: None,                          // Some(seed) makes runs repeat exactly
+    clock: None,                              // the host's clock, needed on the web
     ..Options::default()
 })?;
 
@@ -63,9 +64,20 @@ assert_eq!(result, "hello, world");
 - `JitMode` and `Options::jit` exist in both builds, so turning the `jit` feature on changes no
   host's code. Without the feature, the default is `JitMode::Off`, and `Lua::new` refuses
   `JitMode::On` and `JitMode::Forced` with an error that names the feature
-  ([`jit.md`](jit.md#modes)).
+  ([`jit.md`](jit.md#modes)). On iOS and the web, which have no JIT, the same holds with the
+  feature on, and the error names the target. Where the operating system refuses executable
+  memory, a state in `JitMode::On` runs interpreted, and `Lua::jit_running` tells the host
+  (ADR-0028, proposed: the targets, host services, math, and tests of the six platforms).
+- `Options::clock` gives a state its wall clock and its processor clock, for `os.time`, `os.clock`,
+  and `os.date`. Where the standard library has a clock, the default uses it. On
+  `wasm32-unknown-unknown`, which has none, those functions are absent without a host clock, and a
+  state given no `hash_seed` uses a fixed seed, so a web host passes one from the browser's
+  `crypto.getRandomValues` (ADR-0028, proposed).
+- The crate builds for every target in [`03-platforms.md`](../03-platforms.md#targets) (ADR-0027:
+  six platforms).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests
-  from `os.exit`, a JIT mode asked for without the `jit` feature, and internal errors.
+  from `os.exit`, a JIT mode asked for without the `jit` feature or on a target without a JIT, and
+  internal errors.
 
 ## Open questions
 

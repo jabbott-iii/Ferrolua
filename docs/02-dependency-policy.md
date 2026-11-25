@@ -1,7 +1,8 @@
 # 02 — Dependency Policy
 
-Ferrolua uses no third-party code (ADR-0002: Ferrolua uses only the Rust toolchain, the Linux
-platform, Git, GitHub, and PUC-Rio Lua 5.5 as a test reference). This document explains the rule
+Ferrolua uses no third-party code (ADR-0002: Ferrolua uses only the Rust toolchain, its
+platforms, Git, GitHub, and PUC-Rio Lua 5.5 as a test reference; ADR-0027 widened the platforms to
+six). This document explains the rule
 for contributors, lists the exceptions, and records each build-or-buy decision. The rule itself, with
 every detail an agent or reviewer applies, is [`.claude/rules/dependencies.md`](../.claude/rules/dependencies.md).
 
@@ -20,7 +21,11 @@ These don't count, because they are the platform Ferrolua is built on:
 - PUC-Rio Lua 5.5 from lua.org, the reference interpreter for the part of the language Ferrolua
   keeps from Lua 5.5, which records the expected output of the conformance scripts' Lua 5.5 twins
   and is never built into or linked with Ferrolua;
-- Linux on x86-64, including the C library that Rust's standard library already links;
+- the six platforms of [`03-platforms.md`](03-platforms.md) and their own tools (ADR-0027: six
+  platforms): Linux on x86-64 and AArch64, with the C library that Rust's standard library
+  already links; Windows, with Microsoft's compiler tools and Windows SDK; macOS and iOS, with
+  Apple's Xcode, its SDKs, and the iOS simulator; Android, with Google's Android SDK, NDK, and
+  emulator; and the web, through the browsers that run WebAssembly;
 - Git, GitHub, GitHub Actions, and the actions that the `actions` and `github` organizations
   publish, each pinned to a full commit hash.
 
@@ -83,8 +88,10 @@ Each row is something Ferrolua needs, and how it gets it without a third-party p
 | Seed for string hashing | Randomness from the standard library's `RandomState` | `ferrolua-vm` (M2.3) |
 | `math.random` | xoshiro256**, the generator PUC-Rio Lua 5.5 uses, so seeded sequences match | `ferrolua-stdlib` (M3.7) |
 | Number printing and `string.format` | Float formatting of Ferrolua's own, matching PUC-Rio's output | `ferrolua-stdlib` (M3.4) |
-| x86-64 machine code | An encoder of Ferrolua's own | `ferrolua-jit` (M5.2) |
-| Executable memory | Linux's `mmap` and `mprotect`, declared against the C library | `ferrolua-jit` (M5.3, ADR-0013) |
+| x86-64 and AArch64 machine code | Encoders of Ferrolua's own | `ferrolua-jit` (M5.2, M13.1) |
+| Executable memory | Each operating system's own calls, declared against the libraries the standard library links | `ferrolua-jit` (M5.3, M13.2, ADR-0013) |
+| Math functions with the same bits on every target | A math library of Ferrolua's own | `ferrolua-math` (M2.19, ADR-0027) |
+| Tests on Android, iOS, and the web | The platforms' own `adb`, `xcrun simctl`, and browsers, driven by `xtask`, with a browser harness of Ferrolua's own | `cargo xtask test` (M3.17, ADR-0027) |
 | JSON, JSON-RPC, and SARIF | A JSON crate of Ferrolua's own | `ferrolua-json` (M6.9) |
 | Command-line arguments | A parser of Ferrolua's own, on `std::env::args_os` | `ferrolua-cli` (M1.10) |
 | Tool configuration | A data-only Lua file, read by Ferrolua's own parser | `.ferrolua.lua` (ADR-0016) |

@@ -13,8 +13,8 @@ build, how to tell it worked, and the commands that check it. Why each choice wa
   every task, so `Verify` lists only the commands that belong to the task itself.
 - A task with a `Decide first` line waits for the owner's answer before work starts.
 - A milestone's exit criteria are checked by a person, who closes the milestone.
-- Within each milestone, work happens on Linux on x86-64; other targets follow
-  [`03-platforms.md`](03-platforms.md).
+- Within each milestone, work happens on Linux on x86-64. From M3.18 on, CI also builds and tests
+  every target in [`03-platforms.md`](03-platforms.md), and a task's checks pass on each.
 - A task that needs PUC-Rio Lua 5.5.1 to record output, on a machine without it, leaves its box
   unticked with a `⏳ needs PUC-Rio Lua 5.5.1` line naming the check that remains.
 - A conformance script that a task adds comes with its Lua 5.5 twin in
@@ -331,8 +331,27 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       with PUC-Rio's message.
   - Verify: `cargo test -p ferrolua-compiler --locked`
 
+- [ ] **M2.19 — math: floating-point functions with the same bits on every target**
+  - Note: added on 2026-11-24, when the owner chose math functions of Ferrolua's own (ADR-0027).
+    It is listed where it is to be done, before M2.6, whose constant folding uses it.
+  - Depends: M0.2
+  - Decide first: the owner accepts ADR-0028 (the targets, host services, math, and tests of the
+    six platforms), which sets the crate and the accuracy.
+  - Do:
+    - Build `ferrolua-math`, with the functions of §6.7 of the manual that IEEE 754 doesn't define
+      exactly, such as sine, cosine, tangent, their inverses, `exp`, and `log` in every base, and
+      float `**`, using only the operations
+      [`03-platforms.md`](03-platforms.md#the-same-results-on-every-target) allows.
+    - Store a file of inputs, each with its exact value to 40 digits and the bits of Ferrolua's
+      result, including zeros, subnormal numbers, the largest floats, `inf`, `nan`, and the inputs
+      near which each function's result changes fastest.
+  - Accept:
+    - Every stored result is within one unit in the last place of its exact value.
+    - Every function gives the stored bits, which M3.18 then checks on every target.
+  - Verify: `cargo test -p ferrolua-math --locked`
+
 - [ ] **M2.6 — compiler: expressions, registers, and constant folding**
-  - Depends: M2.5
+  - Depends: M2.5, M2.19
   - Do:
     - Compile every expression, including chained comparisons that evaluate each middle operand
       once, conditional expressions that evaluate one branch, truth tests, f-strings, and list and
@@ -367,7 +386,9 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Note: 2026-11-24, the owner's choice (ADR-0023): operators give Python's results, `+` joins
     strings, and nothing converts between strings and numbers.
   - Note: 2026-11-24, the owner's choice (ADR-0025): truth follows Python's rule.
-  - Depends: M2.8
+  - Note: 2026-11-24, the owner's choice (ADR-0027): float `**` comes from `ferrolua-math`, and
+    every NaN prints as `nan` (ADR-0028, proposed).
+  - Depends: M2.8, M2.19
   - Do:
     - Build the operators of [`specs/language.md`](specs/language.md#meanings) on numbers and
       strings, `in`, `is`, and chained comparisons, and number to string conversion with PUC-Rio's
@@ -588,7 +609,7 @@ scripts within limits, and gets every standard library it grants.
     - Build float formatting and every `string.format` conversion, as
       [`specs/stdlib.md`](specs/stdlib.md#number-formatting) describes.
     - Make `%p` print object IDs (ADR-0019), and record what it prints for values with no
-      address.
+      address. Print every NaN as `nan` (ADR-0028, proposed).
     - Build f-string formatting, `format`, and `__format` with Python's mini-language, as
       [`specs/stdlib.md`](specs/stdlib.md#formatted-strings) describes (ADR-0025), and add
       `tests/extensions/format.lua` and the f-string property test of
@@ -636,14 +657,18 @@ scripts within limits, and gets every standard library it grants.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.7 — stdlib: `math` and `utf8`**
-  - Depends: M2.13
+  - Note: 2026-11-24, the owner's choice (ADR-0027): the math functions come from `ferrolua-math`.
+  - Depends: M2.13, M2.19
   - Do:
-    - Build §6.7 with xoshiro256** seeded as PUC-Rio seeds it, and §6.5 with Lua 5.5's `lax`
-      argument, both with the ranges of [`specs/stdlib.md`](specs/stdlib.md#positions-and-ranges),
-      and add `tests/conformance/math.lua` and `tests/conformance/utf8.lua`.
+    - Build §6.7 on `ferrolua-math`, with xoshiro256** seeded as PUC-Rio seeds it, and §6.5 with Lua
+      5.5's `lax` argument, both with the ranges of
+      [`specs/stdlib.md`](specs/stdlib.md#positions-and-ranges), and add
+      `tests/conformance/math.lua` and `tests/conformance/utf8.lua`.
   - Accept:
     - `math.randomseed(42)` followed by ten `math.random(1, 101)` calls prints the numbers that
       PUC-Rio's `math.random(1, 100)` gives, for the same range of 1 to 100.
+    - `math.lua` and its twin print float results with `%.12g`, so a last-bit difference from the
+      C library that PUC-Rio uses doesn't show, and `ferrolua-math`'s stored bits check the rest.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.8 — stdlib: the `coroutine` library**
@@ -654,8 +679,22 @@ scripts within limits, and gets every standard library it grants.
     - The script prints its recorded output, including `close` with pending `<close>` variables.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
+- [ ] **M3.16 — ferrolua: a clock and a hash seed from the host**
+  - Note: added on 2026-11-24, when the owner chose the web as a platform (ADR-0027). It is listed
+    where it is to be done, before M3.9, whose time functions use it.
+  - Depends: M3.1
+  - Do:
+    - Add `Options::clock`, and use it and `Options::hash_seed` where the standard library has no
+      clock or source of randomness, as [`specs/ferrolua.md`](specs/ferrolua.md) describes
+      (ADR-0028, proposed).
+  - Accept:
+    - On `wasm32-unknown-unknown`, `os.time` is absent without a clock and gives the host's time
+      with one, and a state given no seed uses the fixed seed.
+  - Verify: `cargo test -p ferrolua --locked`;
+    `cargo build -p ferrolua --target wasm32-unknown-unknown --locked`
+
 - [ ] **M3.9 — stdlib: `io` and `os`, under the file access policy**
-  - Depends: M3.2
+  - Depends: M3.2, M3.16
   - Do:
     - Build §6.8 and §6.9, the file access policies of [`specs/sandbox.md`](specs/sandbox.md#file-access),
       and `os.exit` returning an exit error.
@@ -713,8 +752,43 @@ scripts within limits, and gets every standard library it grants.
     - `ferrolua run --sandbox` refuses `io.open`, and `-e` and `-l` behave as in `lua`.
   - Verify: `cargo test -p ferrolua-cli --locked`
 
+- [ ] **M3.17 — xtask: test runners for Android, iOS, and the web**
+  - Note: added on 2026-11-24, when the owner chose six platforms and a browser harness of
+    Ferrolua's own (ADR-0027).
+  - Depends: M2.14
+  - Do:
+    - Build `cargo xtask test --target <triple>` for every target, as
+      [`03-platforms.md`](03-platforms.md#how-tests-run-on-each-target) describes: native runs,
+      Android through `adb`, iOS through `xcrun simctl spawn`, and the web harness, with its test
+      module, its page, a local HTTP server written with the standard library, and the headless
+      browser.
+    - Describe each target's setup in `CONTRIBUTING.md`: the Android NDK and SDK, Xcode, and a
+      browser.
+  - Accept:
+    - On each kind of target, a script that fails on purpose fails the run, and one that passes
+      passes.
+    - The web harness reports every script's result, and fails when the browser reports nothing
+      within its time limit.
+  - Verify: `cargo test -p xtask --locked`; `cargo xtask test --target wasm32-unknown-unknown`
+
+- [ ] **M3.18 — ci: the interpreter on every target**
+  - Note: added on 2026-11-24, when the owner chose all six platforms by the first release
+    (ADR-0027).
+  - Depends: M3.17, M0.6
+  - Do:
+    - Add a CI job for each target in [`03-platforms.md`](03-platforms.md#targets) that runs
+      `cargo xtask test --target` there, and `cargo xtask coverage` on Linux, Windows, and macOS,
+      with every action pinned to a full commit hash.
+    - Run the invariants of [`03-platforms.md`](03-platforms.md#invariants-tested-on-every-target)
+      on each target, interpreted.
+  - Accept:
+    - Every job passes, and a pull request that breaks one target fails that target's job.
+  - Verify: open a pull request and observe its checks on GitHub; the owner then makes each job
+    required for `main`
+
 **Exit criteria (M3):** A person embeds Ferrolua in a small Rust program, registers a function and
-a userdata type, and sees a hostile script stopped by each limit.
+a userdata type, and sees a hostile script stopped by each limit; CI runs the interpreter's tests
+on every target.
 
 ---
 
@@ -836,7 +910,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
 - [ ] **M5.2 — jit: the x86-64 encoder**
   - Depends: M0.1
   - Do:
-    - Build `jit::asm`, as [`specs/jit.md`](specs/jit.md#the-encoder) describes.
+    - Build `jit::asm`, as [`specs/jit.md`](specs/jit.md#the-encoders) describes.
   - Accept:
     - Each instruction form encodes to the bytes the Intel manual gives, with tests citing the page.
   - Verify: `cargo test -p ferrolua-jit --locked`
@@ -930,6 +1004,84 @@ output with the JIT on or forced, and the agreed budgets are checked.
 
 **Exit criteria (M5):** A person runs the benchmarks with the JIT on and off, and sees the
 interpreter and baseline budgets met.
+
+---
+
+## M13 — Run hot code as machine code on every platform that allows it
+
+**Goal:** The baseline JIT runs on Linux, Windows, macOS, and Android, on x86-64 and AArch64, and
+every script prints the same output with the JIT off, on, or forced, on each (ADR-0027). The
+milestone was added on 2026-11-24, when the owner chose all six platforms by the first release.
+
+- [ ] **M13.1 — jit: the AArch64 encoder**
+  - Depends: M5.2
+  - Do:
+    - Build the AArch64 half of `jit::asm`, as [`specs/jit.md`](specs/jit.md#the-encoders)
+      describes, with each instruction form's bytes taken from Arm's Architecture Reference Manual.
+  - Accept:
+    - Each instruction form encodes to the manual's bytes, and labels fix up across the whole
+      range of each branch form.
+  - Verify: `cargo test -p ferrolua-jit --locked`
+
+- [ ] **M13.2 — jit: executable memory on Windows, macOS, and Android, and on AArch64**
+  - Depends: M5.3, M3.18
+  - Do:
+    - Build `jit::memory` for each operating system, and the instruction cache flush on AArch64, as
+      ADR-0013 (proposed) lists, each `unsafe` block with its `// SAFETY:` comment and a test.
+  - Accept:
+    - On every JIT target, a buffer written and then run returns what it should, and a buffer
+      rewritten after it ran runs the new code.
+    - The W^X test of [`03-platforms.md`](03-platforms.md#invariants-tested-on-every-target)
+      passes on each target.
+  - Verify: `cargo xtask test --target <triple>` for each JIT target in
+    [`03-platforms.md`](03-platforms.md#targets)
+
+- [ ] **M13.3 — jit: the baseline tier on AArch64**
+  - Depends: M13.1, M13.2, M5.7
+  - Do:
+    - Emit the baseline tier's templates, calls, returns, on-stack replacement, limits, and debug
+      hooks for AArch64, with the procedure call standard and Apple's and Microsoft's variants of
+      it.
+  - Accept:
+    - Every conformance script prints its recorded output in `JitMode::Forced` on every AArch64
+      target, with the collection log stored for it.
+  - Verify: `cargo xtask test --target aarch64-unknown-linux-gnu`, and the same on each other
+    AArch64 JIT target
+
+- [ ] **M13.4 — jit: Windows on x86-64**
+  - Depends: M13.2, M5.7
+  - Do:
+    - Emit the Windows x64 calling convention, and register unwind tables for generated code.
+  - Accept:
+    - Every conformance script prints its recorded output in `JitMode::Forced` on
+      `x86_64-pc-windows-msvc`.
+    - A debugger walks a stack through generated code to the host's frames.
+  - Verify: `cargo xtask test --target x86_64-pc-windows-msvc`; observe the stack in a debugger on
+    Windows
+
+- [ ] **M13.5 — ferrolua: JIT modes on every target**
+  - Depends: M13.2, M5.4
+  - Do:
+    - Make `JitMode::On` the default where a backend exists, compile `ferrolua-jit` to nothing on
+      iOS and the web, and fall back to the interpreter when the operating system refuses
+      executable memory, as [`specs/jit.md`](specs/jit.md#modes) describes (ADR-0028, proposed).
+  - Accept:
+    - A hardened macOS host without the `allow-jit` entitlement runs in `JitMode::On`, interpreted,
+      and its state reports that the JIT isn't running; `JitMode::Forced` returns the error.
+    - On iOS and the web, `Lua::new` refuses `JitMode::On` with an error that names the target.
+  - Verify: `cargo xtask test --target aarch64-apple-darwin`;
+    `cargo xtask test --target aarch64-apple-ios-sim`
+
+- [ ] **M13.6 — ci: the JIT on every JIT target**
+  - Depends: M13.3, M13.4, M13.5, M5.8
+  - Do:
+    - Run the forced conformance pass and a differential fuzz run of 60 s on each JIT target in CI.
+  - Accept:
+    - Every job passes on every JIT target.
+  - Verify: open a pull request and observe its checks on GitHub
+
+**Exit criteria (M13):** A person runs the benchmarks with the JIT on and off on an AArch64 Mac, a
+Windows PC, and an Android device, and sees each script print the same output as on Linux.
 
 ---
 
@@ -1306,7 +1458,9 @@ launched by `ferrolua dap` or running inside a host.
 hints from annotations, within the optimizing JIT budget.
 
 - [ ] **M11.1 — jit: SSA form and type feedback**
-  - Depends: M5.8
+  - Note: 2026-11-24, the owner's choice (ADR-0027): the optimizing tier emits code for both
+    backends, x86-64 and AArch64.
+  - Depends: M5.8, M13.6
   - Do:
     - Build the SSA form of [`specs/jit.md`](specs/jit.md#optimizing-tier) from bytecode and the
       types the baseline tier recorded.
@@ -1358,10 +1512,11 @@ hints from annotations, within the optimizing JIT budget.
 embed Ferrolua and use its language and tools.
 
 - [ ] **M12.1 — docs: the release document**
-  - Depends: M11.5
+  - Depends: M11.5, M13.6
   - Do:
     - Write `docs/05-release.md`: build profiles, versioning, the publishing order of the crates,
-      and the release checklist.
+      and the release checklist, which includes running the Android and iOS tests on a device
+      (ADR-0028, proposed).
   - Accept:
     - The checklist names every step from tagging to publishing, in order.
   - Verify: read the rendered document
@@ -1378,9 +1533,8 @@ embed Ferrolua and use its language and tools.
 - [ ] **M12.3 — docs: user guide**
   - Depends: M12.2
   - Do:
-    - Write a guide to embedding Ferrolua, to its language and how it differs from Lua 5.5, and to
-      its tools, with examples
-      that run as doc tests or conformance scripts.
+    - Write a guide to embedding Ferrolua on each platform, to its language and how it differs from
+      Lua 5.5, and to its tools, with examples that run as doc tests or conformance scripts.
   - Accept:
     - Every example in the guide runs.
   - Verify: `cargo test --workspace --locked`
@@ -1394,7 +1548,7 @@ embed Ferrolua and use its language and tools.
   - Verify: push a test tag and observe the workflow; the owner publishes with their own token
 
 **Exit criteria (M12):** The owner publishes the crates, and a new user embeds Ferrolua by
-following the guide.
+following the guide, on any of the six platforms.
 
 ---
 
@@ -1402,7 +1556,9 @@ following the guide.
 
 | Item | Trigger / reason |
 | :- | :- |
-| JIT and CI for Linux on AArch64, then macOS on AArch64, then Windows on x86-64 ([`03-platforms.md`](03-platforms.md)) | M12 ships, and the owner widens the platform for the next target |
+| A WebAssembly JIT, which compiles hot functions to WebAssembly modules in the browser; the web runs interpreted today (ADR-0027) | A web host measures its scripts too slow interpreted |
+| `wasm32-wasip1`, the WebAssembly System Interface, as a target | A host asks to run Ferrolua under WASI |
+| 32-bit targets, such as Android on ARMv7 | A host asks for one |
 | An interactive prompt for `ferrolua` with no arguments, as `lua` has | A user files a feature request for one |
 | The Lua C API and C modules; today hosts must be Rust programs (ADR-0017) | A C or C++ host asks to embed Ferrolua |
 | Incremental loop collection, which spreads one collection over several safe points to shorten pauses | A host measures a collection pause above the agreed budget that turning off automatic runs and scheduling collections can't avoid |

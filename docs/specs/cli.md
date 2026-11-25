@@ -1,9 +1,11 @@
 # Subsystem: `ferrolua-cli`
 
 `ferrolua-cli` builds the `ferrolua` command: one binary that runs scripts, checks them, and starts
-the editor servers. It parses its own arguments, with no third-party parser (ADR-0002), and is the
-only crate that reads environment variables or writes to standard output and standard error. The
-first command, `parse`, lands in M1.10, and each later command lands with its milestone.
+the editor servers, for Linux, Windows, and macOS on x86-64 and AArch64 (ADR-0027: six platforms,
+where the library alone serves Android, iOS, and the web). It parses its own arguments, with no
+third-party parser (ADR-0002), and is the only crate that reads environment variables or writes to
+standard output and standard error. The first command, `parse`, lands in M1.10, and each later
+command lands with its milestone.
 
 ## Why one binary
 

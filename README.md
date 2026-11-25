@@ -25,6 +25,9 @@ yet. The next task is M0.1 in the [roadmap](docs/roadmap.md), which creates the 
   such as `table: #42`, never as memory addresses.
 - **Language extensions:** optional type annotations, classes, compound assignment such as `+=`, and
   a strict mode that reports wrong argument counts and undeclared variables.
+- **Six platforms:** Linux, Windows, macOS, Android, iOS, and the web, with the JIT on every one
+  that allows it and the same results on each, as [`docs/03-platforms.md`](docs/03-platforms.md)
+  plans.
 - **Tools in one binary:** `ferrolua run`, `check` (types), `lint`, `fmt`, and `sast` (security),
   plus a language server for editor auto complete and a debug adapter for editor debugging.
 

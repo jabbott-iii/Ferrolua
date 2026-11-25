@@ -43,7 +43,8 @@ under one directory, or unrestricted. Under a directory policy, every path is re
 absolute path with symbolic links followed, and refused unless it is inside the directory. A path
 that leaves it, such as `../secret`, raises an error. Between that check and the open, another
 process could replace a directory with a symbolic link; Ferrolua documents this race rather than
-claim to close it.
+claim to close it. On the web the standard library has no file system, so a host that grants `io`
+there supplies its own loader.
 
 ### Exiting
 
@@ -128,7 +129,8 @@ is.
 - Invariant 3: limits reached inside `pcall`, inside `xpcall` with a handler that loops, inside a
   metamethod, and inside a coroutine.
 - Invariant 4: `..`, absolute paths, symbolic links that leave the directory, empty paths, and paths
-  with NUL bytes.
+  with NUL bytes, and on Windows also drive letters, backslashes, `..\`, and `\\?\` prefixes
+  (ADR-0028, proposed: the targets, host services, math, and tests of the six platforms).
 - Invariant 5: `os.exit` with and without a status, inside `pcall` and a coroutine.
 - Invariant 6: two states in one test, one changing shared names, the other checking them.
 - Invariant 7: scripts pass every kind of object to `tostring`, `print`, `string.format` with

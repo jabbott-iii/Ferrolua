@@ -31,14 +31,15 @@ so they can fill them in.
   `03-platforms.md`, and `04-quality.md`. `05-release.md` comes before the first crates.io release
   (M12.1)
 - **Specs:** `docs/specs/<name>.md`: one for each crate except the test tools (`ferrolua-testkit`,
-  `ferrolua-fuzz`, and `xtask`), which `docs/04-quality.md` describes, plus one for each contract
-  that spans crates: `language`, `memory`, `sandbox`, and `diagnostics`
+  `ferrolua-fuzz`, `ferrolua-webtest`, and `xtask`), which `docs/04-quality.md` describes, plus one
+  for each contract that spans crates: `language`, `memory`, `sandbox`, and `diagnostics`
 - **Task IDs:** `M<milestone>.<task>`, with areas taken from the **Scopes** in `commits.md`, for
   example `M1.5 — syntax: expressions and operator precedence`
-- **Environments:** Linux on x86-64 first. As of 2026-11-24 this machine has Rust 1.100.0 with
-  Clippy, rustfmt, and the `llvm-tools` component, but not PUC-Rio Lua 5.5.1. Other targets, such as
-  AArch64, macOS, and Windows, follow in the order `docs/03-platforms.md` sets, and run the
-  interpreter until their JIT backends land
+- **Environments:** Linux on x86-64 first, where development happens. As of 2026-11-24 this machine
+  has Rust 1.100.0 with Clippy, rustfmt, and the `llvm-tools` component, but not PUC-Rio Lua 5.5.1
+  or the Android SDK and NDK, and it can't run Xcode or Windows. From M3.18 on, CI runs every target
+  in `docs/03-platforms.md`; the JIT targets run their JIT from M13 on, and iOS and the web run the
+  interpreter only
 - **Definition of done:** "Definition of done" in `CLAUDE.md`. No single command runs every check
   yet
 - **Decision log:** `docs/decisions.md`, with `ADR-NNNN` records

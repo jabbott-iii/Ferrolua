@@ -76,7 +76,7 @@ Pattern capture numbers, stack levels, line numbers, `file:seek` offsets, and th
 | Base | `print` writes through the host's output sink; `load` and `loadfile` accept mode `"t"`, and `"b"` only when the host allows precompiled chunks; `collectgarbage` follows [`memory.md`](memory.md#collectgarbage); `_VERSION` is `"Lua 5.5"`; `assert` tests truth as [`language.md`](language.md#truth-adr-0025) defines it; `type` also returns `"list"`, `"tuple"`, and `"set"`; and `list`, `tuple`, `set`, and `format` are new |
 | `coroutine` | Every function in §6.2, including `close` and `isyieldable` |
 | `package` | `require`, `package.loaded`, `package.preload`, `package.path`, `package.searchpath`, and a Lua searcher that reads files through the host's loader; `package.loadlib` returns `nil` and an error message, and `package.cpath` has no searcher (ADR-0017) |
-| `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, `dump` in Ferrolua's chunk format, and `join` (ADR-0026, proposed) |
+| `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, `dump` in Ferrolua's chunk format, and `join` (ADR-0026) |
 | `utf8` | Every function, with Lua 5.5's `lax` argument and the end position from `utf8.offset` |
 | `table` | `create`, `concat`, `insert`, `move`, `pack`, `remove`, `sort`, and `unpack`; `sort` uses PUC-Rio's algorithm, so equal elements end up in the same order and `invalid order function for sorting` is raised in the same cases |
 | `math` | `math.random` uses xoshiro256**, seeded as PUC-Rio seeds it, so `math.randomseed(42)` gives the same sequence; `math.randomseed()` with no argument takes its seed from `RandomState` |
@@ -106,7 +106,7 @@ records it here.
 - `pairs` and `ipairs` accept a list or a tuple and give its positions and values; `next`,
   `rawget`, and `rawset` take tables only. `#` and `rawlen` give a collection's length.
 - `tostring` of a collection writes its elements as an f-string's `!r` does, as in `[1, "a"]`,
-  `(1,)`, and `set([1, 2])`, and writes `...` where a collection holds itself (ADR-0026, proposed).
+  `(1,)`, and `set([1, 2])`, and writes `...` where a collection holds itself (ADR-0026).
 - `string.join(sep, c)` joins the strings in a collection, so `(", "):join(xs)` works as Python's
   `", ".join(xs)` does.
 - The `table` library stays, for tables.
@@ -128,7 +128,7 @@ spec ::= [[fill]align][sign]['z']['#']['0'][width][grouping]['.' precision][type
 - `n` formats as `d` or `g` does, because Ferrolua has no locale.
 - Floats use the same exact decimal conversion as `string.format`, below.
 - A value whose metatable has `__format` is formatted by `__format(value, spec)`, which must
-  return a string (ADR-0026, proposed). A spec on any other value that isn't a number or a string
+  return a string (ADR-0026). A spec on any other value that isn't a number or a string
   raises an error, and so does a type that doesn't fit the value, such as `d` with a float. M3.4
   records each message here.
 - Each byte a field produces counts as one work unit against the instruction limit, as

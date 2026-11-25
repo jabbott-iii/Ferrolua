@@ -167,7 +167,7 @@ end
 would hold a counted reference to itself through its upvalue, a loop the collector would have to
 find. The same holds for a function-wide local assigned a function once, such as
 `function fact(n) ... end` at a chunk's top level, which is a local of the chunk (ADR-0025: locals
-by default; ADR-0026, proposed). The compiler sees that `fact` is assigned only once, by its own
+by default; ADR-0026). The compiler sees that `fact` is assigned only once, by its own
 definition, so every use of `fact` inside the body is the function that is running. It compiles
 those uses to "the running function" and creates no upvalue, so no loop forms and the closure is
 freed by counting alone. A local function that is assigned anywhere else keeps an ordinary upvalue.

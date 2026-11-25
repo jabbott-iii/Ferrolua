@@ -90,7 +90,7 @@ Every event in §2.4 of the manual is supported: arithmetic, bitwise, `__len`, `
 `__le`, `__index`, `__newindex`, `__call`, `__close`, `__gc`, `__mode`, `__name`, `__tostring`,
 `__metatable`, and `__pairs`, apart from `__concat`, which went with `..`. Three are new:
 `__contains`, for `in` (ADR-0024: the details Python's operators and 0-based indexes leave open),
-and `__bool`, for truth, and `__format`, for an f-string field with a spec (ADR-0026, proposed:
+and `__bool`, for truth, and `__format`, for an f-string field with a spec (ADR-0026:
 the details of f-strings, locals, collections, and truth). A chain of
 `__index` or `__newindex` tables stops at PUC-Rio Lua 5.5.1's limit, with its message, which M2.10
 records here. A chain of `__call` stops after 15 objects, as §8.1 of the manual says.

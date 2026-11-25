@@ -50,7 +50,7 @@ assert_eq!(result, "hello, world");
   for numbers, strings, booleans, `Option`, `Vec`, `HashSet`, `HashMap`, and tuples for multiple
   values. A `Vec` converts to and from a list and a `HashSet` to and from a set, with `v[i]` as the
   list's `xs[i]`, since both count from 0, and a `HashMap` to and from a table (ADR-0025: lists,
-  tuples, and sets beside tables; ADR-0026, proposed). `FromLua` also reads a `Vec` from a table's
+  tuples, and sets beside tables; ADR-0026). `FromLua` also reads a `Vec` from a table's
   keys 0 to `#t - 1`. None converts between strings and numbers.
 - `UserData` lets a Rust type become userdata with methods, fields, and metamethods.
 - `Lua::collect` runs the loop collector and the finalizers it queues, at a point the host

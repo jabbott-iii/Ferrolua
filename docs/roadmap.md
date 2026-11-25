@@ -132,9 +132,9 @@ builds on.
   - Note: 2026-11-24, the owner's choice (ADR-0023): the lexer reads Python's operators instead of
     `..` and `~=`.
   - Note: 2026-11-24, the owner's choice (ADR-0025): the lexer also reads f-strings.
-  - Depends: M1.1
-  - Decide first: the owner accepts ADR-0026 (the details of f-strings, locals by default,
+  - Note: 2026-11-24, the owner accepted ADR-0026 (the details of f-strings, locals by default,
     collections, and truth), which sets the `f` prefix and keeps `[[` a long string.
+  - Depends: M1.1
   - Do:
     - Build the lexer of [`specs/syntax.md`](specs/syntax.md#lexer), with trivia on every token.
     - Add `tests/conformance/lexer.lua`, covering numbers, escapes, and long strings, with its
@@ -535,7 +535,7 @@ scripts within limits, and gets every standard library it grants.
     describes.
   - Do:
     - Build values tied to their state, `IntoLua` and `FromLua`, with `Vec` and `HashSet`
-      converting to lists and sets (ADR-0026, proposed), Rust functions, `UserData`, the
+      converting to lists and sets (ADR-0026), Rust functions, `UserData`, the
       registry, `Lua::collect`, the collector's options and `hash_seed`, a way to change the limits
       between calls (ADR-0021), and `Error`, then update the spec with the names the code settled.
   - Accept:

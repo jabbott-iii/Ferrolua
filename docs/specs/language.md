@@ -10,8 +10,8 @@ enforcement and undeclared-variable errors. This spec defines what differs from 
 [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) defines everything else. The parser
 lands in M1, and compound assignment, types, classes, and strict mode in M4. ADR-0006 (types),
 ADR-0007 (classes, proposed), ADR-0008 (strict mode, proposed), ADR-0024 (the details Python's
-operators and 0-based indexes leave open), and ADR-0026 (the details of ADR-0025's features,
-proposed) shaped it.
+operators and 0-based indexes leave open), and ADR-0026 (the details of ADR-0025's features)
+shaped it.
 
 ## Why a language of its own
 
@@ -65,7 +65,7 @@ Ferrolua implements all of Lua 5.5 that this spec doesn't change, including what
   by `-=`, then `-` and `1`, while `x--=1` is `x` followed by a comment.
 - The lexer takes the longest token it can: `**=` before `**`, and `**` before `*`.
 - `nonlocal` stays an ordinary name too, a keyword only at the start of a statement and followed
-  by a name (ADR-0026, proposed).
+  by a name (ADR-0026).
 - `class`, `extends`, `type`, and `super` stay ordinary names. `class` is a keyword only at the
   start of a statement, or right after `local` or `global`, and followed by a name; `type` only at
   the start of a statement and followed by a name; and `extends` only after the name in a class
@@ -268,15 +268,15 @@ print(f"{{n}} is {n}")              --> {n} is 3
   form, so a long-bracket f-string has none.
 - A field's expression is any expression, and may hold strings and braces of its own. At its top
   level, `!s` or `!r` before `:` or `}` is a conversion, and `:` starts the format spec unless a
-  name and `(` follow it, which make a method call (ADR-0026, proposed).
+  name and `(` follow it, which make a method call (ADR-0026).
 - `=` after the expression writes the expression's text, then `=`, then the value.
 - Without a spec, a field writes `tostring` of its value. `!r` writes a string quoted, as
   `string.format("%q")` writes it, and any other value as `tostring` does. `=` uses `!r` unless the
   field gives a conversion or a spec.
 - After `:` comes Python's format specification mini-language,
   `[[fill]align][sign][z][#][0][width][grouping][.precision][type]`, for numbers and strings. A
-  value whose metatable has `__format` is formatted by `__format(value, spec)` (ADR-0026,
-  proposed). A spec may hold fields of its own, as in `{x:>{width}}`.
+  value whose metatable has `__format` is formatted by `__format(value, spec)` (ADR-0026). A spec
+  may hold fields of its own, as in `{x:>{width}}`.
   [`stdlib.md`](stdlib.md#formatted-strings) gives the details.
 - Formatting a field is a conversion the code asks for, so f-strings keep ADR-0023's rule that
   nothing converts between strings and numbers on its own.
@@ -298,7 +298,7 @@ the innermost scope out, to:
   assignment comes later or inside a block, so `if c then x = 1 else x = 2 end print(x)` prints
   the local.
 - Reading such a local before the function assigns it raises an error,
-  `local 'x' read before assignment` (ADR-0026, proposed). Assigning `nil` counts as assigning it.
+  `local 'x' read before assignment` (ADR-0026). Assigning `nil` counts as assigning it.
 - `global x` declares that `x` names a global, so assignments to it write the global. Lua 5.5's
   forms `global x <const> = 1`, `global function f`, `global *`, and `global <const> *` stay.
 - `nonlocal x` declares that `x` names the variable `x` of the nearest enclosing function that has
@@ -306,12 +306,12 @@ the innermost scope out, to:
 - A `global` or `nonlocal` declaration covers the whole function it is in and the functions nested
   in it, and comes before the function's first use of the name. `global *` makes every name that
   the function assigns, and nothing else declares, a global, which restores Lua's rule for code
-  being ported (ADR-0026, proposed).
+  being ported (ADR-0026).
 - `local` keeps Lua's meaning: a local that lasts to the end of its block, with `<const>` or
   `<close>` if wanted. Each pass of a loop gets a new `local`, while a function-wide local is one
   variable for the whole call, so closures made in a loop share it, as in Python.
 - Reading a name that no scope declares reads a global, as in Lua and Python. Lua 5.5's implicit
-  `global *` at the start of every chunk is gone (ADR-0026, proposed), and strict mode's
+  `global *` at the start of every chunk is gone (ADR-0026), and strict mode's
   [undeclared-variable errors](#undeclared-variable-errors) are the way to forbid such reads.
 
 ```lua
@@ -333,8 +333,8 @@ end
 | `tuple` | `(1, 2)`, `(1,)`, `()` | No | Any values, `nil` included, in order | By value, when its elements can be keys |
 | `set` | `set([1, 2])`, `set()` | Yes | Distinct values that can be keys, in no order | Not allowed |
 
-Tables stay, as dictionaries, records, modules, and metatables. Most of what follows is ADR-0026's
-proposal.
+Tables stay, as dictionaries, records, modules, and metatables. Most of what follows comes from
+ADR-0026.
 
 - `#` gives a collection's exact length. A list or a tuple is indexed by an integer from `-#c` to
   `#c - 1`, a negative index counting from the end; any other index raises an error, as Python's
@@ -382,8 +382,8 @@ Python's rule decides which values are false; ADR-0024 had kept Lua's, where onl
 - `0`, `0.0`, and `-0.0`;
 - `""`;
 - an empty list, tuple, or set;
-- a table with no entries and no metatable, as an empty Python dictionary is (ADR-0026, proposed);
-- a table or userdata whose metatable's `__bool` returns `false` (ADR-0026, proposed).
+- a table with no entries and no metatable, as an empty Python dictionary is (ADR-0026);
+- a table or userdata whose metatable's `__bool` returns `false` (ADR-0026).
 
 Every other value is true, including `nan`, every function and thread, a class instance, and a
 table that has a metatable but no `__bool`, which acts as an object. `__bool` must return a
@@ -395,8 +395,7 @@ boolean, or the test raises an error.
 - `and` and `or` still return one of their operands: `0 or 5` is 5, and `"" and f()` is `""`. So
   `x = x or default` now replaces a 0 or an empty string too.
 - Library functions that take `nil` or `false` to mean "no value", such as `string.gsub` with a
-  replacement function and `load` with a reader, keep testing for exactly those two (ADR-0026,
-  proposed).
+  replacement function and `load` with a reader, keep testing for exactly those two (ADR-0026).
 
 ## Compound assignment (ADR-0023)
 

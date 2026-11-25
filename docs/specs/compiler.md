@@ -40,7 +40,7 @@ lists, and reading any other undeclared name is a compile error
 ## Self-recursion
 
 For each `local function f`, and each function-wide local whose one assignment is a function, such
-as `function f() ... end` at a chunk's top level (ADR-0026, proposed), the compiler checks every
+as `function f() ... end` at a chunk's top level (ADR-0026), the compiler checks every
 assignment to `f` in its scope. If the
 definition is the only one, every use of `f` inside its own body compiles to `SELF`, which loads
 the running closure, and `f` gets no upvalue. Closures nested inside the body that use `f` capture

@@ -986,7 +986,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0025 — Add f-strings, function-wide locals, lists, tuples, and sets, and Python's truth
 
-- **Status:** Accepted
+- **Status:** Accepted; the owner also accepted ADR-0026, which settles its details, on 2026-11-24
 - **Date:** 2026-11-24
 - **Context:**
   - ADR-0023 made Ferrolua a language of its own, with Python's operators and 0-based indexes, and
@@ -1065,7 +1065,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0026 — Settle what f-strings, function-wide locals, collections, and truth leave open
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:** ADR-0025 records the owner's choices. Writing them into the language spec raised
   questions they don't answer. Python's f-strings use `:` for a format spec, where Ferrolua also
@@ -1073,8 +1073,8 @@ it is `Proposed`, and no code may depend on it.
   `global` declarations also cover the functions nested in them. Python's lists, tuples, and sets
   live in a language without Lua's multiple results, metatables, or long strings. Python's truth
   rule has no case for a table, which is both a dictionary and an object. The agent proposed these
-  answers on 2026-11-24.
-- **Decision:**
+  answers on 2026-11-24, and the owner accepted them the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - **f-strings:**
     - The prefix is a lowercase `f` touching the opening `"`, `'`, or long bracket, as in
       `f[[...]]`; `f "x"`, with a space, is still a call.
@@ -1171,4 +1171,5 @@ it is `Proposed`, and no code may depend on it.
   - `__bool` falling back to `__len`, as Python's `__bool__` falls back to `__len__`: one more
     lookup on every truth test of a table with a metatable.
   - A set literal `{1, 2}`, as Python writes it: `{1, 2}` already builds a table.
-- **Revisit when:** the owner accepts or changes this record, which M1.2 needs first.
+- **Revisit when:** a format spec that Python accepts fails in an f-string because of the
+  method-call rule, or a host needs an empty table with a metatable to be false.

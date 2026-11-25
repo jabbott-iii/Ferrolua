@@ -7,8 +7,8 @@ reference counting, with a loop collector that runs at points the program fixes,
 the same values in the same order.
 
 **Status:** design and the first test tools. The design documents in [`docs/`](docs/) are
-written, and the Cargo workspace has a crate for each part, apart from the package manager's,
-which waits for its decision records. Each holds only its documentation,
+written, and the Cargo workspace has a crate for each part, apart from the two that packages need,
+which wait for their decision records. Each holds only its documentation,
 except the test tools: the test kit, which has a seeded random generator and a property-test
 runner; the fuzzer, which runs its targets on mutated inputs and saves each input that makes one
 fail; and `xtask`, whose `cargo xtask coverage` measures which lines and regions of code the tests
@@ -37,7 +37,7 @@ recorded, and waits for the conformance runner that M2.14 builds. The next task 
 - **Six platforms:** Linux, Windows, macOS, Android, iOS, and the web, with the JIT on every one
   that allows it and the same results on each, as [`docs/03-platforms.md`](docs/03-platforms.md)
   plans.
-- **Packages, as Cargo has them:** a manifest, `Lunaferra.lua`, will name each package, its
+- **Packages, as Cargo has them:** a TOML manifest, `Lunaferra.toml`, will name each package, its
   version, the modules it exports, and its dependencies, from a folder or a Git repository; a lock
   file, `Lunaferra.lock`, will pin the version and commit of each; and a module will reach only
   its own package and the packages its manifest lists, as the [package spec](docs/specs/package.md)

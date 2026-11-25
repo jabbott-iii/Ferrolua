@@ -474,8 +474,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0016 — Configure the tools with a data-only Lua file
 
-- **Status:** Proposed; ADR-0038, proposed, moves these settings into the `tools` table of the
-  package manifest, `Lunaferra.lua`
+- **Status:** Proposed; ADR-0038, proposed, replaces this file with the `[lints]` and `[tools]`
+  tables of the TOML package manifest, `Lunaferra.toml`, as the owner chose on 2026-11-25
 - **Date:** 2026-11-24
 - **Context:** The linter, formatter, type checker, and SAST tool (static application security
   testing, which finds security problems in source code without running it) need per-project
@@ -1780,16 +1780,23 @@ it is `Proposed`, and no code may depend on it.
     install scripts and Cargo's build scripts run a package's own code while it is installed or
     built, which is how many attacks on package registries work.
   - On 2026-11-25 the owner asked for a module system based on Cargo, so that package management,
-    dependency management, and the architecture of a project are clear and modular.
-- **Decision:**
-  - **Packages.** A package is a folder whose manifest, `Lunaferra.lua`, has a `package` table
+    dependency management, and the architecture of a project are clear and modular. The agent's
+    first draft used data-only Lua files, ADR-0016's format; the same day, the owner asked for
+    TOML files used the way Cargo uses them instead.
+- **Decision** (the owner chose TOML files, as Cargo uses them, on 2026-11-25):
+  - **Packages.** A package is a folder whose manifest, `Lunaferra.toml`, has a `[package]` table
     with its name and its version. Its modules are the files under `src/`: `src/init.lua` is the
     root module, as `src/lib.rs` is a Rust library's, and the name `a.b` names `src/a/b.lua` or
     `src/a/b/init.lua`. `src/main.lua` is the package's program, which no module can require.
-  - **The manifest's format** is ADR-0016's: a data-only Lua file, parsed and never run. The
-    manifest also takes over the job of `.lunaferra.lua`: its `tools` table holds the settings
-    ADR-0016 lists, and a manifest with no `package` table holds settings for loose scripts or
-    lists a workspace's members. Unknown fields are errors.
+  - **TOML files, as Cargo's are.** The manifest is TOML 1.0.0 with Cargo's tables, such as
+    `[package]`, `[dependencies]`, `[dev-dependencies]`, `[workspace]`, and `[lints]`, Cargo's
+    kebab-case keys, and Cargo's workspace inheritance with `workspace = true`. The lock file
+    (ADR-0039) and the package commands' `config.toml` files are TOML too. A TOML crate of
+    Lunaferra's own, `lunaferra-toml`, reads, edits, and writes them (ADR-0002). Unknown keys are
+    errors.
+  - **Tool settings in the manifest.** `[lints]` holds each diagnostic code's severity, and
+    `[tools]` the other settings ADR-0016 put in `.lunaferra.lua`, which goes away. A manifest with
+    no `[package]` table holds settings for loose scripts or lists a workspace's members.
   - **Namespaces.** In a package, the first part of a name in `require` must be the package's own
     name, the name of a dependency its manifest lists, or a module the host added. A package sees
     no other package, as a Rust crate sees only the crates its manifest names. Two packages that
@@ -1805,25 +1812,31 @@ it is `Proposed`, and no code may depend on it.
   - **Hosts and tools.** The `lunaferra` crate installs the resolved packages in a state, reading
     their files through a loader the host supplies, and the analysis tools resolve every `require`
     through the same module graph. A new crate, `lunaferra-package`, holds the formats and the
-    graph. [`specs/package.md`](specs/package.md) gives the details.
+    graph. [`specs/package.md`](specs/package.md) and [`specs/toml.md`](specs/toml.md) give the
+    details.
 - **Consequences:**
   - Good: each package says in one file what it is, what it uses, and what it offers, and the
     module graph matches the dependency graph, so a reader can see a project's architecture from
     its manifests.
+  - Good: a Rust programmer reads a manifest, a lock file, and a config file at a glance, and any
+    TOML library, in any language, can read them, so editors, CI scripts, and update bots need no
+    Lua parser.
   - Good: private modules can change without breaking any dependent.
   - Good: installing or building a package runs none of its code, and a script can't swap another
     package's modules, even with `package` granted.
   - Good: a host bundles its packages in its binary and runs the same layout on every platform.
   - Bad: Lua code laid out for `package.path` needs a manifest and a `src/` folder to become a
     package; it still runs as loose scripts without one.
-  - Bad: the manifest is a public interface, so a released field keeps its meaning, and a field
+  - Bad: the manifest is a public interface, so a released key keeps its meaning, and a key
     renamed or removed is a breaking change.
+  - Bad: Lunaferra writes, tests, and fuzzes a TOML parser and an editable TOML document of its
+    own, beside its Lua parser (M14.9).
   - Bad: a name in `require` means different modules in different packages, so a tool must read
     the manifest to know what a `require` loads.
-  - Bad: `.lunaferra.lua` goes away before any tool reads it; ADR-0016 changes only in where its
-    settings live.
-  - Follow-up: M14 builds packages, and M6.3 reads the manifest and links files through the module
-    graph.
+  - Bad: `.lunaferra.lua` goes away before any tool reads it, and with it ADR-0016's data-only
+    Lua file.
+  - Follow-up: M14.9 builds `lunaferra-toml`, the rest of M14 builds packages, and M6.3 reads the
+    manifest and links files through the module graph.
 - **Alternatives considered:**
   - Lua's `package.path` only, as today: nothing to build, but every file can reach every other,
     module names collide, and no file records a version.
@@ -1831,10 +1844,10 @@ it is `Proposed`, and no code may depend on it.
     Lua program that runs when it is read, many rocks build C modules that ADR-0017 (no Lua C API)
     rules out, and their code targets Lua's operators and 1-based indexes, not Lunaferra's
     (ADR-0023).
-  - A TOML manifest, as Cargo's is: familiar to Rust users, but it needs a TOML parser of
-    Lunaferra's own, which is why ADR-0016 chose Lua.
-  - A manifest beside `.lunaferra.lua`: no change to ADR-0016, but two files with almost the same
-    name and overlapping jobs.
+  - A data-only Lua manifest, in ADR-0016's format, which the agent drafted first: no second
+    parser, and Lua users read it as Lua, but other tools need a Lua parser to read it, and it
+    looks like nothing Cargo's users know. The owner chose TOML on 2026-11-25.
+  - A manifest beside `.lunaferra.lua`: no change to ADR-0016, but two files with overlapping jobs.
   - Every module public, as in Lua: nothing to declare, but every file in a package becomes part of
     its interface.
   - An `import` statement: new syntax for what `require` does, which ADR-0036 also turned down.
@@ -1872,10 +1885,17 @@ it is `Proposed`, and no code may depend on it.
     the newest version that meets every requirement in the graph. It backtracks when a later
     requirement rules out a choice, up to a step limit, and otherwise reports the conflicting
     requirements and the manifests that made them.
-  - **The lock file.** `Lunaferra.lock`, at the root of a package or workspace, records each
-    package's name, version, source, and, for Git, its full commit hash. It is data-only Lua,
-    sorted, and the same resolution writes the same bytes. `--locked` fails a command that would
-    change it, and `--offline` starts no network operation.
+  - **The lock file.** `Lunaferra.lock`, at the root of a package or workspace, is TOML in the
+    shape of `Cargo.lock`: a format `version`, then one `[[package]]` table for each package, with
+    its name, version, dependencies, and, for Git, a `source` such as
+    `git+<url>?tag=<tag>#<commit>` that ends in the full commit hash. It is sorted, and the same
+    resolution writes the same bytes. `--locked` fails a command that would change it, and
+    `--offline` starts no network operation.
+  - **Config files.** `.lunaferra/config.toml` in a project's folder or a folder above it, and
+    `config.toml` in the cache folder, hold settings for the package commands, nearer files first
+    and flags over both, as Cargo's `config.toml` files do. They hold `[net] offline` and
+    `[source] vendor`, and no key that names a program, so a project someone else wrote can't make
+    `lunaferra` run one.
   - **Integrity from Git.** The commit hash in the lock file is the check that the code is the code
     that was resolved. Lunaferra writes no checksum of its own, so it needs no hash function.
   - **Hostile repositories.** Lunaferra starts `git` with no shell and with only the `https`,
@@ -1887,8 +1907,9 @@ it is `Proposed`, and no code may depend on it.
   - **One cache per user**, in `LUNAFERRA_HOME` or `.lunaferra` in the home folder, as Cargo keeps
     `~/.cargo`, shared by every project on the machine.
   - **Commands.** `lunaferra new`, `init`, `add`, `remove`, `fetch`, `update`, `tree`, and
-    `vendor`. `add` and `remove` edit the manifest through the lossless syntax tree, so its
-    comments and layout stay.
+    `vendor`. `add` and `remove` edit the manifest through `lunaferra-toml`'s document, so its
+    comments and layout stay, as with `cargo add`. `vendor` prints the `[source]` lines that make
+    later commands read the vendored copies, as `cargo vendor` does.
   - **A registry later.** A registry that finds packages by name is planned as a Git repository
     that records each version's Git URL and commit, so it needs no new transport. Running a public
     one waits in the backlog.

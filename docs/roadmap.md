@@ -1038,23 +1038,47 @@ a lock file). The milestone was added on 2026-11-25, when the owner asked for a 
 based on Cargo. It sits after M3, because a state's packages build on `require` (M3.10, M3.23) and
 `lunaferra run` (M3.14), and before M6, whose analysis reads the manifest (M6.3).
 
-- [ ] **M14.1 — package: data-only files and the manifest**
-  - Depends: M1.6, M1.8
-  - Decide first: the owner accepts ADR-0016 (a data-only Lua configuration file) and ADR-0038
-    (packages and modules).
+- [ ] **M14.9 — toml: values, parser, document, and writer**
+  - Note: added on 2026-11-25, when the owner chose TOML files used the way Cargo uses them
+    (ADR-0038). It is listed where it is to be done, before M14.1, which reads the manifest with it.
+  - Depends: M0.2
+  - Decide first: the owner accepts ADR-0038 (packages and modules).
   - Do:
-    - Add `lunaferra-package` to the workspace, in the crate map's order, with
-      `lunaferra-syntax` as its one dependency.
-    - Build the data-only reader and `Manifest`, with every field, rule, and limit of
-      [`specs/package.md`](specs/package.md#the-manifest-lunaferralua), errors as `M` diagnostics
+    - Add `lunaferra-toml` to the workspace, in the crate map's order, with no dependencies.
+    - Build [`specs/toml.md`](specs/toml.md): values with their spans, the parser and its limits,
+      the document that keeps comments and layout, the writer, and the `toml` fuzz target, with
+      hostile-input tests in `crates/toml/tests/hostile_toml.rs`.
+  - Accept:
+    - Each valid and invalid test document, written for a rule of TOML 1.0.0, is accepted or
+      rejected as that rule says, and each error gives its line and column.
+    - Printing an unedited document gives back its bytes, and changing one value changes only its
+      line.
+    - Nesting one level past the limit is an error, and one million mutated documents from seed 0
+      crash nothing.
+  - Verify: `cargo test -p lunaferra-toml --locked`;
+    `cargo xtask fuzz toml --seed 0 --runs 1000000`
+
+- [ ] **M14.1 — package: the manifest and config files**
+  - Note: 2026-11-25, the owner chose TOML files used the way Cargo uses them, so this task reads
+    `Lunaferra.toml` and `config.toml` with `lunaferra-toml` (M14.9) instead of building a reader
+    for data-only Lua files; it was "package: data-only files and the manifest".
+  - Depends: M14.9, M1.6
+  - Decide first: the owner accepts ADR-0038 (packages and modules).
+  - Do:
+    - Add `lunaferra-package` to the workspace, in the crate map's order, with `lunaferra-syntax`,
+      for the diagnostic type, and `lunaferra-toml` as its dependencies.
+    - Build `Manifest`, with workspace inheritance, and `Config`, with every key, rule, and limit
+      of [`specs/package.md`](specs/package.md#the-manifest-lunaferratoml) and
+      [`specs/package.md`](specs/package.md#configuration-configtoml), errors as `M` diagnostics
       ([`specs/diagnostics.md`](specs/diagnostics.md#codes)), the `manifest` fuzz target, and
       hostile-input tests in `crates/package/tests/hostile_manifest.rs`.
   - Accept:
-    - A manifest with a call, an operator, or a name in an expression is rejected with its exact
-      message, and so is one past each limit.
-    - An unknown field, such as `dependancies`, gives its `M` diagnostic with a hint naming
-      `dependencies`.
-    - One million mutated manifests from seed 0 crash nothing.
+    - An unknown key, such as `[dev_dependencies]`, gives its `M` diagnostic with a hint naming
+      `[dev-dependencies]`, and a bare version string gives the hint to add `git` or `path`.
+    - A member's `version.workspace = true` takes the root's version, and `workspace = true` on a
+      key the root doesn't define is an error.
+    - A manifest one past each limit is rejected with its exact message, and one million mutated
+      manifests from seed 0 crash nothing.
   - Verify: `cargo test -p lunaferra-package --locked`;
     `cargo xtask fuzz manifest --seed 0 --runs 1000000`
 
@@ -1077,7 +1101,9 @@ based on Cargo. It sits after M3, because a state's packages build on `require` 
   - Do:
     - Build `resolve` over the `Registry` trait, as
       [`specs/package.md`](specs/package.md#resolution) describes, with its step limit, and read
-      and write `Lunaferra.lock`, plus the `lock` fuzz target.
+      and write `Lunaferra.lock` in the shape of
+      [`specs/package.md`](specs/package.md#the-lock-file-lunaferralock), plus the `lock` fuzz
+      target.
   - Accept:
     - On generated graphs, every chosen version meets every requirement on its series, and
       resolving twice writes the same bytes.
@@ -1118,7 +1144,7 @@ based on Cargo. It sits after M3, because a state's packages build on `require` 
     - Build `lunaferra new`, `init`, `add --path`, `remove`, `fetch` for path dependencies, `tree`,
       `run` with no script inside a package, and `--locked`, as
       [`specs/cli.md`](specs/cli.md#commands) lists. `add` and `remove` edit the manifest through
-      the lossless tree.
+      the document of `lunaferra-toml`, which keeps its comments and layout.
   - Accept:
     - `lunaferra new game`, then `lunaferra run` in `game/`, prints the template's greeting.
     - `lunaferra add --path ../util` keeps the manifest's comments and layout.
@@ -1146,10 +1172,12 @@ based on Cargo. It sits after M3, because a state's packages build on `require` 
 - [ ] **M14.8 — cli: `lunaferra vendor`, and packages bundled in a host**
   - Depends: M14.7, M3.17
   - Do:
-    - Build `lunaferra vendor`, and a `Packages` loader over sources a host compiles into its
+    - Build `lunaferra vendor`, which prints the `[source]` lines for `.lunaferra/config.toml`,
+      the `source.vendor` setting, and a `Packages` loader over sources a host compiles into its
       binary, as [`specs/package.md`](specs/package.md#fetching-with-git) describes.
   - Accept:
-    - A project vendored on Linux runs with `--offline` and an empty cache.
+    - A project vendored on Linux, with `source.vendor` set, runs with an empty cache and no
+      network.
     - The web harness runs a vendored package bundled in its test module, with no file system.
   - Verify: `cargo test -p lunaferra-cli --locked`;
     `cargo xtask test --target wasm32-unknown-unknown`
@@ -1518,19 +1546,19 @@ annotations, LuaCATS comments, and declarations for the standard library.
 
 - [ ] **M6.3 — analysis: projects, modules, and the manifest**
   - Note: 2026-11-25, ADR-0038 (packages and modules, proposed) moves the settings of
-    `.lunaferra.lua` into the `tools` table of the package manifest, `Lunaferra.lua`, and links a
-    package's files through its module graph. This task now reads the manifest through
-    `lunaferra-package` and depends on M14.4; it was "analysis: projects, modules, and
-    `.lunaferra.lua`".
+    `.lunaferra.lua` into the `[lints]` and `[tools]` tables of the package manifest,
+    `Lunaferra.toml`, a TOML file as the owner chose, and links a package's files through its
+    module graph. This task now reads the manifest through `lunaferra-package` and depends on
+    M14.4; it was "analysis: projects, modules, and `.lunaferra.lua`".
   - Depends: M6.2, M14.4
-  - Decide first: the owner accepts ADR-0016 (a data-only Lua configuration file) and ADR-0038.
+  - Decide first: the owner accepts ADR-0038.
   - Do:
-    - Read the manifest's `tools` table as
-      [`specs/diagnostics.md`](specs/diagnostics.md#configuration-the-manifests-tools-table)
+    - Read the manifest's `[lints]` and `[tools]` as
+      [`specs/diagnostics.md`](specs/diagnostics.md#configuration-lints-and-tools-in-the-manifest)
       describes, and link files through `require` as
       [`specs/analysis.md`](specs/analysis.md#modules) describes.
   - Accept:
-    - A manifest with a function call is rejected with its message.
+    - A manifest with an unknown key in `[tools]` gives its `M` diagnostic with its span.
     - In a workspace of two packages, `require` resolves each module's value across the packages,
       and a private module of the other package gives its diagnostic.
   - Verify: `cargo test -p lunaferra-analysis --locked`
@@ -1559,7 +1587,7 @@ annotations, LuaCATS comments, and declarations for the standard library.
     - Settle the declaration syntax in [`specs/types.md`](specs/types.md#declarations), and write
       declarations for every Lua 5.5 library function.
   - Accept:
-    - With `check_all` on, the conformance scripts give no `T` diagnostics beyond their marked
+    - With `check-all` on, the conformance scripts give no `T` diagnostics beyond their marked
       lines.
   - Verify: `cargo test -p lunaferra-types --locked`
 
@@ -1629,7 +1657,7 @@ formats files without changing what they do.
 - [ ] **M7.1 — lint: the rule engine, configuration, and suppression**
   - Depends: M6.3, M6.5
   - Do:
-    - Build rule registration, severities from the manifest's `tools` table, and suppression
+    - Build rule registration, severities from the manifest's `[lints]` table, and suppression
       comments, as [`specs/diagnostics.md`](specs/diagnostics.md#suppression-comments) describes.
   - Accept:
     - Each comment form suppresses exactly the codes and lines it names.
@@ -1688,9 +1716,10 @@ formats files without changing what they do.
   - Depends: M7.6, M0.6
   - Do:
     - Format the Lunaferra scripts in `tests/` and `benches/`, excluding the Lua 5.5 twins in
-      `reference/` folders in the `tools` table of a manifest at the repository's root, run both
-      commands on them in CI, and add both to the [automated checks](04-quality.md#automated-checks)
-      and to "Definition of done" in [`../CLAUDE.md`](../CLAUDE.md).
+      `reference/` folders in the `[tools]` table of a `Lunaferra.toml` at the repository's root,
+      run both commands on them in CI, and add both to the
+      [automated checks](04-quality.md#automated-checks) and to "Definition of done" in
+      [`../CLAUDE.md`](../CLAUDE.md).
   - Accept:
     - CI fails on a pull request that adds an unformatted script.
   - Verify: `lunaferra fmt --check tests benches`; `lunaferra lint tests benches`
@@ -1709,7 +1738,7 @@ reports each flow, in text or as SARIF for code scanning.
   - Depends: M6.3, M6.5
   - Do:
     - Build the built-in lists of [`specs/sast.md`](specs/sast.md#sources-sinks-and-sanitizers) and
-      the `sast` settings in the manifest's `tools` table.
+      the `[tools.sast]` settings in the manifest.
   - Accept:
     - A host-declared source and sink are honored like built-in ones.
   - Verify: `cargo test -p lunaferra-sast --locked`

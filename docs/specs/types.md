@@ -53,15 +53,15 @@ Classes are nominal: only instances of a class or its subclasses have its type.
 Types for the standard library, and for host APIs, come from declaration files: Lunaferra files
 with `declare` statements and no code, such as `declare function print(...: any)`. Lunaferra ships
 declarations for all of its standard library. Projects list their own in `declarations` in the
-manifest's `tools` table
-([`diagnostics.md`](diagnostics.md#configuration-the-manifests-tools-table)). M6.6 settles the
-declaration syntax. A host writes its declaration file from the same `Api` description that
+manifest's `[tools]`
+([`diagnostics.md`](diagnostics.md#configuration-lints-and-tools-in-the-manifest)). M6.6 settles
+the declaration syntax. A host writes its declaration file from the same `Api` description that
 registers its bindings, so the two never drift (ADR-0035: the host's API described once; M6.12).
 
 ## Which files are checked
 
 A file is checked when it has at least one annotation, inline or LuaCATS, or starts with
-`--!strict`, or when the manifest's `tools` table sets `types = { check_all = true }`. Other files
+`--!strict`, or when the manifest sets `check-all = true` in `[tools.types]`. Other files
 get no `T` diagnostics, so adding the checker to an untyped project reports nothing until the
 project opts in.
 
@@ -88,7 +88,7 @@ the conflict.
 - Invariant 2: the `types` fuzz target, and hostile-input tests with deeply nested and recursive
   types.
 - Invariant 3: a property test on generated typed programs.
-- Invariant 4: a test runs the checker on every conformance script with `check_all` on. The lines
+- Invariant 4: a test runs the checker on every conformance script with `check-all` on. The lines
   that pass wrong arguments on purpose carry a `--lunaferra:allow` comment for their `T` code, and
   the test expects no other `T` diagnostics.
 - Each `T` code has a test file in `crates/types/tests/` with one case that triggers it and one

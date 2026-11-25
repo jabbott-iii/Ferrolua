@@ -34,10 +34,10 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
 - **Breaking changes:** a break in a published crate's public API (see **Public API** in `rust.md`);
   a change to how a valid Lunaferra script runs; a new intended difference from how PUC-Rio
   Lua 5.5.1 runs the part of the language Lunaferra keeps from Lua 5.5; a renamed or removed
-  diagnostic code that users' lint settings refer to; and a manifest or lock file field renamed,
-  removed, or given a new meaning, so an existing `Lunaferra.lua` or `Lunaferra.lock` reads
-  differently. Each adds `BREAKING CHANGE:` and names the architecture decision record (ADR) in
-  `docs/decisions.md` that records it
+  diagnostic code that users' lint settings refer to; and a key of the manifest, the lock file, or
+  a config file renamed, removed, or given a new meaning, so an existing `Lunaferra.toml`,
+  `Lunaferra.lock`, or `config.toml` reads differently. Each adds `BREAKING CHANGE:` and names the
+  architecture decision record (ADR) in `docs/decisions.md` that records it
 
 ## Handing off commit messages
 

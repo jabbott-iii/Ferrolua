@@ -577,7 +577,7 @@ Modules stay Lua's: a module is a file that returns a value, usually a table, an
 it once and returns that value. ADR-0038 (packages and modules, as Cargo has) adds packages around
 them, with no new syntax:
 
-- A package is a folder with a manifest, `Lunaferra.lua`, and its modules are the files under its
+- A package is a folder with a manifest, `Lunaferra.toml`, and its modules are the files under its
   `src/` folder. `src/init.lua` is the root module, and the name `a.b` names `src/a/b.lua`.
 - Inside a package, the first part of a name in `require` is the package's own name, a dependency
   its manifest lists, or a module the host added. `require("json.stream")` loads the `stream`

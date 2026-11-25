@@ -98,7 +98,7 @@ Each row is something Lunaferra needs, and how it gets it without a third-party 
 | Tests on Android, iOS, and the web | The platforms' own `adb`, `xcrun simctl`, and browsers, driven by `xtask`, with a browser harness of Lunaferra's own | `cargo xtask test` (M3.17, ADR-0027) |
 | JSON, JSON-RPC, and SARIF | A JSON crate of Lunaferra's own | `lunaferra-json` (M6.9) |
 | Command-line arguments | A parser of Lunaferra's own, on `std::env::args_os` | `lunaferra-cli` (M1.10) |
-| Tool configuration and package manifests | A data-only Lua file, read by Lunaferra's own parser | `Lunaferra.lua` (ADR-0016, ADR-0038) |
+| Package manifests, lock files, config files, and tool settings | TOML files, as Cargo uses them, read and written by a TOML crate of Lunaferra's own | `Lunaferra.toml`, `Lunaferra.lock`, and `config.toml`; `lunaferra-toml` (M14.9, ADR-0038) |
 | Semantic Versioning, version resolution, and lock files | Code of Lunaferra's own | `lunaferra-package` (M14.2, M14.3) |
 | Fetching packages, and checking that they are the code that was locked | The `git` command, which fetches over HTTPS and SSH and names every object by a hash of its contents | `lunaferra fetch` (M14.7, ADR-0039) |
 | Editor integration | Lunaferra's own LSP and DAP servers; no editor extension yet | `lunaferra-lsp` and `lunaferra-dap` (ADR-0015) |

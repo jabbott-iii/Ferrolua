@@ -15,11 +15,12 @@ commits. Read the rule for each kind of file you touch.
 ## Status
 
 Design and the first test tools: the documents in `docs/` exist, and the Cargo workspace has every
-crate of the crate map in `docs/01-architecture.md` except `lunaferra-package`, which M14.1 adds
-once its decision records are accepted. Each crate holds only its crate docs, except
-`lunaferra-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
-`lunaferra-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
-`cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and `cargo xtask record` (M0.5).
+crate of the crate map in `docs/01-architecture.md` except `lunaferra-toml` and
+`lunaferra-package`, which M14.9 and M14.1 add once their decision records are accepted. Each
+crate holds only its crate docs, except `lunaferra-testkit`, which holds the seeded random
+generator and the property-test runner (M0.2); `lunaferra-fuzz`, the fuzzer, with only its two
+fixture targets (M0.4); and `xtask`, which holds `cargo xtask coverage` (M0.3), `cargo xtask fuzz`
+(M0.4), and `cargo xtask record` (M0.5).
 `tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin with the twin's recorded
 `hello.out`. The next task is M0.6, which adds the CI workflow.
 
@@ -35,8 +36,8 @@ once its decision records are accepted. Each crate holds only its crate docs, ex
 | The language: syntax, semantics, operators, indexes, and extensions | [`docs/specs/language.md`](docs/specs/language.md), which says where it differs from the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) |
 | Memory, reference counting, the loop collector, `__gc`, weak tables | [`docs/specs/memory.md`](docs/specs/memory.md) |
 | Libraries a host grants, limits, untrusted input | [`docs/specs/sandbox.md`](docs/specs/sandbox.md) |
-| Diagnostics, codes, and the tool settings in `Lunaferra.lua` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
-| Packages, modules, `require` across packages, manifests, lock files, versions, and fetching with Git | [`docs/specs/package.md`](docs/specs/package.md) |
+| Diagnostics, codes, and `[lints]` and `[tools]` in `Lunaferra.toml` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
+| Packages, modules, `require` across packages, `Lunaferra.toml`, `Lunaferra.lock`, `config.toml`, versions, and fetching with Git | [`docs/specs/package.md`](docs/specs/package.md) |
 | `crates/syntax` | [`docs/specs/syntax.md`](docs/specs/syntax.md) |
 | `crates/bytecode` | [`docs/specs/bytecode.md`](docs/specs/bytecode.md) |
 | `crates/math` | [`docs/specs/math.md`](docs/specs/math.md) and [`docs/03-platforms.md`](docs/03-platforms.md) |
@@ -51,6 +52,7 @@ once its decision records are accepted. Each crate holds only its crate docs, ex
 | `crates/fmt` | [`docs/specs/fmt.md`](docs/specs/fmt.md) |
 | `crates/sast` | [`docs/specs/sast.md`](docs/specs/sast.md) |
 | `crates/json` | [`docs/specs/json.md`](docs/specs/json.md) |
+| `crates/toml` | [`docs/specs/toml.md`](docs/specs/toml.md) |
 | `crates/package` | [`docs/specs/package.md`](docs/specs/package.md) |
 | `crates/lsp` | [`docs/specs/lsp.md`](docs/specs/lsp.md) |
 | `crates/dap` | [`docs/specs/dap.md`](docs/specs/dap.md) |

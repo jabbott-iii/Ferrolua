@@ -3,8 +3,8 @@
 This spec is the contract every Lunaferra tool follows when it reports a problem in Lua code: the
 syntax checker, strict mode, the type checker, the linter, the formatter, the SAST tool, and the
 package manager. It defines the diagnostic type, the codes, the output formats, suppression
-comments, and the tool settings in the package manifest, `Lunaferra.lua` (ADR-0016, proposed: the
-tools read a data-only Lua file; ADR-0038, proposed: that file is the package manifest).
+comments, and the tool settings in the package manifest, `Lunaferra.toml` (ADR-0038, proposed:
+packages and modules, with TOML files as Cargo uses them).
 `lunaferra-syntax` defines the type in M1.6, and each tool adds its codes as it lands.
 
 ## Why one contract
@@ -82,55 +82,52 @@ risky_call()
   nothing is itself reported by the linter.
 - `P` and `C` codes can't be suppressed, because the file doesn't compile.
 
-## Configuration: the manifest's `tools` table
+## Configuration: `[lints]` and `[tools]` in the manifest
 
-The tools read their settings from the `tools` table of the manifest, `Lunaferra.lua`, in the
-directory they run in or the nearest parent that has one (ADR-0038). A manifest with no `package`
-table holds settings for loose scripts. The manifest is a data-only Lua file: one statement,
-`return` followed by a table constructor, holding table constructors, strings, numbers, booleans,
-and comments, and nothing else; any other expression is an error. The tools parse it and never run
-it. In a workspace, a member with no `tools` table of its own uses the root's
-([`package.md`](package.md#workspaces)).
+The tools read their settings from the manifest, `Lunaferra.toml`, in the directory they run in or
+the nearest parent that has one (ADR-0038). `[lints]` sets each diagnostic code's severity, as
+Cargo's `[lints]` table does, and `[tools]` holds every other setting. A manifest with no
+`[package]` table holds settings for loose scripts. The manifest is TOML
+([`package.md`](package.md#the-manifest-lunaferratoml)), which holds only data, so reading it runs
+no code. In a workspace, a member takes the root's `[workspace.lints]` or `[workspace.tools]` when
+its own `[lints]` or `[tools]` says `workspace = true` ([`package.md`](package.md#workspaces)).
 
-```lua
-return {
-  package = { name = "game", version = "0.3.1" },
+```toml
+[package]
+name = "game"
+version = "0.3.1"
 
-  tools = {
-    -- Files for the tools to check; by default, a package's src/, tests/, and examples/.
-    include = { "src/**/*.lua", "scripts/*.lua" },
-    exclude = { "src/vendor/**" },
+# Each code's severity: "off", "note", "warning", or "error".
+[lints]
+L0001 = "off"
+S0002 = "error"
 
-    -- Where loose scripts find modules; a package's modules follow its module graph instead.
-    package_path = "./?.lua;./?/init.lua",
+[tools]
+# Files for the tools to check; by default, a package's src/, tests/, and examples/.
+include = ["src/**/*.lua", "scripts/*.lua"]
+exclude = ["src/vendor/**"]
 
-    -- Names the host defines, for strict mode and the type checker.
-    globals = { "game", "log" },
-    declarations = { "types/game.d.lua" },
-    strict = true,
+# Where loose scripts find modules; a package's modules follow its module graph instead.
+package-path = "./?.lua;./?/init.lua"
 
-    rules = {
-      L0001 = "off",
-      S0002 = "error",
-    },
+# Names the host defines, for strict mode and the type checker.
+globals = ["game", "log"]
+declarations = ["types/game.d.lua"]
+strict = true
 
-    format = {
-      indent_width = 2,
-      line_width = 100,
-      quote_style = "double",
-    },
+[tools.format]
+indent-width = 2
+line-width = 100
+quote-style = "double"
 
-    sast = {
-      sources = { "game.read_chat", "http.request_body" },
-      sinks = { "game.run_command" },
-    },
-  },
-}
+[tools.sast]
+sources = ["game.read_chat", "http.request_body"]
+sinks = ["game.run_command"]
 ```
 
-`lunaferra-package` reads the manifest in M14.1, and `lunaferra-analysis` takes the tool settings
-from it in M6.3; each tool's spec lists the settings it adds. Command-line flags override the
-manifest.
+- `P`, `C`, and `M` codes are always errors, so a `[lints]` entry for one is itself an error.
+- `lunaferra-package` reads the manifest in M14.1, and `lunaferra-analysis` takes the settings from
+  it in M6.3; each tool's spec lists the settings it adds. Command-line flags override the manifest.
 
 ## Invariants
 
@@ -139,8 +136,8 @@ manifest.
 3. JSON Lines output parses with `lunaferra-json`, one object per line, and SARIF output is a valid
    SARIF 2.1.0 log.
 4. A suppression comment removes exactly the codes it names, on exactly the lines it covers.
-5. Reading a manifest runs no code: a file with a function call, an operator, or a name in an
-   expression is rejected.
+5. A manifest with a key or a value the format doesn't define, or a `[lints]` entry for a `P`,
+   `C`, or `M` code, is rejected with an `M` diagnostic at its span.
 
 ## Tests
 
@@ -152,6 +149,6 @@ manifest.
   fields that SARIF 2.1.0 requires.
 - Invariant 4: tests cover each comment form, a suppression of an absent code, and a suppression
   of a `P` code.
-- Invariant 5: hostile-input tests in `lunaferra-package` give manifests with calls, operators, and
-  names, and expect each to be rejected with its exact message
-  ([`package.md`](package.md#tests)).
+- Invariant 5: hostile-input tests in `lunaferra-package` give manifests with unknown keys, values
+  of the wrong type, and `[lints]` entries for `P`, `C`, and `M` codes, and expect each exact
+  diagnostic ([`package.md`](package.md#tests)).

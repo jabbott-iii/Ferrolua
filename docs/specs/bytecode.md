@@ -47,7 +47,7 @@ pub struct Prototype {
     pub is_vararg: bool,
     pub strict_arity: bool,
     pub max_registers: u8,
-    pub debug: DebugInfo,              // source name, line of each instruction, local names
+    pub debug: DebugInfo,              // source name, line and span of each instruction, locals
     pub hints: Vec<TypeHint>,          // JIT hints from type annotations (ADR-0006)
 }
 ```
@@ -68,6 +68,8 @@ The verifier runs on every chunk `load` reads in binary mode, before any of it r
 - every jump lands on an instruction inside the function, and never in the middle of an
   instruction and its `EXTRA` word;
 - every opcode is defined, and an `EXTRA` word follows only instructions that take one;
+- no opcode is one of the specialized forms that exist only inside a state, if ADR-0031
+  (proposed: specialize instructions in place) is accepted;
 - the code ends with a return on every path;
 - the debug information has one line entry per instruction.
 

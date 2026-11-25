@@ -1353,3 +1353,218 @@ it is `Proposed`, and no code may depend on it.
     but browsers don't provide it, and running it needs a third-party runtime.
 - **Revisit when:** a host asks for `JitMode::On` to fail instead of falling back to the
   interpreter, or a target's math results differ from the stored bits.
+
+## ADR-0029 — Show runtime errors with their source line, a caret, and a hint
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - The owner wants Ferrolua to stay easy to learn, and on 2026-11-24 asked the agent to draft
+    this record as one of five improvements.
+  - A runtime error keeps PUC-Rio Lua 5.5.1's wording where Ferrolua shares the error, because
+    scripts match on it ([`specs/vm.md`](specs/vm.md#errors)), and it names only a line:
+    `game.lua:12: attempt to call a nil value (global 'pirnt')`.
+  - Python 3.10 added "Did you mean" suggestions for misspelled names, and Python 3.11 prints the
+    failing line with carets under the expression. Rust's compiler shows errors the same way, with
+    hints. A learner who sees the expression and a likely fix spends less time on the error.
+  - The tools' diagnostics already carry spans, labels, and notes
+    ([`specs/diagnostics.md`](specs/diagnostics.md#the-diagnostic)), but runtime errors don't.
+- **Decision:**
+  - Each instruction's debug information records the byte span of the expression it came from, not
+    only its line.
+  - A runtime error's message stays exactly as it is, so `pcall` and scripts see no change. Beside
+    it, `ferrolua::Error` carries the span and, where Ferrolua can work one out, a hint.
+  - Ferrolua works out a hint only once an error reaches the host, never while the script runs:
+    - for a name or field that isn't defined, the closest visible one within two edits, as in
+      "did you mean `print`?";
+    - for a local read before assignment, where an enclosing function has the same name,
+      "add `nonlocal count`";
+    - for `+` between a string and a number, "convert with `tostring(n)`, or use an f-string";
+    - for indexing `nil` through `self` in a method called with `.`, "call it with `:`";
+    - for a list index out of range, the list's length.
+  - The `ferrolua` command and the debugger print a runtime error in the diagnostics' text format:
+    the message, the file, line, and column, the source line with carets under the span, and the
+    hint. `debug.traceback` keeps PUC-Rio's format.
+- **Consequences:**
+  - Good: a learner sees where an error happened and often how to fix it, and no script sees a
+    different message.
+  - Good: hints cost nothing until an error reaches the host.
+  - Bad: debug information grows by a span for each instruction, in memory and in precompiled
+    chunks.
+  - Bad: each hint is code that must stay right, because a wrong hint misleads; each has a test.
+  - Follow-up: M2.20 records the spans and builds the hints; M2.21 prints them in `ferrolua run`;
+    M10.3 shows them in the debugger.
+- **Alternatives considered:**
+  - The hint inside the message string: every tool would show it, but scripts that match messages
+    would break, and so would the comparison with PUC-Rio's wording.
+  - Carets from line numbers alone: no new debug data, but a caret couldn't point inside a line.
+- **Revisit when:** the owner accepts or changes this record, which M2.20 needs first.
+
+## ADR-0030 — Give every state finite limits by default
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - Without a host limit, a state has no memory, instruction, or source-size limit
+    ([`specs/sandbox.md`](specs/sandbox.md#limits)). The libraries already default to a safe set:
+    `io`, `debug`, `package`, and most of `os` are off. ADR-0014 (proposed) makes the VM the
+    sandbox, and ADR-0021 counts the instruction limit for each call from the host.
+  - A host that forgets to set limits runs untrusted scripts with no bound: `while true do end`
+    hangs it, and a table that keeps growing exhausts its memory.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
+- **Decision:**
+  - `Options::default()` sets finite limits: 256 MB of memory, 1,000,000,000 instructions for each
+    call from the host, and 16 MB for one chunk's source. Call depth and nesting keep their limits.
+  - `Options::trusted()` grants every library and sets no limits, for a host that runs only its
+    own scripts. `Limits::none()` turns the limits off and leaves the libraries as they are.
+  - A limit error names the limit and the setting that raises it, such as
+    `instruction limit of 1000000000 reached in one call (Limits::instructions)`.
+  - `ferrolua run` uses `Options::trusted()`, because a person runs their own scripts there, and
+    `ferrolua run --sandbox` uses the defaults.
+  - M5.1's benchmarks check that no benchmark script reaches a default limit, and the numbers are
+    revisited with those measurements.
+- **Consequences:**
+  - Good: a host that forgets the limits still bounds every script, so a hostile one ends with an
+    error instead of a hang.
+  - Good: a host reads the defaults in one place and raises the one it needs.
+  - Bad: a host that embeds its own long-running scripts with the defaults gets a limit error, and
+    must choose `Options::trusted()` or a higher limit.
+  - Bad: the instruction counter runs by default; M5.1 measures what it costs.
+  - Follow-up: M3.20 sets the defaults, `Options::trusted()`, and the messages.
+- **Alternatives considered:**
+  - No limits by default, as today: no surprise for trusted code, but every forgetful host is open.
+  - `Options` with no default, so every host must choose: nothing is forgotten, but every example
+    needs a page of settings.
+  - A time limit: easy to understand, but wall-clock time differs between runs and machines, which
+    the determinism of ADR-0018 forbids.
+- **Revisit when:** the owner accepts or changes this record, which M3.20 needs first.
+
+## ADR-0031 — Specialize instructions in place in the interpreter
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - iOS and the web run only the interpreter (ADR-0027), and everywhere else so does every function
+    the JIT hasn't compiled. A generic instruction such as `ADD` checks its operands' types each
+    time it runs: integers, floats, strings, collections, or a metamethod.
+  - CPython 3.11's specializing adaptive interpreter rewrites an instruction, once it has seen the
+    same types, into a version for those types, and rewrites it back when they change. It was the
+    largest part of a release that its notes say ran about 25% faster on average.
+  - The baseline JIT needs to know which types each instruction saw
+    ([`specs/jit.md`](specs/jit.md#baseline-tier)).
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
+- **Decision:**
+  - A prototype's code starts generic. After an instruction runs a fixed number of times with the
+    same kinds of operands, the interpreter rewrites its opcode in place to a specialized form,
+    such as an integer add, a float add, a read of a class instance's field slot, or a table read
+    that remembers where a constant string key was found.
+  - A specialized instruction checks its assumption first. When the check fails, it does the
+    generic work, and after a fixed number of failures it rewrites itself back.
+  - The specialized and generic forms give the same results, raise the same errors, and count the
+    same work units (ADR-0020, ADR-0021), so limits stop a script at the same point either way.
+    The counts are fixed numbers, so the same run rewrites the same instructions at the same
+    moments every time.
+  - Specialized opcodes exist only inside a state. `string.dump` writes the generic forms, and the
+    verifier (ADR-0010) rejects a specialized opcode in a loaded chunk.
+  - The baseline JIT reads the specialized opcodes as its record of the types each instruction
+    saw.
+  - Rewriting is safe Rust: the code is a vector of words in the prototype's arena slot.
+- **Consequences:**
+  - Good: every platform runs faster, iOS and the web most of all, since they have no JIT.
+  - Good: the JIT gets its type feedback with no second mechanism.
+  - Bad: many more opcodes, each specialized form tested against its generic one.
+  - Bad: a prototype's code changes as it runs, so sharing compiled prototypes between states, which
+    the backlog holds, needs a copy of the code in each state.
+  - Follow-up: M5.10 builds it and measures it with M5.1's benchmarks; the differential tests also
+    compare a run that specializes with one that doesn't.
+- **Alternatives considered:**
+  - A fast generic interpreter only: simpler, but every check runs every time.
+  - Specializing at compile time from type annotations: free at run time, but most code has no
+    annotations, and the VM never trusts them (ADR-0006).
+  - A side table of caches without rewriting the opcode: the code stays fixed, but each
+    instruction pays an extra lookup to find its cache.
+- **Revisit when:** the owner accepts or changes this record, which M5.10 needs first.
+
+## ADR-0032 — Grow strings and lists in place when only one place holds them
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - Strings can't change, and `+` joins two strings into a new one (ADR-0023), so `s += part` in a
+    loop copies the whole string each time, and building a string from n parts takes time that
+    grows with n². `xs = xs + [v]` copies a list the same way. The linter warns about it, and
+    f-strings and `string.join` avoid it, but learners write the loop first.
+  - CPython appends to a string in place when nothing else refers to it. Ferrolua counts
+    references (ADR-0018), so it knows the same fact at no extra cost.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
+- **Decision:**
+  - When the left operand of `+` is a string or a list that only the register receiving the result
+    holds, as in `s = s + t` or `s += t` on a local, the VM appends to it in place instead of
+    copying it. A string of 40 bytes or fewer, which the state interns, and any value with another
+    reference, are copied as before.
+  - The result equals what a copy would give, and nothing else can see the change, because nothing
+    else refers to the value.
+  - The buffer grows by Ferrolua's own rule and its bytes count by the fixed charges of ADR-0021.
+    The JIT applies the same rule, so collections fall at the same points interpreted and
+    compiled.
+  - An append in place drops the string's cached hash.
+  - `+=` keeps its meaning, `v = v + e`, so on a list that another variable also holds it makes a
+    new list, unlike Python's `+=`, which extends the shared one.
+- **Consequences:**
+  - Good: the loop that learners write first runs in time that grows with n, not n².
+  - Good: no new syntax and no new function.
+  - Bad: the speed depends on whether a value is shared, so the same loop over a string that a
+    table also holds stays slow; the lint rule stays for those cases.
+  - Bad: the interpreter and the JIT must agree on the rule exactly, which the differential tests
+    check.
+  - Follow-up: M4.9 builds it in the VM, with a benchmark in `benches/lua/` that checks the time
+    grows linearly; M5.5 and M13.3 apply it in compiled code.
+- **Alternatives considered:**
+  - Ropes, strings kept as trees of pieces: fast joins in every case, but every other string
+    operation gets slower and more complex.
+  - Python's in-place `+=` on lists: familiar to Python programmers, but a change to one variable
+    would show through every other that holds the list, which `+=` on strings and numbers never
+    does.
+  - The lint rule alone: no VM change, but the slow loop stays the one learners write first.
+- **Revisit when:** the owner accepts or changes this record, which M4.9 needs first.
+
+## ADR-0033 — Start an interactive prompt from `ferrolua` with no arguments, in M3
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:**
+  - The backlog holds "an interactive prompt for `ferrolua` with no arguments, as `lua` has",
+    waiting for a user to ask. Python and Lua both start a prompt when run with no arguments, and
+    learners try expressions there before they write a file.
+  - With locals by default (ADR-0025), each line typed at a prompt is a chunk of its own, so every
+    name a line assigns would be gone on the next line.
+  - Arrow-key history and line editing need the terminal's raw mode, which takes `tcsetattr` or
+    `SetConsoleMode`, and so `unsafe` code outside the JIT, which ADR-0013 (proposed) forbids.
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
+- **Decision:**
+  - `ferrolua` with no arguments starts a prompt when standard input is a terminal, which
+    `std::io::IsTerminal` tells. Otherwise it runs standard input as a script, as `lua -` does.
+  - A line that parses as an expression prints its value as an f-string's `!r` would write it, as
+    Python's prompt does. A chunk that isn't finished continues on the next line, after a `...`
+    prompt.
+  - Each line compiles as if `global *` (ADR-0026) covered its top level, into a table for the
+    session that falls back to the real globals, so `x = 1` on one line and `x` on the next work.
+    Functions defined at the prompt keep local scoping inside.
+  - Errors print as ADR-0029 (proposed) shows them.
+  - Line editing is the terminal's own until a way to set raw mode without `unsafe` code exists,
+    which the backlog tracks.
+  - The prompt uses `Options::trusted()` (ADR-0030, proposed), and `--sandbox` gives the defaults.
+- **Consequences:**
+  - Good: a learner tries code at once, and names persist between lines as in Python's prompt.
+  - Bad: no arrow-key history at first; a user who wants it runs the prompt under a line-editing
+    tool of their own.
+  - Bad: a line at the prompt assigns into the session's table, while the same line in a file makes
+    a local of its chunk.
+  - Follow-up: M3.19 builds it; the backlog row for the prompt becomes one for line editing.
+- **Alternatives considered:**
+  - Keep the prompt in the backlog: no work now, but learners have nowhere to try code.
+  - Each line's names lost, as Lua's prompt loses `local x`: simplest, but almost useless with
+    locals by default.
+  - Raw mode with `unsafe` code in `ferrolua-cli`: history from the start, but a second crate with
+    `unsafe`, which ADR-0013 rules out.
+- **Revisit when:** the owner accepts or changes this record, which M3.19 needs first.

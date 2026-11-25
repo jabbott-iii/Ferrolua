@@ -56,7 +56,10 @@ instruction:
 - Values stay in their registers in the VM's frame, so an exit needs no conversion.
 - Each operation first checks the types the interpreter has seen there, such as two integers for
   an `ADD`, and the hints from type annotations. When a guard fails, the code exits to the
-  interpreter at that instruction.
+  interpreter at that instruction. If ADR-0031 (proposed) is accepted, the interpreter's
+  specialized opcodes are that record of types.
+- Where the interpreter appends to a string or list in place because only one place holds it,
+  compiled code does the same, under ADR-0032 (proposed), so both collect at the same points.
 - Reference counts are updated exactly as the interpreter updates them, including recording
   candidates for the loop collector, and the collector runs only at safe points, where every
   count is exact.

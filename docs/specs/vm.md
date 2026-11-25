@@ -25,6 +25,11 @@ seeded per state: from the standard library's `RandomState` by default, so a scr
 keys that collide, or from `Options::hash_seed` when a host needs runs to repeat exactly
 ([`ferrolua.md`](ferrolua.md)).
 
+ADR-0032 (proposed: grow strings and lists in place when only one place holds them) would let
+`s = s + t` and `s += t` on a local append to `s` in place when its count shows nothing else holds
+it and it is longer than 40 bytes, so it isn't interned. The result is the value a copy would give,
+the append drops the cached hash, and lists follow the same rule (M4.9).
+
 ## Tables
 
 A table has an array part for keys 0 to n − 1 and a hash part for the rest (ADR-0023: a language
@@ -84,6 +89,12 @@ operator's edge cases and error messages here. Number-to-string conversion print
 digits to read back the same value, as Lua 5.5 does, using PUC-Rio's exact rules, which M2.9 records
 here.
 
+ADR-0031 (proposed: specialize instructions in place) would let the interpreter rewrite an
+instruction that keeps seeing the same kinds of operands into a form for them, such as an integer
+add, and rewrite it back when they change. Both forms give the same results and count the same
+work units, so limits stop a script at the same point, and specialized opcodes never leave the
+state: `string.dump` writes the generic ones (M5.10).
+
 ## Metamethods
 
 Every event in §2.4 of the manual is supported: arithmetic, bitwise, `__len`, `__eq`, `__lt`,
@@ -103,6 +114,11 @@ way closes its `<close>` variables. `pcall` and `xpcall` catch errors, except th
 PUC-Rio Lua 5.5.1's, including the variable description the bytecode allows, as in
 `attempt to index a nil value (global 'config')` and `attempt to call a nil value (method 'draw')`.
 An error with a `nil` value becomes a string, as Lua 5.5 does.
+
+ADR-0029 (proposed: runtime errors with their source line, a caret, and a hint) would keep each
+message as it is and add, beside it, the span of the failing expression from the debug
+information and, once the error reaches the host, a hint such as "did you mean `print`?". The VM
+works out no hint while the script runs, so `pcall` and its cost don't change (M2.20).
 
 ## Coroutines
 

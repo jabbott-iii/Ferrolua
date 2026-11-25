@@ -62,6 +62,11 @@ status to the host, which the command-line tool turns into the process's exit st
 | Source size | Bytes of one chunk passed to `load` | None |
 | Nesting depth | Nested blocks and expressions in the parser | PUC-Rio Lua 5.5.1's limit, which M1.8 records |
 
+ADR-0030 (proposed: finite limits by default) would give a state these limits unless its host
+sets others: 256 MB of memory, 1,000,000,000 instructions for each call from the host, and 16 MB
+of source for one chunk. `Options::trusted()` would keep today's defaults, with no limit and every
+library, and each limit error would name the setting that raises it (M3.20).
+
 Library functions that can run long count their work against the instruction limit: one unit per
 byte that `string.rep`, `table.concat`, `string.format`, `string.join`, `format`, and f-string
 fields produce, one per element that joining, repeating, comparing, or combining lists, tuples,

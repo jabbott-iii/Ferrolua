@@ -14,9 +14,10 @@ commits. Read the rule for each kind of file you touch.
 
 ## Status
 
-Design and an empty workspace: the documents in `docs/` exist, and the Cargo workspace has every
-crate of the crate map in `docs/01-architecture.md`, each holding only its crate docs. The next
-task is M0.2, which builds the seeded random generator and property tests of `ferrolua-testkit`.
+Design and the first test tool: the documents in `docs/` exist, and the Cargo workspace has every
+crate of the crate map in `docs/01-architecture.md`. Each crate holds only its crate docs, except
+`ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2).
+The next task is M0.3, which builds `cargo xtask coverage`.
 
 ## Read before working
 

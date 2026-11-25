@@ -79,12 +79,26 @@ Each is tested like any other code.
 A dev-dependency of the other crates, never published (M0.2):
 
 - a seeded generator of random numbers (SplitMix64 to expand the seed, xoshiro256** to generate),
-  so every test that uses random input repeats exactly;
+  so every test that uses random input repeats exactly. Its tests check both against the output
+  of the reference code that their authors publish at <https://prng.di.unimi.it/>;
 - a property-test runner: it checks a property against a fixed number of generated cases, and on a
-  failure, shrinks the case to a smaller one that still fails and prints the seed;
-- a generator of valid Ferrolua programs, built from the grammar in
+  failure, shrinks the case to a smaller one that still fails and reports the seed;
+- a generator of valid Ferrolua programs (M1.9), built from the grammar in
   [`specs/syntax.md`](specs/syntax.md) and [`specs/language.md`](specs/language.md), which the
   fuzzer and the property tests share.
+
+A generator is a function that builds a case from the random choices of a `Source`, which records
+each choice. To shrink a failing case, the runner edits that record: it deletes runs of choices and
+lowers each choice toward zero, then runs the generator again on the edited record. It keeps each
+edit that still fails and leaves a smaller record. Every generator therefore shrinks without a
+shrinking function of its own, as in Hypothesis, a property-testing library for Python, provided
+that choices nearer zero give simpler cases. A property returns `true`, `false`, or a `Result`, and
+a property that panics fails too.
+
+A run checks 256 cases from seed 0 unless its `Config` says otherwise, and tries at most 10,000
+edits while shrinking. Case `i` uses seed `seed + i`, so the seed of a failing case reruns that case
+alone. `Config::check` returns the failure, and `Config::assert` panics with a report of the seed,
+the shrunk case, and the original case, which the test harness prints.
 
 ### `ferrolua-fuzz`
 

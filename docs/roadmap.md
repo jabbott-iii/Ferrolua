@@ -57,7 +57,23 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     `cargo tree --workspace --edges normal,build,dev --target all --prefix none` (expect only
     `ferrolua` crates and `xtask`)
 
-- [ ] **M0.2 — testkit: seeded generator and property tests**
+- [x] **M0.2 — testkit: seeded generator and property tests**
+  - Note: Built on 2026-11-25. The xoshiro authors publish reference C code, not a list of outputs,
+    so the expected numbers in `crates/testkit/tests/random.rs` come from `splitmix64.c` and
+    `xoshiro256starstar.c` at <https://prng.di.unimi.it/>, compiled with GCC 13.3.0 on x86-64 Linux.
+    From the state `{1, 2, 3, 4}`, xoshiro256** gives `11520`, `0`, and `1509978240` first. Seeded
+    with 0, which fills the state from SplitMix64, it gives `11091344671253066420` first.
+  - Note: The runner shrinks the record of a generator's random choices, not the case itself, so no
+    generator needs a shrinking function of its own. A run checks 256 cases from seed 0 by default,
+    tries at most 10,000 edits while shrinking, and gives case `i` the seed `seed + i`. The crate
+    never prints: `Config::assert` panics with a report that holds the seed, and the test harness
+    prints the report.
+  - Note: The property `x <= 1000`, on numbers below `u64::MAX` from seed 0, fails on its first case,
+    `11091344671253066419`, which shrinks to `1001` after 61 smaller failing cases.
+  - Note: Step 3 of the definition of done, coverage, couldn't run as written, because M0.3 builds
+    `cargo xtask coverage`. Measured by hand with `-C instrument-coverage`, `llvm-profdata`, and
+    `llvm-cov report` from the `llvm-tools` component, the crate's tests cover all 235 of its lines
+    and all 236 of its regions.
   - Depends: M0.1
   - Do:
     - Build `ferrolua-testkit` as [`04-quality.md`](04-quality.md#ferrolua-testkit) describes: a
@@ -73,6 +89,12 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - Note (from M0.1): `crates/cli/src/main.rs` and `xtask/src/main.rs` each hold an empty
     `fn main` that no test calls, so the coverage run has to reach both, for example by running
     each binary from an integration test.
+  - Note (from M0.2): `llvm-cov report` scores a generic function by its one instantiation that
+    covers the most regions, not by the union of all its instantiations. A generic function that
+    tests call with different closures can therefore show a missed region that a test does run.
+    `ferrolua-testkit` reaches 100% on that measure because its tests share named generator and
+    property functions. The coverage command should either keep that measure, or take the union of
+    every instantiation's regions from `llvm-cov export`.
   - Depends: M0.1
   - Do:
     - Build `cargo xtask coverage` as [`04-quality.md`](04-quality.md#xtask) describes, finding
@@ -241,6 +263,10 @@ builds on.
   - Verify: `cargo test -p ferrolua-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
+  - Note (from M0.2): A generator in `ferrolua-testkit` is a function of `&mut Source` that makes
+    each choice with `Source::below`. The program generator shrinks well if a choice of 0 gives the
+    simplest program, for example when alternative 0 of each grammar rule is its shortest. Only the
+    property runner can make a `Source` today, so the fuzzer needs a way to make one as well.
   - Depends: M0.4, M1.7
   - Do:
     - Add the Ferrolua program generator to `ferrolua-testkit`, and the `lexer` and `parser`

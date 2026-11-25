@@ -27,36 +27,40 @@ each value by its bold name. If a value still reads `[FILL IN: …]`, the rule i
 yet. Work out that value from the repository itself, and tell the user which values are missing
 so they can fill them in.
 
-- **Lua version:** Lua 5.5, which Ferrolua implements and extends (architecture decision records
-  ADR-0001 and ADR-0004 in `docs/decisions.md`). Every `.lua` file in this repository must run the
-  same on Ferrolua and on PUC-Rio Lua 5.5.1, the reference interpreter, unless it tests something
-  only Ferrolua has, such as its embedding API, its language extensions, or an intended difference
-  the decision log records; those files go in `tests/extensions/`
-- **Host:** Ferrolua itself, which provides Lua 5.5's standard libraries and whatever an embedding
-  host registers. The conformance scripts also run on PUC-Rio's standalone `lua` 5.5.1 interpreter,
-  to record the output Ferrolua must match
-- **Modules:** none yet. The repository's Lua is test and benchmark scripts in `tests/conformance/`,
-  `tests/extensions/`, and `benches/lua/`, each run as a main chunk; none loads another with
-  `require`, except the scripts M3.10 adds to `tests/conformance/require/`
+- **Lua version:** two languages. Most `.lua` files here are Ferrolua scripts: Lua 5.5 with
+  Python's operators, indexes that start at 0, and ranges that stop before their end (architecture
+  decision records ADR-0001 and ADR-0023 in `docs/decisions.md`). Write them by this rule, with the
+  changes `docs/specs/language.md` makes, which win where the two disagree: `**` for powers, `^`
+  for XOR, `!=`, `+` to join strings, no conversion between strings and numbers, and positions
+  from 0. The files in each `reference/` folder are plain Lua 5.5, for PUC-Rio Lua 5.5.1, the
+  reference interpreter: the twin of each conformance script and benchmark, which must make the
+  same calls and print the same output
+- **Host:** Ferrolua itself, which provides the standard libraries and whatever an embedding host
+  registers. The Lua 5.5 twins run on PUC-Rio's standalone `lua` 5.5.1 interpreter, to record the
+  output Ferrolua must match
+- **Modules:** none yet. The repository's scripts are tests and benchmarks in `tests/conformance/`,
+  `tests/extensions/`, and `benches/lua/`, and their twins in `reference/` folders, each run as a
+  main chunk; none loads another with `require`, except the scripts M3.10 adds to
+  `tests/conformance/require/`
 - **Check commands:** the conformance run in `cargo test --workspace --locked`. Once Ferrolua's own
   formatter, linter, and type checker exist, they check every script too
 - **Lint configuration:** none yet. Third-party tools such as StyLua and luacheck aren't allowed
   (see `dependencies.md`), so Ferrolua's own formatter and linter will check the scripts once they
   exist, configured as their specs in `docs/specs/` describe
 - **Annotations:** LuaCATS (Lua Comment And Type System) annotations, such as `---@param` and
-  `---@return`, which Ferrolua's type checker will read, because these scripts must also run on
-  PUC-Rio Lua 5.5.1. Scripts in `tests/extensions/` may use Ferrolua's inline annotations instead,
+  `---@return`, which Ferrolua's type checker will read, in conformance scripts and their twins, so
+  the two stay alike. Scripts in `tests/extensions/` may use Ferrolua's inline annotations instead,
   as `docs/specs/language.md` defines them. lua-language-server reads LuaCATS too, but the project
   doesn't require it
 - **Errors:** raise with `error` for bugs and broken contracts, and return `nil, message` for
-  failures a caller expects, as Lua 5.5's standard library does. Conformance scripts catch errors
-  with `pcall` and print the message, so it is compared with PUC-Rio Lua 5.5.1's
+  failures a caller expects, as Lua 5.5's standard library does. Conformance scripts and their twins
+  catch errors with `pcall` and print the message, so it is compared with PUC-Rio Lua 5.5.1's
 - **Dependency policy:** `dependencies.md` in this folder
 - **C boundary:** none: Ferrolua is written in Rust and has no Lua C API (`lua.h`), so C modules
   built for PUC-Rio Lua don't load in it. Hosts reach Lua through Ferrolua's Rust embedding API,
   which `rust.md` and its **Unsafe policy** cover
-- **Languages:** English only. Runtime error messages keep PUC-Rio Lua 5.5.1's English wording,
-  because scripts match on them
+- **Languages:** English only. Runtime error messages that Ferrolua shares with Lua 5.5 keep
+  PUC-Rio Lua 5.5.1's English wording, because scripts match on them
 - **Untrusted input:** none in the repository's own scripts. The scripts that hosts give Ferrolua
   are untrusted, and **Untrusted input** in `rust.md` covers them
 - **Sandbox:** Ferrolua runs Lua its hosts didn't write, so the VM is the sandbox. A host must pick
@@ -66,17 +70,19 @@ so they can fill them in.
   proposed, sets the design, and `docs/specs/sandbox.md` gives the details; the owner accepts it
   before the limits land in M3.2
 - **Performance budgets:** none agreed yet. Benchmarks in `benches/lua/` will compare Ferrolua with
-  PUC-Rio Lua 5.5.1 on the same x86-64 Linux machine (M5.1), and `docs/00-overview.md` proposes the
-  budgets
+  PUC-Rio Lua 5.5.1, running each benchmark's twin, on the same x86-64 Linux machine (M5.1), and
+  `docs/00-overview.md` proposes the budgets
 - **Published rocks:** none
 - **Design docs:** `docs/specs/<name>.md`, as in `rust.md`, with `docs/specs/language.md` for the
   language itself; the test and benchmark scripts have none of their own
 - **Test layout:** conformance scripts in `tests/conformance/`, named after the feature they cover,
-  such as `goto.lua`, each with the output PUC-Rio Lua 5.5.1 printed in a `.out` file beside it;
-  scripts for Ferrolua-only behavior in `tests/extensions/`, each with a `.out` file written from
-  the spec section it tests. A Rust integration test runs each script on Ferrolua, interpreted and
-  with the JIT forced on, and compares the output. busted isn't used, because it needs C modules
-  such as LuaFileSystem, which Ferrolua can't load. Lua benchmark scripts go in `benches/lua/`
+  such as `goto.lua`, each with a Lua 5.5 twin of the same name in `tests/conformance/reference/`
+  and the output PUC-Rio Lua 5.5.1 printed for the twin in a `.out` file beside it; scripts for
+  behavior with no Lua 5.5 counterpart in `tests/extensions/`, each with a `.out` file written from
+  the spec section it tests. `docs/04-quality.md` says how twins stay alike. A Rust integration test
+  runs each script on Ferrolua, interpreted and with the JIT forced on, and compares the output.
+  busted isn't used, because it needs C modules such as LuaFileSystem, which Ferrolua can't load.
+  Lua benchmark scripts go in `benches/lua/`
 
 ## Working as a pair
 

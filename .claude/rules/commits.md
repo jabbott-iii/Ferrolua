@@ -26,13 +26,15 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
   `rust-toolchain.toml`, `clippy.toml`, and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for
   `.claude/` and `CLAUDE.md`
 - **Changes that travel together:** a roadmap task's code, tests, ticked checkbox, and the **Status
-  locations** of `roadmap-and-docs.md`; a change to how Ferrolua runs Lua with the conformance
-  script that covers it; an `unsafe` block with its `// SAFETY:` comment and the test that exercises
-  it; and a change to a published crate's public API with its doc comments and its crate README
+  locations** of `roadmap-and-docs.md`; a change to how Ferrolua runs a script with the conformance
+  or extension script that covers it, and a conformance script with its Lua 5.5 twin; an `unsafe`
+  block with its `// SAFETY:` comment and the test that exercises it; and a change to a published
+  crate's public API with its doc comments and its crate README
 - **Task IDs:** end the summary with the roadmap task's ID in parentheses, for example
   `feat: parse goto statements and labels (M1.3)`, when the commit finishes or advances one
 - **Breaking changes:** a break in a published crate's public API (see **Public API** in `rust.md`);
-  an intended difference from how PUC-Rio Lua 5.5.1 runs a valid script; and a renamed or removed
+  a change to how a valid Ferrolua script runs; a new intended difference from how PUC-Rio
+  Lua 5.5.1 runs the part of the language Ferrolua keeps from Lua 5.5; and a renamed or removed
   diagnostic code that users' lint settings refer to. Each adds `BREAKING CHANGE:` and names the
   architecture decision record (ADR) in `docs/decisions.md` that records it
 

@@ -24,7 +24,7 @@ so they can fill them in. Until **Coverage floor** is filled in, treat it as "10
 branches".
 
 - **Test commands:** `cargo test --workspace --locked`, once the workspace exists. It runs the Rust
-  tests, the Lua conformance scripts, and every saved fuzz input
+  tests, the conformance and extension scripts, and every saved fuzz input
 - **Coverage command:** `cargo xtask coverage`, once the workspace exists. A std-only `xtask` crate
   in the workspace builds the tests with `-C instrument-coverage`, merges the profiles with
   `llvm-profdata` from the `llvm-tools` rustup component, and fails when `llvm-cov` reports less
@@ -37,7 +37,8 @@ branches".
   own yet
 - **Performance budgets:** none agreed yet. `docs/00-overview.md` proposes them, measured against
   PUC-Rio Lua 5.5.1 on the same x86-64 Linux machine by the benchmarks in each crate's `benches/`
-  and in `benches/lua/`, and M5.9 makes each agreed budget a check that fails the build
+  and in `benches/lua/`, where PUC-Rio runs each script's Lua 5.5 twin, and M5.9 makes each agreed
+  budget a check that fails the build
 - **Security checks:** hostile-input tests for the lexer, parser, compiler, bytecode loader, and
   sandbox limits in each crate's `tests/`; and fuzz targets for every parser of outside data, in
   `fuzz/`, run by Ferrolua's own std-only fuzzer from a fixed seed. Every input that ever crashed a

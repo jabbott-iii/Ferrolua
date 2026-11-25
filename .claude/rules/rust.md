@@ -58,14 +58,15 @@ so they can fill them in.
   size, nesting depth, string length, memory, and instruction count go in each part's spec in
   `docs/specs/`
 - **Errors:** one error enum per library crate, implementing `Display` and `std::error::Error`. A
-  Lua runtime error carries a Lua value, as `error` allows, and Ferrolua's own messages match
-  PUC-Rio Lua 5.5.1's wording, such as `attempt to index a nil value`, because scripts match on
-  them. Each analysis diagnostic carries a stable code, as `docs/specs/diagnostics.md` defines
+  Lua runtime error carries a Lua value, as `error` allows, and for the errors Ferrolua shares with
+  Lua 5.5 its messages match PUC-Rio Lua 5.5.1's wording, such as `attempt to index a nil value`,
+  because scripts match on them. Each analysis diagnostic carries a stable code, as
+  `docs/specs/diagnostics.md` defines
 - **Logging:** none: library crates return errors and diagnostics to the host, and never print or
   log. Only a command-line binary, if one is added, writes to stdout and stderr, from its entry
   point
-- **Languages:** English only. Runtime error messages keep PUC-Rio Lua 5.5.1's English wording,
-  because scripts match on them
+- **Languages:** English only. Runtime error messages that Ferrolua shares with Lua 5.5 keep
+  PUC-Rio Lua 5.5.1's English wording, because scripts match on them
 - **Concurrency:** none: no crate starts a thread or an async runtime. Lua coroutines run on the
   thread that resumes them, inside one Lua state
 - **Public API:** every published crate, the embedding API above all. No tool catches breaking
@@ -77,11 +78,11 @@ so they can fill them in.
   `docs/04-quality.md` describes, plus the specs for contracts that span crates: `language`,
   `memory`, `sandbox`, and `diagnostics`
 - **Test layout:** unit tests in a `#[cfg(test)] mod tests` beside the code; integration tests that
-  use only the public API in each crate's `tests/`; Lua conformance scripts in `tests/conformance/`
-  and `tests/extensions/`, which run once interpreted and once with the JIT forced on, and must
-  print their recorded output (see **Test layout** in `lua.md`); benchmarks in each crate's
-  `benches/`, timed with `std::time::Instant`; and fuzz targets in `fuzz/`, as **Security checks**
-  in `testing.md` describes
+  use only the public API in each crate's `tests/`; Ferrolua scripts in `tests/conformance/`, with
+  their Lua 5.5 twins in `tests/conformance/reference/`, and in `tests/extensions/`, which run once
+  interpreted and once with the JIT forced on, and must print their recorded output (see **Test
+  layout** in `lua.md`); benchmarks in each crate's `benches/`, timed with `std::time::Instant`; and
+  fuzz targets in `fuzz/`, as **Security checks** in `testing.md` describes
 
 ## Working as a pair
 

@@ -25,7 +25,8 @@ party, and until **Approved exceptions** is filled in, treat it as "none".
 - **Allowed publishers:** `https://github.com/jabbott-iii` and `https://crates.io/users/jabbott-iii`
 - **Platform:** Rust's toolchain from rustup at the version in `rust-toolchain.toml` (rustc, Cargo,
   the standard library, rustdoc, rustfmt, Clippy, and the `llvm-tools` component), PUC-Rio Lua 5.5
-  from lua.org, the language's reference interpreter, Linux on x86-64, Git, and GitHub, with GitHub
+  from lua.org, the reference interpreter for the part of Ferrolua's language kept from Lua 5.5,
+  Linux on x86-64, Git, and GitHub, with GitHub
   Actions and the actions that the `actions` and `github` organizations publish
 - **Manifests:** the `Cargo.toml` files, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/config.toml`,
   the `uses:` lines in `.github/workflows/`, and `.gitmodules`; none exists yet

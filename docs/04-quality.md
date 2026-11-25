@@ -154,14 +154,15 @@ twins in `reference/` folders.
 
 ## Continuous integration
 
-CodeQL already scans the workflows on every push and pull request to `main`
-(`.github/workflows/codeql.yml`). The CI workflow, `.github/workflows/ci.yml`, lands in M0.6. It
-runs every automated check above on `ubuntu-latest`, plus a short fuzz run from a fixed seed. From
-M3.18 on, a job for each target in [`03-platforms.md`](03-platforms.md#targets) runs
-`cargo xtask test` there, and coverage runs on Linux, Windows, and macOS (ADR-0027: six platforms);
-from M13.6 on, each JIT target also runs the forced pass and a short differential fuzz run. The
-owner then makes each job required before a merge to `main`. CI never installs PUC-Rio Lua: it
-compares against the recorded `.out` files.
+CodeQL already scans the workflows and the Rust code on every push and pull request to `main`, and
+once a week (`.github/workflows/codeql.yml`). Dependabot proposes each new Rust release for
+`rust-toolchain.toml` as a pull request (`.github/dependabot.yml`). The CI workflow,
+`.github/workflows/ci.yml`, lands in M0.6. It runs every automated check above on `ubuntu-latest`,
+plus a short fuzz run from a fixed seed. From M3.18 on, a job for each target in
+[`03-platforms.md`](03-platforms.md#targets) runs `cargo xtask test` there, and coverage runs on
+Linux, Windows, and macOS (ADR-0027: six platforms); from M13.6 on, each JIT target also runs the
+forced pass and a short differential fuzz run. The owner then makes each job required before a merge
+to `main`. CI never installs PUC-Rio Lua: it compares against the recorded `.out` files.
 
 ## Review checklists
 

@@ -24,7 +24,8 @@ jobs:
         include:
           - language: "actions"
             build-mode: "none"
-          # Add `rust` with build mode `none` once the Cargo workspace has Rust source files.
+          - language: "rust"
+            build-mode: "none"
     steps:
       - name: "Check out the repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -3,9 +3,11 @@
 The `ferrolua` crate is the one a host adds to embed Lua. It creates states with chosen libraries,
 limits, and JIT mode; loads and runs chunks; moves values between Rust and Lua; registers Rust
 functions and Rust types for scripts to use; and exposes the debugger interface. It wires the
-compiler, the VM, the standard library, and the JIT together, and adds no third-party crate to the
-host's build. Its API holds Rust's guarantees: a value can't outlive its state or be used with
-another state. A minimal API lands in M2.14, and the full one in M3.1.
+compiler, the VM, and the standard library together, and the JIT too when its `jit` feature is on,
+which it is not by default (ADR-0022: the JIT is an optional feature of `ferrolua`, off by
+default). It adds no third-party crate to the host's build. Its API holds Rust's guarantees: a
+value can't outlive its state or be used with another state. A minimal API lands in M2.14, and the
+full one in M3.1.
 
 ## Why handles tied to the state by lifetime
 
@@ -26,7 +28,7 @@ use ferrolua::{Gc, JitMode, Libraries, Limits, Lua, Options, Value};
 let lua = Lua::new(Options {
     libraries: Libraries::SAFE,
     limits: Limits { memory: Some(64 << 20), instructions: Some(10_000_000), ..Limits::default() },
-    jit: JitMode::On,
+    jit: JitMode::On,                         // needs the `jit` feature
     gc: Gc { pause: 100, automatic: true },   // the loop collector's schedule
     hash_seed: None,                          // Some(seed) makes runs repeat exactly
     ..Options::default()
@@ -57,8 +59,12 @@ assert_eq!(result, "hello, world");
   collection's finalizers included, and bytes are counted alike on every target).
 - `Lua::set_limits` changes a state's limits between calls. The instruction limit applies to each
   call from the host on its own ([`sandbox.md`](sandbox.md#limits)).
+- `JitMode` and `Options::jit` exist in both builds, so turning the `jit` feature on changes no
+  host's code. Without the feature, the default is `JitMode::Off`, and `Lua::new` refuses
+  `JitMode::On` and `JitMode::Forced` with an error that names the feature
+  ([`jit.md`](jit.md#modes)).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests
-  from `os.exit`, and internal errors.
+  from `os.exit`, a JIT mode asked for without the `jit` feature, and internal errors.
 
 ## Open questions
 
@@ -73,6 +79,8 @@ assert_eq!(result, "hello, world");
 2. Using a value with a state other than its own returns an error.
 3. No API call panics on any input.
 4. A host that adds only `ferrolua` builds no third-party crate.
+5. Without the `jit` feature, a build of `ferrolua` contains no `ferrolua-jit`, and so no Ferrolua
+   code with `unsafe`.
 
 ## Tests
 
@@ -81,3 +89,5 @@ assert_eq!(result, "hello, world");
 - Invariant 2: an integration test with two states.
 - Invariant 3: the `api` fuzz target calls API functions with generated values and scripts.
 - Invariant 4: the `cargo tree` check in [`../04-quality.md`](../04-quality.md#automated-checks).
+- Invariant 5: `cargo tree -p ferrolua --edges normal --prefix none` lists no `ferrolua-jit`, a
+  check that M5.4 adds to the automated checks.

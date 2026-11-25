@@ -781,14 +781,30 @@ output with the JIT on or forced, and the agreed budgets are checked.
   - Verify: `cargo test -p ferrolua-jit --locked`
 
 - [ ] **M5.4 — jit: entry, exits, and the `Tier` trait**
+  - Note: 2026-11-24, the owner's choice: `JitMode` and the conformance runner's forced pass moved
+    here from M5.8, because M5.5 to M5.7 check their work in `JitMode::Forced`.
   - Depends: M5.3, M2.14
   - Do:
     - Build `jit::entry`, the `Tier` trait in `ferrolua-vm`, and exits to the interpreter, with
       layout assertions for every `#[repr(C)]` type, as [`specs/vm.md`](specs/vm.md#the-compiled-tier)
       describes.
+    - Add the `ferrolua` crate's `jit` feature, off by default, which plugs the tier in
+      (ADR-0022). Lint, test, and cover `ferrolua` with the feature off (`-p ferrolua`) and on (the
+      workspace run), in CI and in "Definition of done" in [`../CLAUDE.md`](../CLAUDE.md), and check
+      that `cargo tree -p ferrolua --edges normal` lists no `ferrolua-jit`, in
+      [`04-quality.md`](04-quality.md#automated-checks) as well.
+    - Add `JitMode` to `Options` in both builds of `ferrolua`, refused without the feature, as
+      [`specs/jit.md`](specs/jit.md#modes) describes, and the forced pass to the conformance runner,
+      which runs when the feature is on.
   - Accept:
     - A compiled function that does nothing but exit continues correctly in the interpreter.
-  - Verify: `cargo test -p ferrolua-jit -p ferrolua-vm --locked`
+    - Without the feature, `cargo tree -p ferrolua --edges normal --prefix none` lists no
+      `ferrolua-jit`, and `ferrolua`'s tests pass with the feature off and on.
+    - Without the feature, `Lua::new` refuses `JitMode::On` and `JitMode::Forced` with an error that
+      names it.
+    - With the feature, the conformance runner's forced pass prints every script's recorded output.
+  - Verify: `cargo test -p ferrolua-jit -p ferrolua-vm --locked`; `cargo test -p ferrolua --locked`;
+    `cargo test -p ferrolua --features jit --locked`
 
 - [ ] **M5.5 — jit: baseline tier for arithmetic, tables, and control flow**
   - Depends: M5.4
@@ -797,7 +813,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
       [`specs/jit.md`](specs/jit.md#baseline-tier) describes.
   - Accept:
     - Conformance scripts without calls print their output in `JitMode::Forced`.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p ferrolua --features jit --test conformance --locked`
 
 - [ ] **M5.6 — jit: calls, returns, and on-stack replacement**
   - Depends: M5.5
@@ -806,7 +822,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
       replacement.
   - Accept:
     - Every conformance script prints its output in `JitMode::Forced`.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+  - Verify: `cargo test -p ferrolua --features jit --test conformance --locked`
 
 - [ ] **M5.7 — jit: limits and debug hooks in compiled code**
   - Depends: M5.6
@@ -816,13 +832,16 @@ output with the JIT on or forced, and the agreed budgets are checked.
     - Let the loop collector run only at safe points in compiled code, with every count exact.
   - Accept:
     - The limit tests of the sandbox spec pass in `JitMode::Forced`.
-  - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
+  - Verify: `cargo test -p ferrolua --features jit --test hostile_sandbox --locked`
 
 - [ ] **M5.8 — ferrolua: JIT modes and differential fuzzing**
+  - Note: 2026-11-24, the owner's choice: `JitMode` and the conformance runner's forced pass moved
+    to M5.4, because M5.5 to M5.7 check their work in `JitMode::Forced`.
   - Depends: M5.7
   - Do:
-    - Add `JitMode` to `Options`, `--jit` to `ferrolua run`, the forced pass to the conformance
-      runner, and the `differential` fuzz target, each comparing output and collection logs.
+    - Turn the `jit` feature on in `ferrolua-cli` and the fuzzer (ADR-0022).
+    - Add `--jit` to `ferrolua run`, and the `differential` fuzz target, which compares the output
+      and collection logs of the interpreter and the JIT.
   - Accept:
     - One million differential runs from seed 0 find no difference in output or collection log
       between the interpreter and the JIT.

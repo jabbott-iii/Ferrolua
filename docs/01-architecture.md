@@ -10,7 +10,9 @@ creates the workspace, and the crate map below names the task that builds each c
 
 - **Memory safety comes first.** No crate uses `unsafe` except `ferrolua-jit`, and there only in
   the two modules that ADR-0013 (only the JIT's memory and entry modules may use `unsafe`) names.
-  The heap is safe Rust (ADR-0011: values live in arenas and are reached through checked handles).
+  A host links `ferrolua-jit` only by turning on the `ferrolua` crate's `jit` feature, which is off
+  by default (ADR-0022: the JIT is an optional feature of `ferrolua`, off by default). The heap is
+  safe Rust (ADR-0011: values live in arenas and are reached through checked handles).
 - **The interpreter is the reference.** Every tier of the JIT must produce what the interpreter
   produces. When generated code meets a case it didn't plan for, it exits to the interpreter at the
   same instruction (ADR-0012).
@@ -37,7 +39,7 @@ describes; the `ferrolua` crate's scope is `ferrolua`.
 | `ferrolua-vm` | Heap and loop collector, values, tables, interpreter, metamethods, coroutines, limits, debug hooks | bytecode, compiler | Yes | [vm](specs/vm.md) | M2.2 |
 | `ferrolua-jit` | x86-64 encoder, executable memory, baseline and optimizing tiers | vm, bytecode | Yes | [jit](specs/jit.md) | M5 |
 | `ferrolua-stdlib` | The standard libraries, Lua 5.5's with positions from 0 | vm | Yes | [stdlib](specs/stdlib.md) | M2.13 |
-| `ferrolua` | The embedding API that hosts depend on | vm, compiler, stdlib, jit | Yes | [ferrolua](specs/ferrolua.md) | M2.14 |
+| `ferrolua` | The embedding API that hosts depend on | vm, compiler, stdlib; jit with its `jit` feature | Yes | [ferrolua](specs/ferrolua.md) | M2.14 |
 | `ferrolua-analysis` | Semantic model: scopes, symbols, control flow, data flow, modules | syntax | Yes | [analysis](specs/analysis.md) | M6.1 |
 | `ferrolua-types` | Gradual type checker | analysis, syntax | Yes | [types](specs/types.md) | M6.4 |
 | `ferrolua-lint` | Lint rules | analysis, types | Yes | [lint](specs/lint.md) | M7.1 |
@@ -71,7 +73,8 @@ A crate may depend only on crates in lower layers, or on lower crates in its own
   build the type checker. The compiler reads type annotations from the syntax tree and stores them
   as hints in the bytecode; the JIT reads the hints, never the type checker (ADR-0006).
 - `ferrolua-vm` doesn't depend on `ferrolua-jit`. The VM defines a trait for a compiled tier, and
-  the `ferrolua` crate plugs the JIT into it, so the VM builds and tests without machine code.
+  the `ferrolua` crate plugs the JIT into it when its `jit` feature is on, so the VM, and a host
+  that leaves the feature off, build and run without machine code.
 - Nothing depends on a front end.
 
 The diagram shows what depends on what. Every part is drawn dashed because none is built yet; a
@@ -112,7 +115,7 @@ flowchart TB
   lsp -.-> json
   dap -.-> api
   dap -.-> json
-  api -.-> jit
+  api -. jit feature .-> jit
   api -.-> stdlib
   api -.-> compiler
   jit -.-> vm
@@ -149,8 +152,8 @@ docs/                 these documents
 
 ## Running a script
 
-1. The host creates a state with `ferrolua::Lua::new`, choosing its libraries, limits, and JIT
-   mode ([`specs/ferrolua.md`](specs/ferrolua.md)).
+1. The host creates a state with `ferrolua::Lua::new`, choosing its libraries, limits, and, with
+   the `jit` feature, its JIT mode ([`specs/ferrolua.md`](specs/ferrolua.md)).
 2. `Lua::load` passes the source to `ferrolua-syntax`, whose parser builds the compact tree. A
    syntax error returns a message in PUC-Rio's format, such as
    `input:3: unexpected symbol near 'end'`.
@@ -163,9 +166,9 @@ docs/                 these documents
    loops keep alive are freed by the loop collector, which runs at a safe point when the bytes
    allocated pass the host's threshold, or when the script or host asks (ADR-0018: a
    deterministic loop collector on top of reference counting).
-5. The interpreter counts calls and loop iterations. When a function gets hot, the JIT compiles it,
-   and later calls run the machine code. A failed guard exits to the interpreter at the same
-   instruction ([`specs/jit.md`](specs/jit.md)).
+5. The interpreter counts calls and loop iterations. With the `jit` feature on, when a function
+   gets hot, the JIT compiles it, and later calls run the machine code. A failed guard exits to the
+   interpreter at the same instruction ([`specs/jit.md`](specs/jit.md)).
 6. A Lua error returns `Err` through each frame until a `pcall` catches it or it reaches the host.
    A limit error passes through `pcall` to the host ([`specs/sandbox.md`](specs/sandbox.md)).
 7. Dropping the state runs the pending finalizers, then frees every value left.

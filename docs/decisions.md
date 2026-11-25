@@ -749,6 +749,77 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** a host measures a state whose real memory is more than twice its counted bytes,
   or needs a limit on a state's total work across calls.
 
+## ADR-0022 — Put the JIT behind an optional `jit` feature of `ferrolua`, off by default
+
+- **Status:** Accepted; on 2026-11-24 the owner chose the agent's recommendation, an optional
+  feature off by default. Keeping `JitMode` in both builds, refused without the feature, is the
+  agent's detail within it
+- **Date:** 2026-11-24
+- **Context:**
+  - The `ferrolua` crate, the one a host adds, depends on `ferrolua-jit`
+    ([`01-architecture.md`](01-architecture.md#crate-map)). `ferrolua-jit` is the only crate with
+    `unsafe` code (ADR-0013, proposed: only its memory and entry modules), maps executable memory,
+    and has a backend for Linux on x86-64 only (ADR-0012, proposed: a method JIT with tiers).
+    `ferrolua-vm` already doesn't depend on it: the VM defines a `Tier` trait for compiled code, and
+    `ferrolua` plugs the JIT in.
+  - Every host therefore links the JIT's code, even one that sets `JitMode::Off`.
+    [Nadir](https://github.com/jabbott-iii/Nadir), a game engine that embeds Ferrolua, takes a
+    Ferrolua crate as its own code only if the crate forbids `unsafe`, and asks that the JIT be a
+    crate of its own or a feature off by default (its ADR-0079, requirement 10). Its dependency
+    check fails on any package in its `Cargo.lock` that it doesn't allow, so as planned it can't
+    depend on `ferrolua`.
+  - Cargo leaves an optional dependency that no crate turns on out of a host's `Cargo.lock`, but
+    lists a dependency gated to one target on every machine. Inside a workspace, it turns a feature
+    on for every crate built in the same run once one crate asks for it: `cargo test --workspace`
+    builds a crate with a feature that a sibling turns on, and `cargo test -p <crate>` builds it
+    without. Both were checked on 2026-11-24 in a scratch workspace.
+- **Decision** (the owner chose an optional feature, off by default, on 2026-11-24, over a run-time
+  switch, a crate the host adds, a dependency gated by target, and hosts using the inner crates):
+  - **An optional feature.** `ferrolua-jit` is an optional dependency of `ferrolua`, turned on by
+    its `jit` feature (`jit = ["dep:ferrolua-jit"]`), which is off by default. Without it, a host's
+    build contains no `ferrolua-jit`, and no Ferrolua code with `unsafe`.
+  - **The same API in both builds.** `JitMode` and `Options::jit` exist with or without the
+    feature, so turning it on, as any crate in a host's tree can, changes no host's code. Without
+    the feature, the default mode is `JitMode::Off`, and `Lua::new` refuses `JitMode::On` and
+    `JitMode::Forced` with an error that names the feature, so a host that asks for the JIT without
+    it finds out when it creates the state.
+  - **Who turns it on.** `ferrolua-cli`, so the `ferrolua` command runs with the JIT, and any host
+    that asks with `features = ["jit"]`. The conformance runner's forced pass and the
+    `differential` fuzz target need it too.
+  - **Both builds checked.** CI lints, tests, and covers `ferrolua` with the feature on, in the
+    workspace run, and off, with `-p ferrolua`, and checks that
+    `cargo tree -p ferrolua --edges normal` lists no `ferrolua-jit`.
+- **Consequences:**
+  - Good: a host gets no `unsafe` code and no executable memory unless it asks, as the
+    architecture's first principle, memory safety first, wants. Nadir's requirement 10 is met.
+  - Good: without the feature, `ferrolua` is portable Rust, so a new target needs CI jobs for the
+    interpreter, not a JIT backend.
+  - Good: the `Tier` trait stays between `ferrolua-vm` and `ferrolua`, and the embedding API is the
+    same in both builds.
+  - Bad: a host that adds `ferrolua` and reads nothing else runs at the interpreter's speed, not
+    the JIT's.
+  - Bad: asking for the JIT without the feature fails when the state is created, not when the host
+    compiles.
+  - Bad: `ferrolua` has two builds to lint, test, and cover, and its code that plugs the JIT in sits
+    behind `#[cfg(feature = "jit")]`.
+  - Follow-up: M5.4 adds the feature, `JitMode` in both builds, and the checks of both builds;
+    M5.5 to M5.7 run their forced-mode checks with it on; M5.8 turns the feature on in
+    `ferrolua-cli` and the fuzzer.
+- **Alternatives considered:**
+  - Keep the dependency, and let hosts turn the JIT off with `JitMode::Off`: every host still links
+    the JIT's code, and Nadir's dependency check rejects it.
+  - The same feature, on by default: most hosts get the JIT without asking, and Nadir could still
+    leave it out with `default-features = false`, but every other host gets `unsafe` code by
+    default.
+  - A crate the host adds and passes to `Options`: no feature, but the `Tier` trait becomes a public
+    interface of `ferrolua-vm`, and hosts keep two crates at matching versions.
+  - A dependency for Linux on x86-64 only: Cargo still lists it in every host's `Cargo.lock`, and
+    hosts on that target link it.
+  - Hosts use `ferrolua-vm`, `ferrolua-compiler`, and `ferrolua-stdlib` directly: those APIs are
+    internal, and each host would rewrite what `ferrolua` wires together.
+- **Revisit when:** a host reports running without the JIT because it missed the feature, or the
+  `Tier` trait has to become public for another reason.
+
 ## ADR-0023 — Make Ferrolua a language of its own, with Python's operators and 0-based indexes
 
 - **Status:** Accepted

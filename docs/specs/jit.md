@@ -5,8 +5,10 @@ for x86-64 instructions, executable memory that is never writable and executable
 baseline tier that translates bytecode instruction by instruction, and an optimizing tier that
 works on SSA form (ADR-0012, proposed: a method JIT with tiers). It is the only crate that may use
 `unsafe`, and only in `jit::memory` and `jit::entry`, under the six invariants of ADR-0013
-(proposed). Generated code always produces what the interpreter produces, and exits to the
-interpreter whenever a guard fails. The baseline tier lands in M5, and the optimizing tier in M11.
+(proposed). A host links it only by turning on the `ferrolua` crate's `jit` feature, which is off
+by default (ADR-0022: the JIT is an optional feature of `ferrolua`, off by default). Generated code
+always produces what the interpreter produces, and exits to the interpreter whenever a guard fails.
+The baseline tier lands in M5, and the optimizing tier in M11.
 
 ## Why a method JIT with exits to the interpreter
 
@@ -66,9 +68,12 @@ where the loop collector can run (ADR-0013, invariant 6).
 
 ## Modes
 
-A host chooses `JitMode::Off`, `JitMode::On` (the default on x86-64 Linux), or `JitMode::Forced`,
-which compiles every function on its first call. Forced mode is for tests: the conformance runner
-and the differential fuzz target use it.
+With the `ferrolua` crate's `jit` feature on, a host chooses `JitMode::Off`, `JitMode::On` (the
+default on x86-64 Linux), or `JitMode::Forced`, which compiles every function on its first call.
+Forced mode is for tests: the conformance runner and the differential fuzz target use it. Without
+the feature, `JitMode` still exists, its default is `Off`, and `Lua::new` refuses the other two
+with an error that names the feature ([`ferrolua.md`](ferrolua.md)). The `ferrolua` command turns
+the feature on.
 
 ## Invariants
 

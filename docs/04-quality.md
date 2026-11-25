@@ -47,7 +47,8 @@ script, fails the runner.
 A Rust test in `crates/ferrolua/tests/conformance.rs` runs each Ferrolua script in a fresh state
 with the full standard library, captures what it prints, and compares the bytes with its twin's
 `.out` file. It runs each script twice: interpreted, and with the JIT compiling every function on
-its first call.
+its first call. The second run needs the `ferrolua` crate's `jit` feature, which is off by default
+(ADR-0022: the JIT is an optional feature), so CI runs the runner with the feature on.
 
 A script's output must not depend on what Lua leaves unspecified, or the recorded output won't
 repeat:

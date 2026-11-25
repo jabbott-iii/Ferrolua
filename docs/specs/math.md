@@ -5,7 +5,7 @@ doesn't define exactly, such as sine, the exponential, the logarithm, and float 
 only the operations IEEE 754 does define exactly, so it gives the same bits on every target
 (ADR-0027: six platforms, and the same results on each). The compiler's constant folding, the
 VM's `**`, the JIT, and the `math` library all call it, so a value never depends on which of them
-computed it. Its accuracy and its place as a crate of its own are ADR-0028's proposal. It lands in
+computed it. Its accuracy and its place as a crate of its own come from ADR-0028. It lands in
 M2.19.
 
 ## Why a math library of Ferrolua's own

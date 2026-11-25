@@ -10,7 +10,7 @@ CI builds and tests every target.
 
 ## Targets
 
-ADR-0028 (proposed: the targets, host services, math, and tests) sets these targets.
+ADR-0028 (the targets, host services, math, and tests) sets these targets.
 
 | Platform | Rust targets | Interpreter in CI | JIT |
 | :- | :- | :- | :- |
@@ -109,7 +109,7 @@ holds on each, so code that only one operating system compiles is covered on tha
   (M2.19). Each result is within one unit in the last place of the exact value.
 - **NaN.** Processors give a new NaN different signs, so every NaN prints as `nan`, as Python
   prints it. `string.pack` still writes a NaN's bits as the processor made them, the one place
-  they can differ (ADR-0028, proposed).
+  they can differ (ADR-0028).
 - **Stacks.** Mobile threads and browsers give smaller stacks than desktop threads, so the
   hostile-input tests at the nesting limit also run on a thread with a 256 KB stack.
 - **Precompiled chunks** are little-endian on every target, so a chunk written on one loads on

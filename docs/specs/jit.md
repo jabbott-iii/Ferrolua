@@ -34,7 +34,7 @@ Architectures Software Developer's Manual, or from Arm's Architecture Reference 
 Calls follow each target's convention: System V on x86-64 Linux, macOS, and Android; Windows x64
 on x86-64 Windows; and the AArch64 procedure call standard, with Apple's and Microsoft's variants,
 on AArch64. Generated code never calls a platform's math library: `**` and the `math` functions
-call `ferrolua-math`, so compiled code gives the interpreter's bits (ADR-0028, proposed).
+call `ferrolua-math`, so compiled code gives the interpreter's bits (ADR-0028).
 
 ## Executable memory
 
@@ -94,7 +94,7 @@ default is `Off`, and `Lua::new` refuses the other modes with an error that name
 the operating system refuses executable memory at run time, as macOS does for a hardened host
 without the `com.apple.security.cs.allow-jit` entitlement, a state in `JitMode::On` runs
 interpreted and tells the host that its JIT isn't running, and `JitMode::Forced` returns the error
-(ADR-0028, proposed). M13.5 builds both.
+(ADR-0028). M13.5 builds both.
 
 ## Invariants
 

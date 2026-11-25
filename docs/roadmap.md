@@ -334,9 +334,9 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 - [ ] **M2.19 — math: floating-point functions with the same bits on every target**
   - Note: added on 2026-11-24, when the owner chose math functions of Ferrolua's own (ADR-0027).
     It is listed where it is to be done, before M2.6, whose constant folding uses it.
+  - Note: 2026-11-24, the owner accepted ADR-0028 (the targets, host services, math, and tests of
+    the six platforms), which sets the crate and the accuracy.
   - Depends: M0.2
-  - Decide first: the owner accepts ADR-0028 (the targets, host services, math, and tests of the
-    six platforms), which sets the crate and the accuracy.
   - Do:
     - Build `ferrolua-math`, with the functions of §6.7 of the manual that IEEE 754 doesn't define
       exactly, such as sine, cosine, tangent, their inverses, `exp`, and `log` in every base, and
@@ -387,7 +387,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     strings, and nothing converts between strings and numbers.
   - Note: 2026-11-24, the owner's choice (ADR-0025): truth follows Python's rule.
   - Note: 2026-11-24, the owner's choice (ADR-0027): float `**` comes from `ferrolua-math`, and
-    every NaN prints as `nan` (ADR-0028, proposed).
+    every NaN prints as `nan` (ADR-0028).
   - Depends: M2.8, M2.19
   - Do:
     - Build the operators of [`specs/language.md`](specs/language.md#meanings) on numbers and
@@ -609,7 +609,7 @@ scripts within limits, and gets every standard library it grants.
     - Build float formatting and every `string.format` conversion, as
       [`specs/stdlib.md`](specs/stdlib.md#number-formatting) describes.
     - Make `%p` print object IDs (ADR-0019), and record what it prints for values with no
-      address. Print every NaN as `nan` (ADR-0028, proposed).
+      address. Print every NaN as `nan` (ADR-0028).
     - Build f-string formatting, `format`, and `__format` with Python's mini-language, as
       [`specs/stdlib.md`](specs/stdlib.md#formatted-strings) describes (ADR-0025), and add
       `tests/extensions/format.lua` and the f-string property test of
@@ -686,7 +686,7 @@ scripts within limits, and gets every standard library it grants.
   - Do:
     - Add `Options::clock`, and use it and `Options::hash_seed` where the standard library has no
       clock or source of randomness, as [`specs/ferrolua.md`](specs/ferrolua.md) describes
-      (ADR-0028, proposed).
+      (ADR-0028).
   - Accept:
     - On `wasm32-unknown-unknown`, `os.time` is absent without a clock and gives the host's time
       with one, and a state given no seed uses the fixed seed.
@@ -1064,7 +1064,7 @@ milestone was added on 2026-11-24, when the owner chose all six platforms by the
   - Do:
     - Make `JitMode::On` the default where a backend exists, compile `ferrolua-jit` to nothing on
       iOS and the web, and fall back to the interpreter when the operating system refuses
-      executable memory, as [`specs/jit.md`](specs/jit.md#modes) describes (ADR-0028, proposed).
+      executable memory, as [`specs/jit.md`](specs/jit.md#modes) describes (ADR-0028).
   - Accept:
     - A hardened macOS host without the `allow-jit` entitlement runs in `JitMode::On`, interpreted,
       and its state reports that the JIT isn't running; `JitMode::Forced` returns the error.
@@ -1516,7 +1516,7 @@ embed Ferrolua and use its language and tools.
   - Do:
     - Write `docs/05-release.md`: build profiles, versioning, the publishing order of the crates,
       and the release checklist, which includes running the Android and iOS tests on a device
-      (ADR-0028, proposed).
+      (ADR-0028).
   - Accept:
     - The checklist names every step from tagging to publishing, in order.
   - Verify: read the rendered document

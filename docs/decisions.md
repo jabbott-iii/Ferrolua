@@ -1192,7 +1192,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0027 — Support Linux, Windows, macOS, Android, iOS, and the web
 
-- **Status:** Accepted
+- **Status:** Accepted; the owner also accepted ADR-0028, which settles its details, on 2026-11-24
 - **Date:** 2026-11-24
 - **Context:**
   - [`03-platforms.md`](03-platforms.md) planned four targets in order: Linux on x86-64 first, then
@@ -1269,15 +1269,15 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0028 — Settle the targets, host services, math, and tests of the six platforms
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:** ADR-0027 records the owner's choices. Writing them into
   [`03-platforms.md`](03-platforms.md) raised questions they don't answer: which processors each
   platform gets, what the JIT does where the operating system refuses executable memory, what a
   browser lacks that the standard library expects, how processors differ in the bits of a NaN (a
   float that isn't a number), and how tests and coverage run on platforms with no test harness.
-  The agent proposed these answers on 2026-11-24.
-- **Decision:**
+  The agent proposed these answers on 2026-11-24, and the owner accepted them the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - **Targets.** Linux on `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`; Windows on
     `x86_64-pc-windows-msvc` and `aarch64-pc-windows-msvc`; macOS on `aarch64-apple-darwin` and
     `x86_64-apple-darwin`; Android on `aarch64-linux-android` and `x86_64-linux-android`, which
@@ -1351,4 +1351,5 @@ it is `Proposed`, and no code may depend on it.
     other correct library, but it takes longer to write and to run.
   - `wasm32-wasip1`, the WebAssembly System Interface, for the web: Rust's test harness runs there,
     but browsers don't provide it, and running it needs a third-party runtime.
-- **Revisit when:** the owner accepts or changes this record, which M2.19 needs first.
+- **Revisit when:** a host asks for `JitMode::On` to fail instead of falling back to the
+  interpreter, or a target's math results differ from the stored bits.

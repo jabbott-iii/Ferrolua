@@ -141,7 +141,7 @@ exact characters PUC-Rio prints, which comes from the C library's `printf` on Li
 formats floats itself, with exact decimal conversion so rounding matches in every case, including
 subnormal numbers, `inf`, and `-inf`. Every NaN prints as `nan`, whatever its sign, because
 processors give a new NaN different signs and the same script must print the same text on every
-target (ADR-0028, proposed). PUC-Rio prints `-nan` for a NaN whose sign is set, so conformance
+target (ADR-0028). PUC-Rio prints `-nan` for a NaN whose sign is set, so conformance
 scripts don't print NaN.
 
 ## Object IDs in output

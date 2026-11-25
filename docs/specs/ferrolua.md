@@ -67,12 +67,12 @@ assert_eq!(result, "hello, world");
   ([`jit.md`](jit.md#modes)). On iOS and the web, which have no JIT, the same holds with the
   feature on, and the error names the target. Where the operating system refuses executable
   memory, a state in `JitMode::On` runs interpreted, and `Lua::jit_running` tells the host
-  (ADR-0028, proposed: the targets, host services, math, and tests of the six platforms).
+  (ADR-0028: the targets, host services, math, and tests of the six platforms).
 - `Options::clock` gives a state its wall clock and its processor clock, for `os.time`, `os.clock`,
   and `os.date`. Where the standard library has a clock, the default uses it. On
   `wasm32-unknown-unknown`, which has none, those functions are absent without a host clock, and a
   state given no `hash_seed` uses a fixed seed, so a web host passes one from the browser's
-  `crypto.getRandomValues` (ADR-0028, proposed).
+  `crypto.getRandomValues` (ADR-0028).
 - The crate builds for every target in [`03-platforms.md`](../03-platforms.md#targets) (ADR-0027:
   six platforms).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests

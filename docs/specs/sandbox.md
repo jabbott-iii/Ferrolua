@@ -130,7 +130,7 @@ is.
   metamethod, and inside a coroutine.
 - Invariant 4: `..`, absolute paths, symbolic links that leave the directory, empty paths, and paths
   with NUL bytes, and on Windows also drive letters, backslashes, `..\`, and `\\?\` prefixes
-  (ADR-0028, proposed: the targets, host services, math, and tests of the six platforms).
+  (ADR-0028: the targets, host services, math, and tests of the six platforms).
 - Invariant 5: `os.exit` with and without a status, inside `pcall` and a coroutine.
 - Invariant 6: two states in one test, one changing shared names, the other checking them.
 - Invariant 7: scripts pass every kind of object to `tostring`, `print`, `string.format` with

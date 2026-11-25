@@ -376,6 +376,8 @@ tasks:
             and region
   fuzz      run the fuzzer with the arguments after `fuzz`, which `cargo xtask fuzz` alone
             lists
+  record    run PUC-Rio Lua 5.5.1 on the reference scripts in tests/conformance/reference/, or
+            on the one named after `record`, and save what each prints to its .out file
 "
     );
     assert_eq!(output.status.code(), Some(2));

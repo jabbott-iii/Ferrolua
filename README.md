@@ -11,9 +11,12 @@ written, and the Cargo workspace has a crate for each part. Each holds only its 
 except the test tools: the test kit, which has a seeded random generator and a property-test
 runner; the fuzzer, which runs its targets on mutated inputs and saves each input that makes one
 fail; and `xtask`, whose `cargo xtask coverage` measures which lines and regions of code the tests
-run, and whose `cargo xtask fuzz` runs the fuzzer. The fuzzer has only the two targets that test it
-so far. The next task is M0.5 in the [roadmap](docs/roadmap.md), which builds the conformance
-recorder.
+run, whose `cargo xtask fuzz` runs the fuzzer, and whose `cargo xtask record` saves what PUC-Rio
+Lua 5.5.1 prints for the Lua 5.5 twin of each conformance script. The fuzzer has only the two
+targets that test it so far, and the one conformance script, `hello.lua`, has no recorded output
+yet. M0.5 in the [roadmap](docs/roadmap.md), the conformance recorder, stays open until someone
+records that output with PUC-Rio Lua 5.5.1, and the next task is M0.6, which adds the continuous
+integration (CI) workflow.
 
 ## What is planned
 

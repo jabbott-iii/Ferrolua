@@ -182,9 +182,21 @@ Build tasks run with `cargo xtask`, written with the standard library alone:
   - Every `?` is a region of its own, which runs only when it returns an error, so each `?` needs a
     test that makes it return one.
 - `cargo xtask record [script]` (M0.5): runs PUC-Rio Lua 5.5.1 on the reference scripts in
-  `tests/conformance/reference/`, from that folder, and writes their `.out` files. It refuses an
-  interpreter whose `lua -v` doesn't report 5.5.1. It reads the interpreter's path from
-  `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`.
+  `tests/conformance/reference/`, or on the one script named, and saves what each prints to
+  standard output in a `.out` file beside it, such as `goto.out` for `goto.lua`. It reads the
+  interpreter's path from `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`, and refuses an
+  interpreter whose `lua -v` doesn't report 5.5.1. Its rules:
+  - It runs each script as `lua -E goto.lua` from that folder, so Lua names the chunk `goto.lua`,
+    as the twins require. `-E` makes Lua ignore `LUA_INIT`, `LUA_PATH`, and its other
+    environment variables, which could change what a script prints, and each script reads an empty
+    standard input.
+  - A named script must be one of the `.lua` files in `tests/conformance/reference/`, so it
+    refuses the Ferrolua script `tests/conformance/goto.lua`.
+  - It saves the `.out` files only after Lua has run every script and exited with status 0 each
+    time. If any script stops with an error, it saves no `.out` file, and Lua's message appears on
+    standard error.
+  - It prints one line for each `.out` file, which says whether the file is `new`, `changed`, or
+    `unchanged`, and leaves an unchanged file as it is.
 - `cargo xtask fuzz [arguments]` (M0.4): builds `ferrolua-fuzz` and runs it with the arguments
   after `fuzz`, as the section above describes, and exits with its status. Unlike the other tasks,
   it leaves the report to the fuzzer.

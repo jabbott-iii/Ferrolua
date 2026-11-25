@@ -9,9 +9,12 @@
 //!   The [`coverage`] module describes how.
 //! - `fuzz`: builds and runs the fuzzer, `ferrolua-fuzz` in `fuzz/`, with the arguments after
 //!   `fuzz`, as the [`fuzz`] module describes.
+//! - `record`: runs PUC-Rio Lua 5.5.1 on the reference scripts in `tests/conformance/reference/`,
+//!   or on the one named after `record`, and saves what each prints to a `.out` file beside it.
+//!   The [`record`] module describes how.
 //!
-//! The tasks that later roadmap tasks add are `record` (M0.5), `test` (M3.17), and `bench`
-//! (M5.1), as the [roadmap] lists.
+//! The tasks that later roadmap tasks add are `test` (M3.17) and `bench` (M5.1), as the
+//! [roadmap] lists.
 //!
 //! # Output
 //!
@@ -31,11 +34,15 @@ mod fuzz;
 mod json;
 mod llvm;
 mod process;
+mod record;
 mod report;
 
 use std::env;
 use std::ffi::OsString;
+use std::path::Path;
 use std::process::ExitCode;
+
+use crate::error::Error;
 
 /// What `cargo xtask` prints when it isn't given a task it knows.
 const USAGE: &str = "\
@@ -46,6 +53,8 @@ tasks:
             and region
   fuzz      run the fuzzer with the arguments after `fuzz`, which `cargo xtask fuzz` alone
             lists
+  record    run PUC-Rio Lua 5.5.1 on the reference scripts in tests/conformance/reference/, or
+            on the one named after `record`, and save what each prints to its .out file
 ";
 
 #[expect(
@@ -96,10 +105,28 @@ fn run(args: &[OsString]) -> Outcome {
                 status: 1,
             },
         },
+        [task] if task == "record" => recorded(record::run(None)),
+        [task, script] if task == "record" => recorded(record::run(Some(Path::new(script)))),
         _ => Outcome {
             stdout: String::new(),
             stderr: USAGE.to_owned(),
             status: 2,
+        },
+    }
+}
+
+/// The outcome of `record`: its report when it recorded the scripts, and its error otherwise.
+fn recorded(result: Result<String, Error>) -> Outcome {
+    match result {
+        Ok(report) => Outcome {
+            stdout: report,
+            stderr: String::new(),
+            status: 0,
+        },
+        Err(error) => Outcome {
+            stdout: String::new(),
+            stderr: format!("error: {error}\n"),
+            status: 1,
         },
     }
 }
@@ -132,6 +159,18 @@ mod tests {
     fn prints_usage_for_a_task_with_arguments() {
         assert_eq!(
             run(&[OsString::from("coverage"), OsString::from("--all")]),
+            usage()
+        );
+    }
+
+    #[test]
+    fn prints_usage_for_record_with_two_scripts() {
+        assert_eq!(
+            run(&[
+                OsString::from("record"),
+                OsString::from("a.lua"),
+                OsString::from("b.lua")
+            ]),
             usage()
         );
     }

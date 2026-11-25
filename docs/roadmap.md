@@ -162,7 +162,24 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     `cargo test -p ferrolua-fuzz --locked`
 
 - [ ] **M0.5 — xtask: conformance recorder**
-  - ⏳ needs PUC-Rio Lua 5.5.1: recording the first `.out` file
+  - Note: Built on 2026-11-25, apart from the recording. `cargo xtask record` finds the workspace's
+    root with `cargo metadata`, as `cargo xtask coverage` does, then runs `lua -E -v`, and
+    `lua -E <name>` on each script, from `tests/conformance/reference/`. `-E` makes Lua ignore
+    `LUA_INIT` and its other environment variables. It accepts an interpreter whose first line of
+    output from `-v` is `Lua 5.5.1`, alone or followed by whitespace, so it refuses `Lua 5.5.10` and
+    LuaJIT. It saves the `.out` files only after every script exits with status 0, and prints
+    `new`, `changed`, or `unchanged` for each one. The 5.5.1 sources on lua.org, read on
+    2026-11-25, keep `-E`, and their `lua.h` defines the line that `-v` prints as
+    `Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio`.
+  - Note: This machine has no PUC-Rio Lua, so `xtask/tests/record.rs` runs the task with a stand-in
+    interpreter, a Rust program that the tests compile with `rustc`. The tests check that it
+    refuses Lua 5.4.7, an interpreter that prints no version, and one whose `-v` fails, and that
+    recording a script twice reports its `.out` file `unchanged` the second time. Here,
+    `cargo xtask record tests/conformance/reference/hello.lua` stops with
+    ``couldn't start `lua`: No such file or directory (os error 2)``, followed by how to install it.
+  - ⏳ needs PUC-Rio Lua 5.5.1: run `cargo xtask record tests/conformance/reference/hello.lua`
+    twice, and check that the first run saves `tests/conformance/reference/hello.out` holding
+    `hello, world` and reports it `new`, and the second reports it `unchanged`
   - Depends: M0.1
   - Do:
     - Build `cargo xtask record`, which runs PUC-Rio Lua 5.5.1 on the reference scripts in
@@ -625,6 +642,8 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Depends: M2.13, M2.17, M2.18
   - Note: 2026-11-24, the owner accepted ADR-0034 (handles with no lifetime, checked against their
     state), which sets the shape of every handle.
+  - Note (from M0.5): `cargo xtask record` runs each twin with an empty standard input, so the
+    runner should give each Ferrolua script an empty standard input too.
   - Do:
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
       [`specs/ferrolua.md`](specs/ferrolua.md) sketches.
@@ -983,6 +1002,11 @@ scripts within limits, and gets every standard library it grants.
   - Note (from M0.3): `cargo xtask coverage` and its tests have run only on x86-64 Linux so far. It
     adds `EXE_SUFFIX` to the names of the LLVM tools, and `xtask/tests/coverage.rs` expects Windows to
     print Cargo's failure status as `exit code: 101`.
+  - Note (from M0.5): `cargo xtask record` and `xtask/tests/record.rs` have run only on x86-64 Linux.
+    On Windows, PUC-Rio Lua writes its standard output in text mode, so `print` ends each line with
+    `\r\n`, and a `.out` file recorded there differs from one recorded on Linux. Git can also
+    rewrite the line endings of a `.out` file on checkout when `core.autocrlf` is on. A
+    `.gitattributes` line such as `*.out -text` keeps the bytes the conformance runner compares.
   - Depends: M3.17, M0.6
   - Do:
     - Add a CI job for each target in [`03-platforms.md`](03-platforms.md#targets) that runs

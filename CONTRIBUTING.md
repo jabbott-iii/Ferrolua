@@ -23,7 +23,16 @@ Ferrolua is for, and [`docs/roadmap.md`](docs/roadmap.md) what comes next.
 
 2. To record the expected output of a conformance script, which comes from its Lua 5.5 twin, install
    PUC-Rio Lua 5.5.1, the reference interpreter, from [lua.org](https://www.lua.org/download.html)
-   or your operating system's package manager.
+   or your operating system's package manager. Then record the twin:
+
+   ```bash
+   cargo xtask record tests/conformance/reference/hello.lua
+   ```
+
+   It prints `tests/conformance/reference/hello.out: unchanged` when the `.out` file already holds
+   what Lua printed, and `new` or `changed` when it saved the file. It runs `lua` from the `PATH`;
+   set `FERROLUA_PUC_LUA` to the interpreter's path to run another one. With no script named, it
+   records every twin.
 
 There is nothing else to install. Ferrolua uses no third-party code, including test, lint, and
 format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.

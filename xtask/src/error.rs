@@ -43,7 +43,58 @@ pub(crate) enum Error {
     },
     /// Cargo built no test programs, so nothing measures the workspace's code.
     NoTests,
+    /// The Lua interpreter couldn't start, for example because it isn't installed.
+    NoLua {
+        /// The interpreter, as `FERROLUA_PUC_LUA` or the `PATH` gave it.
+        lua: PathBuf,
+        /// Why it couldn't start.
+        source: io::Error,
+    },
+    /// The Lua interpreter failed when asked for its version, or reported a version other than
+    /// Lua 5.5.1.
+    WrongLua {
+        /// The interpreter.
+        lua: PathBuf,
+        /// The first line it printed, which is empty when it printed nothing.
+        reported: String,
+    },
+    /// The Lua interpreter exited with a failure status on a reference script.
+    LuaFailed {
+        /// The interpreter.
+        lua: PathBuf,
+        /// The script.
+        script: PathBuf,
+        /// The status it exited with.
+        status: ExitStatus,
+    },
+    /// A file or folder couldn't be read.
+    Read {
+        /// The file or folder.
+        path: PathBuf,
+        /// Why it couldn't be read.
+        source: io::Error,
+    },
+    /// A `.out` file couldn't be read or written.
+    Save {
+        /// The file.
+        path: PathBuf,
+        /// Why it couldn't be saved.
+        source: io::Error,
+    },
+    /// The script named on the command line isn't one of the reference scripts.
+    NotReference {
+        /// The script, as the command line named it.
+        path: PathBuf,
+    },
+    /// The folder of the reference scripts holds none.
+    NoScripts {
+        /// The folder.
+        folder: PathBuf,
+    },
 }
+
+/// How to fix an interpreter that `cargo xtask record` can't use.
+const INSTALL_LUA: &str = "install PUC-Rio Lua 5.5.1, or set `FERROLUA_PUC_LUA` to its path";
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -62,6 +113,45 @@ impl fmt::Display for Error {
                 write!(f, "couldn't remove `{}`: {source}", path.display())
             }
             Error::NoTests => write!(f, "the workspace has no tests to measure"),
+            Error::NoLua { lua, source } => write!(
+                f,
+                "couldn't start `{}`: {source}: {INSTALL_LUA}",
+                lua.display()
+            ),
+            Error::WrongLua { lua, reported } if reported.is_empty() => write!(
+                f,
+                "`{}` reports no version, not Lua 5.5.1: {INSTALL_LUA}",
+                lua.display()
+            ),
+            Error::WrongLua { lua, reported } => write!(
+                f,
+                "`{}` reports `{reported}` as its version, not Lua 5.5.1: {INSTALL_LUA}",
+                lua.display()
+            ),
+            Error::LuaFailed {
+                lua,
+                script,
+                status,
+            } => write!(
+                f,
+                "`{}` failed on `{}`: {status}",
+                lua.display(),
+                script.display()
+            ),
+            Error::Read { path, source } => {
+                write!(f, "couldn't read `{}`: {source}", path.display())
+            }
+            Error::Save { path, source } => {
+                write!(f, "couldn't save `{}`: {source}", path.display())
+            }
+            Error::NotReference { path } => write!(
+                f,
+                "`{}` isn't a reference script: name a `.lua` file in `tests/conformance/reference/`",
+                path.display()
+            ),
+            Error::NoScripts { folder } => {
+                write!(f, "`{}` holds no `.lua` scripts", folder.display())
+            }
         }
     }
 }
@@ -137,6 +227,111 @@ mod tests {
         assert_eq!(
             Error::NoTests.to_string(),
             "the workspace has no tests to measure"
+        );
+    }
+
+    #[test]
+    fn says_which_lua_could_not_start_and_how_to_install_it() {
+        let error = Error::NoLua {
+            lua: PathBuf::from("lua"),
+            source: io::Error::new(io::ErrorKind::NotFound, "not found"),
+        };
+        assert_eq!(
+            error.to_string(),
+            "couldn't start `lua`: not found: install PUC-Rio Lua 5.5.1, or set \
+             `FERROLUA_PUC_LUA` to its path"
+        );
+    }
+
+    #[test]
+    fn says_which_version_the_wrong_lua_reports() {
+        let error = Error::WrongLua {
+            lua: PathBuf::from("/usr/bin/lua"),
+            reported: "Lua 5.4.7  Copyright (C) 1994-2024 Lua.org, PUC-Rio".to_owned(),
+        };
+        assert_eq!(
+            error.to_string(),
+            "`/usr/bin/lua` reports `Lua 5.4.7  Copyright (C) 1994-2024 Lua.org, PUC-Rio` as its \
+             version, not Lua 5.5.1: install PUC-Rio Lua 5.5.1, or set `FERROLUA_PUC_LUA` to its \
+             path"
+        );
+    }
+
+    #[test]
+    fn says_when_the_wrong_lua_reports_no_version() {
+        let error = Error::WrongLua {
+            lua: PathBuf::from("lua"),
+            reported: String::new(),
+        };
+        assert_eq!(
+            error.to_string(),
+            "`lua` reports no version, not Lua 5.5.1: install PUC-Rio Lua 5.5.1, or set \
+             `FERROLUA_PUC_LUA` to its path"
+        );
+    }
+
+    #[test]
+    fn says_which_script_lua_failed_on_and_its_status() {
+        let status = Command::new("rustc")
+            .arg("--no-such-option")
+            .output()
+            .unwrap()
+            .status;
+        let error = Error::LuaFailed {
+            lua: PathBuf::from("lua"),
+            script: PathBuf::from("reference/goto.lua"),
+            status,
+        };
+        assert_eq!(
+            error.to_string(),
+            format!("`lua` failed on `reference/goto.lua`: {status}")
+        );
+    }
+
+    #[test]
+    fn says_which_path_could_not_be_read_and_why() {
+        let error = Error::Read {
+            path: PathBuf::from("tests/conformance/reference"),
+            source: io::Error::new(io::ErrorKind::NotFound, "not found"),
+        };
+        assert_eq!(
+            error.to_string(),
+            "couldn't read `tests/conformance/reference`: not found"
+        );
+    }
+
+    #[test]
+    fn says_which_out_file_could_not_be_saved_and_why() {
+        let error = Error::Save {
+            path: PathBuf::from("reference/goto.out"),
+            source: io::Error::new(io::ErrorKind::PermissionDenied, "denied"),
+        };
+        assert_eq!(
+            error.to_string(),
+            "couldn't save `reference/goto.out`: denied"
+        );
+    }
+
+    #[test]
+    fn says_where_the_reference_scripts_are() {
+        let error = Error::NotReference {
+            path: PathBuf::from("tests/conformance/goto.lua"),
+        };
+        assert_eq!(
+            error.to_string(),
+            "`tests/conformance/goto.lua` isn't a reference script: name a `.lua` file in \
+             `tests/conformance/reference/`"
+        );
+    }
+
+    #[test]
+    fn says_which_folder_holds_no_scripts() {
+        let error = Error::NoScripts {
+            folder: PathBuf::from("tests/conformance/reference"),
+        };
+        assert_eq!(
+            error.to_string(),
+            "`tests/conformance/reference` holds no `.lua` scripts"
         );
     }
 }

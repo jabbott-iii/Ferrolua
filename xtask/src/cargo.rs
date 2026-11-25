@@ -1,5 +1,5 @@
-//! What the coverage task asks Cargo: where the workspace and its crates are, and which test
-//! programs a build with coverage instrumentation makes.
+//! What the coverage and record tasks ask Cargo: where the workspace and its crates are, and which
+//! test programs a build with coverage instrumentation makes.
 
 use std::ffi::OsStr;
 use std::fs;

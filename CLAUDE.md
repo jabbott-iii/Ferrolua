@@ -18,8 +18,10 @@ Design and the first test tools: the documents in `docs/` exist, and the Cargo w
 crate of the crate map in `docs/01-architecture.md`. Each crate holds only its crate docs, except
 `ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
 `ferrolua-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
-`cargo xtask coverage` (M0.3) and `cargo xtask fuzz` (M0.4). The next task is M0.5, which builds
-the conformance recorder.
+`cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and `cargo xtask record` (M0.5).
+`tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin. M0.5 stays open until
+someone records the twin's `hello.out` with PUC-Rio Lua 5.5.1. The next task is M0.6, which adds
+the CI workflow.
 
 ## Read before working
 

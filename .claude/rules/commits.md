@@ -15,16 +15,15 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
   when the user asks in the current conversation
 - **Done checks:** the "Before finishing" steps of each rule whose files the change touches: the
   **Check commands** of `rust.md` and `lua.md`, the steps in `testing.md` and `dependencies.md` for
-  code, tests, and manifests, and the steps in `roadmap-and-docs.md` and `writing.md`. Until the
-  Cargo workspace exists, only the document and prose steps apply
+  code, tests, and manifests, and the steps in `roadmap-and-docs.md` and `writing.md`. The coverage
+  step applies once M0.3 builds `cargo xtask coverage`
 - **Never commit:** `target/`, `debug/`, `**/*.rs.bk`, `*.pdb`, `**/mutants.out*/`, and
   `rustc-ice-*.txt`, as `.gitignore` lists
 - **Push effect:** none yet: Ferrolua has no GitHub Actions workflows. The repository is public, so
   a push to `main` publishes the code
 - **Scopes:** the crate names in the crate map of `docs/01-architecture.md`, without any `ferrolua-`
-  prefix, once the workspace exists; `workspace` for the root `Cargo.toml`, `Cargo.lock`,
-  `rust-toolchain.toml`, `clippy.toml`, and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for
-  `.claude/` and `CLAUDE.md`
+  prefix; `workspace` for the root `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `clippy.toml`,
+  and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for `.claude/` and `CLAUDE.md`
 - **Changes that travel together:** a roadmap task's code, tests, ticked checkbox, and the **Status
   locations** of `roadmap-and-docs.md`; a change to how Ferrolua runs a script with the conformance
   or extension script that covers it, and a conformance script with its Lua 5.5 twin; an `unsafe`

@@ -1,0 +1,5 @@
+# Clippy settings for the lints in `[workspace.lints.clippy]` of the root `Cargo.toml`.
+
+# Tests may `unwrap`. This covers `#[test]` functions and `#[cfg(test)]` modules, but not a helper
+# function in a crate's `tests/` folder, which uses `expect` instead.
+allow-unwrap-in-tests = true

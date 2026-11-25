@@ -23,10 +23,10 @@ yet. Work out that value from the repository itself, and tell the user which val
 so they can fill them in. Until **Coverage floor** is filled in, treat it as "100% of lines and
 branches".
 
-- **Test commands:** `cargo test --workspace --locked`, once the workspace exists. It runs the Rust
-  tests, the conformance and extension scripts, and every saved fuzz input
-- **Coverage command:** `cargo xtask coverage`, once the workspace exists. A std-only `xtask` crate
-  in the workspace builds the tests with `-C instrument-coverage`, merges the profiles with
+- **Test commands:** `cargo test --workspace --locked`. It runs the Rust tests, the conformance and
+  extension scripts, and every saved fuzz input
+- **Coverage command:** `cargo xtask coverage`, once M0.3 builds it. A std-only `xtask` crate in the
+  workspace builds the tests with `-C instrument-coverage`, merges the profiles with
   `llvm-profdata` from the `llvm-tools` rustup component, and fails when `llvm-cov` reports less
   than the **Coverage floor**
 - **Coverage floor:** 100% of lines and regions. Stable Rust can't measure branches, so regions

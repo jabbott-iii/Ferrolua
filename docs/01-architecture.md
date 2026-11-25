@@ -3,8 +3,8 @@
 Ferrolua is a Cargo workspace of small crates in two stacks that share a parser. The runtime stack
 turns source into bytecode, runs it, and compiles hot code to machine code. The analysis stack
 turns source into a semantic model that the type checker, linter, and SAST tool read. Front ends,
-the `ferrolua` command and the editor servers, sit on top. None of the crates exists yet: M0.1
-creates the workspace, and the crate map below names the task that builds each crate.
+the `ferrolua` command and the editor servers, sit on top. The crate map below names the task that
+builds each crate.
 
 ## Principles
 

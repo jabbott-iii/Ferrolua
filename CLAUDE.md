@@ -14,8 +14,9 @@ commits. Read the rule for each kind of file you touch.
 
 ## Status
 
-Design only: the documents in `docs/` exist, and no code does. The next task is M0.1, which creates
-the Cargo workspace.
+Design and an empty workspace: the documents in `docs/` exist, and the Cargo workspace has every
+crate of the crate map in `docs/01-architecture.md`, each holding only its crate docs. The next
+task is M0.2, which builds the seeded random generator and property tests of `ferrolua-testkit`.
 
 ## Read before working
 
@@ -53,8 +54,8 @@ the Cargo workspace.
 
 ## Definition of done
 
-A task is done when every step below passes. Until the Cargo workspace exists, only steps 5–7
-apply.
+A task is done when every step below passes. Step 3 applies once M0.3 builds
+`cargo xtask coverage`; until then, report it as not run.
 
 1. The task's `Accept` results hold, and its `Verify` commands pass.
 2. The check commands of `.claude/rules/rust.md` pass:

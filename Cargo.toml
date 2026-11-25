@@ -1,0 +1,63 @@
+# The Ferrolua workspace: one member for each crate in the crate map of
+# `docs/01-architecture.md`, in the same order.
+[workspace]
+resolver = "3"
+members = [
+    "crates/syntax",
+    "crates/bytecode",
+    "crates/math",
+    "crates/compiler",
+    "crates/vm",
+    "crates/jit",
+    "crates/stdlib",
+    "crates/ferrolua",
+    "crates/analysis",
+    "crates/types",
+    "crates/lint",
+    "crates/fmt",
+    "crates/sast",
+    "crates/json",
+    "crates/lsp",
+    "crates/dap",
+    "crates/cli",
+    "crates/testkit",
+    "fuzz",
+    "xtask/webtest",
+    "xtask",
+]
+
+# No crate sets `version` yet, so Cargo gives each one 0.0.0 and refuses to publish it. The
+# release tasks of milestone M12 set the versions.
+[workspace.package]
+edition = "2024"
+rust-version = "1.100"
+license = "MIT"
+
+# Every member inherits these with `[lints] workspace = true`, as `.claude/rules/rust.md` says.
+# The check commands turn each warning into an error.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+# Silence a lint with `#[expect(..., reason = "...")]`, never `#[allow]`.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# No `unwrap` outside tests; `clippy.toml` allows it in tests.
+unwrap_used = "warn"
+# No debugging leftovers.
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+# Library crates never print. A binary writes from its entry point, under an `#[expect]`.
+print_stdout = "warn"
+print_stderr = "warn"
+# Convert numbers with `From` and `TryFrom`, not with an `as` that truncates or changes the sign.
+cast_lossless = "warn"
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_sign_loss = "warn"

@@ -33,8 +33,7 @@ so they can fill them in.
   from Lua 5.5; the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) and what PUC-Rio Lua
   5.5.1 does with a conformance script's Lua 5.5 twin, for the rest; `docs/specs/`;
   `docs/decisions.md`; `docs/roadmap.md`; and a command's real output
-- **Preview command:** `cargo doc --workspace --no-deps --open` for doc comments, once the Cargo
-  workspace exists; none for Markdown
+- **Preview command:** `cargo doc --workspace --no-deps --open` for doc comments; none for Markdown
 - **Commit rule:** `commits.md` in this folder
 - **Existing British spellings:** report
 - **Formal documents:** `LICENSE`

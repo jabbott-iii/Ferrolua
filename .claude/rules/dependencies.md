@@ -32,9 +32,9 @@ party, and until **Approved exceptions** is filled in, treat it as "none".
   through the browsers that run WebAssembly), Git, and GitHub, with GitHub Actions and the actions
   that the `actions` and `github` organizations publish
 - **Manifests:** the `Cargo.toml` files, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/config.toml`,
-  the `uses:` lines in `.github/workflows/`, and `.gitmodules`; none exists yet
-- **Tree commands:** `cargo tree --workspace --edges normal,build,dev --target all --prefix none`,
-  once the workspace exists. It must list only Ferrolua's own crates
+  the `uses:` lines in `.github/workflows/`, and `.gitmodules`, which doesn't exist yet
+- **Tree commands:** `cargo tree --workspace --edges normal,build,dev --target all --prefix none`.
+  It must list only Ferrolua's own crates
 - **Approved exceptions:** none. Ferrolua uses no third-party code, including test, lint, and
   format tools. A proposed exception first needs an accepted architecture decision record (ADR) in
   `docs/decisions.md`, and approved ones are listed in `docs/02-dependency-policy.md`

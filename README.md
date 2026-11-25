@@ -6,8 +6,9 @@ whatever a script does, to use no third-party code, and to free memory determini
 reference counting, with a loop collector that runs at points the program fixes, so every run frees
 the same values in the same order.
 
-**Status:** design only. The design documents in [`docs/`](docs/) are written, and no code exists
-yet. The next task is M0.1 in the [roadmap](docs/roadmap.md), which creates the Cargo workspace.
+**Status:** design and an empty workspace. The design documents in [`docs/`](docs/) are written,
+and the Cargo workspace has a crate for each part, holding only its documentation. The next task is
+M0.2 in the [roadmap](docs/roadmap.md), which builds a seeded random generator and property tests.
 
 ## What is planned
 

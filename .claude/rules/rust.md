@@ -27,8 +27,9 @@ each value by its bold name. If a value still reads `[FILL IN: …]`, the rule i
 yet. Work out that value from the repository itself, and tell the user which values are missing
 so they can fill them in.
 
-- **Crates:** none yet. The crate map in `docs/01-architecture.md` lists the planned crates, the job
-  of each, and the task that builds it, and M0.1 creates the workspace with them. They are the
+- **Crates:** the members of the Cargo workspace, one for each crate in the crate map in
+  `docs/01-architecture.md`, which gives the job of each and the task that builds it. Each holds
+  only its crate docs until that task. They are the
   parser, the bytecode format, the compiler, the VM with its reference-counted heap and
   deterministic loop collector, the just-in-time (JIT) compiler for x86-64, the standard library,
   the embedding API, the analysis crates (a semantic model, a type checker, a linter, a formatter,

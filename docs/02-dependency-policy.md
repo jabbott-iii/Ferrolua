@@ -64,7 +64,7 @@ None.
 
 ## Check
 
-Once the workspace exists, this command must list only Ferrolua's own crates:
+This command must list only Ferrolua's own crates:
 
 ```bash
 cargo tree --workspace --edges normal,build,dev --target all --prefix none

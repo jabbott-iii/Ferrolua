@@ -26,7 +26,21 @@ build, how to tell it worked, and the commands that check it. Why each choice wa
 **Goal:** A contributor can clone the repository and run every check, including coverage, the
 fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
 
-- [ ] **M0.1 — workspace: create the Cargo workspace**
+- [x] **M0.1 — workspace: create the Cargo workspace**
+  - Note: Built on 2026-11-24 with Rust 1.100.0 (rustc `0ef1bc386`, 2026-11-09), Cargo 1.100.0, and
+    `resolver = "3"`. The 21 members follow the crate map's order, and no crate depends on another
+    yet: each task adds the dependencies its code needs.
+  - Note: `[workspace.lints]` holds the lints `.claude/rules/rust.md` names (`unsafe_code` forbidden,
+    `unsafe_op_in_unsafe_fn` and `clippy::undocumented_unsafe_blocks` denied, and `missing_docs`,
+    `missing_debug_implementations`, and `unreachable_pub`), plus Clippy lints for the rule's other
+    points: `allow_attributes`, `allow_attributes_without_reason`, `unwrap_used`, `dbg_macro`,
+    `todo`, `unimplemented`, `print_stdout`, `print_stderr`, and four `cast_*` lints. `clippy.toml`
+    allows `unwrap` in tests, but not in a helper function in a crate's `tests/` folder, which uses
+    `expect` instead.
+  - Note: No crate sets `version`, so Cargo gives each one 0.0.0 and won't publish it.
+  - Note: Step 3 of the definition of done, coverage, couldn't run, because M0.3 builds
+    `cargo xtask coverage`. Until then, `cargo xtask` runs an empty `main` and exits with status 0
+    whatever it is given.
   - Do:
     - Write the root `Cargo.toml` with every crate in the crate map of
       [`01-architecture.md`](01-architecture.md#crate-map) as a member, `[workspace.package]` with
@@ -56,6 +70,9 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - Verify: `cargo test -p ferrolua-testkit --locked`
 
 - [ ] **M0.3 — xtask: coverage command**
+  - Note (from M0.1): `crates/cli/src/main.rs` and `xtask/src/main.rs` each hold an empty
+    `fn main` that no test calls, so the coverage run has to reach both, for example by running
+    each binary from an integration test.
   - Depends: M0.1
   - Do:
     - Build `cargo xtask coverage` as [`04-quality.md`](04-quality.md#xtask) describes, finding
@@ -234,6 +251,11 @@ builds on.
   - Verify: `cargo xtask fuzz parser --seed 0 --runs 1000000` (expect no new saved input)
 
 - [ ] **M1.10 — cli: `ferrolua parse`**
+  - Note (from M0.1): Naming the binary `ferrolua` makes `cargo doc --workspace` warn of an output
+    filename collision with the `ferrolua` library
+    ([Cargo issue 6313](https://github.com/rust-lang/cargo/issues/6313)). Setting `doc = false` on
+    the `[[bin]]` target in `crates/cli/Cargo.toml` removes the warning, as a scratch workspace
+    showed on 2026-11-24 with Cargo 1.100.0.
   - Depends: M1.6
   - Do:
     - Build the `ferrolua` binary's argument parser and the `parse` command of
@@ -1674,6 +1696,9 @@ embed Ferrolua and use its language and tools.
   - Verify: read the rendered document
 
 - [ ] **M12.2 — ferrolua: API review, READMEs, and docs.rs settings**
+  - Note (from M0.1): No crate sets `version` yet, so Cargo gives each one 0.0.0 and won't publish
+    it. Once the crates have versions, `ferrolua-testkit`, `ferrolua-fuzz`, `ferrolua-webtest`, and
+    `xtask`, which the crate map keeps off crates.io, each need `publish = false`.
   - Depends: M12.1
   - Do:
     - Review every public item of every published crate by hand, give each crate a README, and set

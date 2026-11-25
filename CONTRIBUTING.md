@@ -3,11 +3,12 @@
 Ferrolua welcomes bug reports, fixes, tests, and documentation. For anything beyond a small fix,
 open an issue first, so the design is agreed before you write the code.
 
-Ferrolua is at its start. The repository holds its design in `docs/` and the rules its code, tests,
-and documents follow in `.claude/rules/`, but no Rust or Lua code yet.
-[`docs/00-overview.md`](docs/00-overview.md) says what Ferrolua is for, and
-[`docs/roadmap.md`](docs/roadmap.md) what comes next. The commands below work once the Cargo
-workspace exists, which task M0.1 creates.
+Ferrolua is at its start. The repository holds its design in `docs/`, the rules its code, tests,
+and documents follow in `.claude/rules/`, and a Cargo workspace whose crates hold only their
+documentation so far. [`docs/00-overview.md`](docs/00-overview.md) says what Ferrolua is for, and
+[`docs/roadmap.md`](docs/roadmap.md) what comes next. Every command below works except
+`cargo xtask coverage`, which task M0.3 builds. Until then, `cargo xtask` does nothing and exits
+with status 0.
 
 ## Set up
 
@@ -19,7 +20,8 @@ workspace exists, which task M0.1 creates.
    ```
 
    rustup prints `1.100.0-x86_64-unknown-linux-gnu installed` on Linux on x86-64, or `unchanged`
-   if you have it already.
+   if you have it already. Inside the repository, Cargo then uses this version, because
+   `rust-toolchain.toml` pins it.
 
 2. To record the expected output of a conformance script, which comes from its Lua 5.5 twin, install
    PUC-Rio Lua 5.5.1, the reference interpreter, from [lua.org](https://www.lua.org/download.html)

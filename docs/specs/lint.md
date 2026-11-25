@@ -1,7 +1,7 @@
 # Subsystem: `ferrolua-lint`
 
 `ferrolua-lint` is Ferrolua's linter: rules that find likely bugs, slow code, and code that keeps
-memory alive by accident, in Lua 5.5 and Ferrolua code alike. Each rule has an `L` code, a default
+memory alive by accident, in Ferrolua code. Each rule has an `L` code, a default
 severity, and a test, and reads the shared model of [`analysis.md`](analysis.md) and the types of
 [`types.md`](types.md). Users turn rules off or change their severity in `.ferrolua.lua`, or
 suppress one line with a comment ([`diagnostics.md`](diagnostics.md)). It lands in M7.1–M7.3.
@@ -21,8 +21,9 @@ Each rule's code is assigned when its task adds it to the registry in
 | Group | Rules |
 | :- | :- |
 | Correctness | Unused local, parameter, or loop variable; assignment that is never read; shadowing a local in the same function; unreachable code; read of an undeclared global in non-strict code; duplicate key in a table constructor; wrong argument count at a call to a known local function; comparison of a value with itself; an unused suppression comment |
+| Porting | Habits from Lua that Ferrolua's operators and indexes turn into bugs (ADR-0023: Python's operators and 0-based indexes): `^` with a literal `2` or `3` on its right, which Lua code meant as a power and Ferrolua computes as XOR; a numeric `for` that starts at 1 and indexes a table with its control variable, which skips the element at 0; `#t + 1` used as a position to append at, one past the end |
 | Memory | `Class.__index = Class` and other tables stored in themselves; parent and child tables that refer to each other; a coroutine stored where its own function can reach it; local functions that call each other, which form a loop. Only the loop collector frees these, later than counting would (ADR-0018) |
-| Performance | String concatenation in a loop, where `table.concat` is linear; `table.insert(t, #t + 1, v)`; a closure created in a hot loop that captures nothing that changes; a global read in a loop that could be a local |
+| Performance | String concatenation in a loop, where `table.concat` is linear; `table.insert(t, #t, v)`, where `t[#t] = v` is faster; a closure created in a hot loop that captures nothing that changes; a global read in a loop that could be a local |
 | Style | Mixed LuaCATS and inline annotations for one name; an annotation that repeats the inferred type |
 
 The memory rules find only the patterns they can see in one project. A loop built at run time from

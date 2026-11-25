@@ -36,7 +36,7 @@ describes; the `ferrolua` crate's scope is `ferrolua`.
 | `ferrolua-compiler` | Compact tree to bytecode: scopes, registers, strict mode | syntax, bytecode | Yes | [compiler](specs/compiler.md) | M2.5 |
 | `ferrolua-vm` | Heap and loop collector, values, tables, interpreter, metamethods, coroutines, limits, debug hooks | bytecode, compiler | Yes | [vm](specs/vm.md) | M2.2 |
 | `ferrolua-jit` | x86-64 encoder, executable memory, baseline and optimizing tiers | vm, bytecode | Yes | [jit](specs/jit.md) | M5 |
-| `ferrolua-stdlib` | Lua 5.5's standard libraries | vm | Yes | [stdlib](specs/stdlib.md) | M2.13 |
+| `ferrolua-stdlib` | The standard libraries, Lua 5.5's with positions from 0 | vm | Yes | [stdlib](specs/stdlib.md) | M2.13 |
 | `ferrolua` | The embedding API that hosts depend on | vm, compiler, stdlib, jit | Yes | [ferrolua](specs/ferrolua.md) | M2.14 |
 | `ferrolua-analysis` | Semantic model: scopes, symbols, control flow, data flow, modules | syntax | Yes | [analysis](specs/analysis.md) | M6.1 |
 | `ferrolua-types` | Gradual type checker | analysis, syntax | Yes | [types](specs/types.md) | M6.4 |
@@ -140,9 +140,10 @@ clippy.toml
 crates/<name>/        one folder per crate in the crate map
 fuzz/                 ferrolua-fuzz, with corpus/ and regressions/
 xtask/                coverage, conformance recording, and benchmarks
-tests/conformance/    Lua 5.5 scripts, each with the .out file PUC-Rio Lua 5.5.1 printed
-tests/extensions/     scripts for Ferrolua-only behavior, with .out files written from the specs
-benches/lua/          Lua benchmark scripts
+tests/conformance/    Ferrolua scripts for behavior kept from Lua 5.5
+  reference/          their Lua 5.5 twins, each with the .out file PUC-Rio Lua 5.5.1 printed
+tests/extensions/     scripts for Ferrolua's own behavior, with .out files written from the specs
+benches/lua/          Ferrolua benchmark scripts, with their Lua 5.5 twins in reference/
 docs/                 these documents
 ```
 

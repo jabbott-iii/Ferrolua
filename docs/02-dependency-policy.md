@@ -17,8 +17,9 @@ These don't count, because they are the platform Ferrolua is built on:
 
 - Rust's toolchain from rustup at the version in `rust-toolchain.toml`: rustc, Cargo, the standard
   library, rustdoc, rustfmt, Clippy, and the `llvm-tools` component;
-- PUC-Rio Lua 5.5 from lua.org, the reference interpreter, which records the expected output of
-  conformance scripts and is never built into or linked with Ferrolua;
+- PUC-Rio Lua 5.5 from lua.org, the reference interpreter for the part of the language Ferrolua
+  keeps from Lua 5.5, which records the expected output of the conformance scripts' Lua 5.5 twins
+  and is never built into or linked with Ferrolua;
 - Linux on x86-64, including the C library that Rust's standard library already links;
 - Git, GitHub, GitHub Actions, and the actions that the `actions` and `github` organizations
   publish, each pinned to a full commit hash.

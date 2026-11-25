@@ -1,11 +1,11 @@
 # 04 — Quality
 
-Ferrolua's tests guard three things: that it runs Lua exactly as PUC-Rio Lua 5.5.1 does, that a
-hostile script can't break memory safety or the host, and that it stays within its performance
-budgets. This document lists the test layers, the test tools Ferrolua writes for itself, the checks
-every change passes, and the review checklists. The rules behind it are
-[`.claude/rules/testing.md`](../.claude/rules/testing.md), which forbids weakening a test to make it
-pass and sets coverage at 100% of lines and regions.
+Ferrolua's tests guard three things: that it runs its language as the specs define it, and the part
+it keeps from Lua 5.5 exactly as PUC-Rio Lua 5.5.1 does; that a hostile script can't break memory
+safety or the host; and that it stays within its performance budgets. This document lists the test
+layers, the test tools Ferrolua writes for itself, the checks every change passes, and the review
+checklists. The rules behind it are [`.claude/rules/testing.md`](../.claude/rules/testing.md), which
+forbids weakening a test to make it pass and sets coverage at 100% of lines and regions.
 
 ## Test layers
 
@@ -13,8 +13,8 @@ pass and sets coverage at 100% of lines and regions.
 | :- | :- | :- |
 | Unit tests | `#[cfg(test)] mod tests` beside the code | Each function's outcomes and edges |
 | Integration tests | Each crate's `tests/` | The crate through its public API only |
-| Conformance scripts | `tests/conformance/` | Lua 5.5 behavior, against output recorded from PUC-Rio Lua 5.5.1, interpreted and with the JIT forced on |
-| Extension scripts | `tests/extensions/` | Ferrolua-only behavior: the language extensions and the intended differences, against output written from the spec |
+| Conformance scripts | `tests/conformance/` | Behavior Ferrolua keeps from Lua 5.5, against the output PUC-Rio Lua 5.5.1 printed for each script's Lua 5.5 twin, interpreted and with the JIT forced on |
+| Extension scripts | `tests/extensions/` | Behavior with no Lua 5.5 counterpart: Python's operators, 0-based indexes and ranges, the language extensions, and the intended differences, against output written from the spec |
 | Differential tests | `crates/ferrolua/tests/` and a fuzz target | The interpreter and the JIT print the same output, raise the same errors, and give the same collection log |
 | Determinism tests | `crates/ferrolua/tests/` | Two runs with a fixed hash seed give the same collection log, which matches the log stored for the script, on every target ([`specs/memory.md`](specs/memory.md#determinism)) |
 | Property tests | Beside the code, using `ferrolua-testkit` | Laws that hold for every input, such as "formatting doesn't change the bytecode" |
@@ -28,11 +28,26 @@ every saved fuzz input.
 
 ### Conformance scripts
 
-Each script in `tests/conformance/` is named after the feature it covers, such as `goto.lua`, and
-has a `.out` file beside it, holding what PUC-Rio Lua 5.5.1 printed. A Rust test in
-`crates/ferrolua/tests/conformance.rs` runs each script in a fresh state with the full standard
-library, captures what it prints, and compares the bytes with the `.out` file. It runs each script
-twice: interpreted, and with the JIT compiling every function on its first call.
+PUC-Rio Lua can't run Ferrolua's scripts (ADR-0023: a language of its own, with Python's operators
+and 0-based indexes), so each feature Ferrolua keeps from Lua 5.5 has a pair of scripts, named
+after the feature, such as `goto.lua`:
+
+- `tests/conformance/goto.lua`, written in Ferrolua;
+- `tests/conformance/reference/goto.lua`, its twin in plain Lua 5.5, with `goto.out` beside it,
+  holding what PUC-Rio Lua 5.5.1 printed for the twin.
+
+The twins make the same calls in the same order, keep each statement on the same line so that line
+numbers in messages agree, and print the same text. Where a value means something different in
+the two languages, the reference script prints it in Ferrolua's terms. A Lua position `i` prints as
+`i - 1`. The end `j` of a Lua range from `i` to `j` prints unchanged, because Ferrolua's range for
+the same elements stops before `j`. Both scripts run under their file name alone as the chunk name,
+such as `goto.lua`, so messages name the same chunk. A script without a twin, or a twin without a
+script, fails the runner.
+
+A Rust test in `crates/ferrolua/tests/conformance.rs` runs each Ferrolua script in a fresh state
+with the full standard library, captures what it prints, and compares the bytes with its twin's
+`.out` file. It runs each script twice: interpreted, and with the JIT compiling every function on
+its first call.
 
 A script's output must not depend on what Lua leaves unspecified, or the recorded output won't
 repeat:
@@ -63,8 +78,9 @@ A dev-dependency of the other crates, never published (M0.2):
   so every test that uses random input repeats exactly;
 - a property-test runner: it checks a property against a fixed number of generated cases, and on a
   failure, shrinks the case to a smaller one that still fails and prints the seed;
-- a generator of valid Lua 5.5 programs, and later of Ferrolua programs, built from the grammar in
-  [`specs/syntax.md`](specs/syntax.md), which the fuzzer and the property tests share.
+- a generator of valid Ferrolua programs, built from the grammar in
+  [`specs/syntax.md`](specs/syntax.md) and [`specs/language.md`](specs/language.md), which the
+  fuzzer and the property tests share.
 
 ### `ferrolua-fuzz`
 
@@ -94,12 +110,13 @@ Build tasks run with `cargo xtask`, written with the standard library alone:
   profiles with `llvm-profdata` from the `llvm-tools` component, reports with `llvm-cov`, and fails
   when lines or regions fall below 100%. Stable Rust can't measure branch coverage, so regions
   stand in for it.
-- `cargo xtask record [script]` (M0.5): runs PUC-Rio Lua 5.5.1 on conformance scripts and writes
-  their `.out` files. It refuses an interpreter whose `lua -v` doesn't report 5.5.1. It reads the
-  interpreter's path from `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`.
+- `cargo xtask record [script]` (M0.5): runs PUC-Rio Lua 5.5.1 on the reference scripts in
+  `tests/conformance/reference/`, from that folder, and writes their `.out` files. It refuses an
+  interpreter whose `lua -v` doesn't report 5.5.1. It reads the interpreter's path from
+  `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`.
 - `cargo xtask fuzz` (M0.4): runs the fuzzer.
-- `cargo xtask bench` (M5.1): runs `benches/lua/` on Ferrolua and on PUC-Rio Lua 5.5.1, and
-  reports the median of several runs.
+- `cargo xtask bench` (M5.1): runs each script in `benches/lua/` on Ferrolua, and its Lua 5.5
+  twin in `benches/lua/reference/` on PUC-Rio Lua 5.5.1, and reports the median of several runs.
 
 ## Automated checks
 
@@ -115,7 +132,8 @@ cargo tree --workspace --edges normal,build,dev --target all --prefix none
 ```
 
 The last command must list only Ferrolua's own crates. Once M7 lands, `ferrolua fmt --check` and
-`ferrolua lint` also check every Lua script in `tests/` and `benches/`.
+`ferrolua lint` also check every Ferrolua script in `tests/` and `benches/`, skipping the Lua 5.5
+twins in `reference/` folders.
 
 ## Continuous integration
 
@@ -140,18 +158,18 @@ compares against the recorded `.out` files.
 - Each block has a `// SAFETY:` comment that names the invariant it relies on.
 - A test exercises it, and a test checks each invariant it relies on.
 
-**Lua behavior:**
+**Behavior kept from Lua 5.5:**
 
-- A conformance script covers the change, with output recorded from PUC-Rio Lua 5.5.1.
+- A conformance script and its Lua 5.5 twin cover the change, with output recorded from PUC-Rio
+  Lua 5.5.1, and the review reads the two side by side.
 - An intended difference from PUC-Rio names its decision record, and its script is in
   `tests/extensions/`.
 
-**Language extensions:**
+**The language:**
 
-- The superset property test still passes: every generated Lua 5.5 program tokenizes and runs the
-  same as before (M4.1).
-- [`specs/language.md`](specs/language.md) describes the change, and its decision record is
-  accepted.
+- The precedence property test still passes (M1.5).
+- [`specs/language.md`](specs/language.md) describes the change, its decision record is accepted,
+  and a script in `tests/extensions/` covers it, with output written from the spec.
 
 **Parsers, loaders, and limits:**
 

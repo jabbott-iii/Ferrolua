@@ -49,7 +49,7 @@ Classes are nominal: only instances of a class or its subclasses have its type.
 
 Types for the standard library, and for host APIs, come from declaration files: Ferrolua files
 with `declare` statements and no code, such as `declare function print(...: any)`. Ferrolua ships
-declarations for all of Lua 5.5's standard library. Projects list their own in `declarations` in
+declarations for all of its standard library. Projects list their own in `declarations` in
 `.ferrolua.lua` ([`diagnostics.md`](diagnostics.md#configuration-ferrolualua)). M6.6 settles the
 declaration syntax.
 
@@ -84,7 +84,7 @@ the conflict.
   types.
 - Invariant 3: a property test on generated typed programs.
 - Invariant 4: a test runs the checker on every conformance script with `check_all` on. The lines
-  that pass wrong arguments on purpose carry a `--ferrolua:allow` comment for their `T` code, which
-  PUC-Rio Lua ignores, and the test expects no other `T` diagnostics.
+  that pass wrong arguments on purpose carry a `--ferrolua:allow` comment for their `T` code, and
+  the test expects no other `T` diagnostics.
 - Each `T` code has a test file in `crates/types/tests/` with one case that triggers it and one
   near miss that doesn't.

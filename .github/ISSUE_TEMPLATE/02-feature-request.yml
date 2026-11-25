@@ -4,8 +4,10 @@ labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
-      value: "Ferrolua implements Lua 5.5. A request to change how a valid Lua 5.5 script runs is a
-        breaking change, and needs an architecture decision record before any code changes."
+      value: "Ferrolua's language derives from Lua 5.5, with Python's operators and indexes that
+        start at 0, as docs/specs/language.md defines. A request to change how a valid Ferrolua
+        script runs is a breaking change, and needs an architecture decision record before any code
+        changes."
   - type: textarea
     id: problem
     attributes:
@@ -17,13 +19,13 @@ body:
     id: proposal
     attributes:
       label: "What you propose"
-      description: "How Ferrolua could solve it, with an example of the Lua or Rust code you'd write."
+      description: "How Ferrolua could solve it, with an example of the Ferrolua or Rust code you'd write."
     validations:
       required: true
   - type: dropdown
     id: semantics
     attributes:
-      label: "Does it change how a valid Lua 5.5 script runs?"
+      label: "Does it change how a valid Ferrolua script runs?"
       options:
         - "No"
         - "Yes"

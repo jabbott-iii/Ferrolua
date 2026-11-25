@@ -17,7 +17,7 @@ the logic lives.
 | Command | Does | Lands in |
 | :- | :- | :- |
 | `ferrolua parse <file>` | Reports syntax errors; `--tree` prints the lossless tree | M1.10 |
-| `ferrolua run <script> [args...]` | Runs a script with every library, like PUC-Rio's `lua`, with `arg` set the same way; `-e`, `-l`, `--sandbox`, and `--jit` | M2.15, M3.14 |
+| `ferrolua run <script> [args...]` | Runs a Ferrolua script with every library, like PUC-Rio's `lua`, with `arg` set the same way; `-e`, `-l`, `--sandbox`, and `--jit` | M2.15, M3.14 |
 | `ferrolua check [paths...]` | Type checks files and reports `P`, `C`, and `T` diagnostics | M6.10 |
 | `ferrolua lint [paths...]` | Runs the lint rules; `--fix` applies certain fixes | M7.6 |
 | `ferrolua fmt [paths...]` | Formats files in place; `--check` reports instead | M7.6 |
@@ -39,18 +39,23 @@ check the files `.ferrolua.lua` includes, or every `.lua` file under the current
 
 ## Environment
 
-`ferrolua` reads `NO_COLOR`, which turns off colored output, and `LUA_INIT_5_5` and `LUA_INIT` for
-`ferrolua run`, as PUC-Rio's `lua` does. It reads no other environment variable.
+`ferrolua` reads `NO_COLOR`, which turns off colored output, and `FERROLUA_INIT` for
+`ferrolua run`, which works as `LUA_INIT` does for PUC-Rio's `lua`: a chunk of Ferrolua code, or
+`@` followed by a file name, run before the script. It doesn't read `LUA_INIT_5_5` or `LUA_INIT`,
+which hold Lua 5.5 code (ADR-0024: the details Python's operators and 0-based indexes
+leave open). It reads no other environment variable.
 
 ## Invariants
 
 1. Every command exits with a status from the table above.
 2. No argument list makes the binary panic.
-3. `ferrolua run` prints what PUC-Rio's `lua` prints for the same script and arguments.
+3. `ferrolua run` prints what PUC-Rio's `lua` prints for the script's Lua 5.5 twin and the same
+   arguments.
 
 ## Tests
 
 - End-to-end tests in `crates/cli/tests/` run the built binary with real arguments and files, and
   check its output and exit status.
 - Invariant 2: a property test passes generated argument lists.
-- Invariant 3: the conformance runner also runs each script through the binary.
+- Invariant 3: the conformance runner also runs each conformance script through the binary, and
+  compares the output with its twin's `.out` file.

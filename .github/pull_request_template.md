@@ -8,7 +8,8 @@
 
 - [ ] `cargo fmt`, `cargo clippy`, `cargo test`, and `cargo doc` pass, as `CONTRIBUTING.md` shows
 - [ ] `cargo xtask coverage` passes: 100% of lines and regions
-- [ ] New behavior has tests, and a change to how Lua runs has a conformance script
+- [ ] New behavior has tests, and a change to how a script runs has a conformance script with its
+  Lua 5.5 twin, or an extension script
 - [ ] Each new `unsafe` block has a `// SAFETY:` comment and an accepted decision record
 - [ ] No third-party code was added
 

@@ -17,6 +17,9 @@ build, how to tell it worked, and the commands that check it. Why each choice wa
   [`03-platforms.md`](03-platforms.md).
 - A task that needs PUC-Rio Lua 5.5.1 to record output, on a machine without it, leaves its box
   unticked with a `⏳ needs PUC-Rio Lua 5.5.1` line naming the check that remains.
+- A conformance script that a task adds comes with its Lua 5.5 twin in
+  `tests/conformance/reference/` and the twin's recorded `.out` file, as
+  [`04-quality.md`](04-quality.md#conformance-scripts) describes.
 
 ## M0 — A workspace where every check runs
 
@@ -80,13 +83,16 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - ⏳ needs PUC-Rio Lua 5.5.1: recording the first `.out` file
   - Depends: M0.1
   - Do:
-    - Build `cargo xtask record`, which runs PUC-Rio Lua 5.5.1 on scripts in `tests/conformance/` and
-      writes their `.out` files, as [`04-quality.md`](04-quality.md#xtask) describes.
-    - Add `tests/conformance/hello.lua`, which prints one line, and its recorded `.out` file.
+    - Build `cargo xtask record`, which runs PUC-Rio Lua 5.5.1 on the reference scripts in
+      `tests/conformance/reference/` and writes their `.out` files, as
+      [`04-quality.md`](04-quality.md#xtask) describes.
+    - Add `tests/conformance/hello.lua`, which prints one line, its twin
+      `tests/conformance/reference/hello.lua`, and the twin's recorded `.out` file.
   - Accept:
     - It refuses, with a clear message, an interpreter whose `lua -v` doesn't report Lua 5.5.1.
     - Recording a script twice gives the same `.out` file.
-  - Verify: `cargo xtask record tests/conformance/hello.lua`; `cargo test -p xtask --locked`
+  - Verify: `cargo xtask record tests/conformance/reference/hello.lua`;
+    `cargo test -p xtask --locked`
 
 - [ ] **M0.6 — ci: the CI workflow**
   - Depends: M0.3, M0.4
@@ -106,10 +112,11 @@ on every pull request; the owner has made the jobs required.
 
 ---
 
-## M1 — Parse Lua 5.5, with errors that point at the problem
+## M1 — Parse Ferrolua, with errors that point at the problem
 
-**Goal:** `ferrolua parse` reads any Lua 5.5 file, reports syntax errors as PUC-Rio Lua 5.5.1 does,
-and prints a lossless tree, which every later tool builds on.
+**Goal:** `ferrolua parse` reads any Ferrolua file, reports syntax errors in the words PUC-Rio
+Lua 5.5.1 uses wherever the syntax is Lua's, and prints a lossless tree, which every later tool
+builds on.
 
 - [ ] **M1.1 — syntax: source text, spans, and line maps**
   - Depends: M0.1
@@ -121,15 +128,18 @@ and prints a lossless tree, which every later tool builds on.
       valid UTF-8.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
-- [ ] **M1.2 — syntax: lexer for Lua 5.5**
+- [ ] **M1.2 — syntax: the lexer**
+  - Note: 2026-11-24, the owner's choice (ADR-0023): the lexer reads Python's operators instead of
+    `..` and `~=`.
   - Depends: M1.1
   - Do:
     - Build the lexer of [`specs/syntax.md`](specs/syntax.md#lexer), with trivia on every token.
     - Add `tests/conformance/lexer.lua`, covering numbers, escapes, and long strings, with its
       recorded output.
   - Accept:
-    - Every token form of §3.1 of the manual lexes, and every malformed form gives PUC-Rio's error,
-      such as `malformed number near '0x'`.
+    - Every token form of §3.1 of the manual lexes, apart from `..` and `~=`, and so do `**`, `!=`,
+      and the reserved word `is`. Every malformed form gives PUC-Rio's error, such as
+      `malformed number near '0x'`.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
 - [ ] **M1.3 — syntax: parser events and the lossless tree**
@@ -150,12 +160,23 @@ and prints a lossless tree, which every later tool builds on.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
 - [ ] **M1.5 — syntax: expressions and operator precedence**
+  - Note: 2026-11-24, the owner's choice (ADR-0023): expressions follow Python's operators and
+    precedence, with chained comparisons, conditional expressions, `in`, and `is`.
+  - Note: 2026-11-24, the owner accepted ADR-0024 (the details Python's operators and 0-based
+    indexes leave open), which makes `is` a reserved word.
   - Depends: M1.3
   - Do:
-    - Parse expressions with the precedence and associativity of §3.4.8 of the manual, plus table
-      constructors, function definitions, calls, and method calls.
+    - Parse expressions with the precedence, grouping, and grammar of
+      [`specs/language.md`](specs/language.md#precedence), including chained comparisons,
+      conditional expressions, `in`, `not in`, `is`, and `is not`, plus table constructors,
+      function definitions, calls, and method calls.
+    - Report `..`, `~=`, and binary `~` with messages that name their replacements, and record the
+      messages in the language spec.
+    - Add the precedence property test of [`specs/language.md`](specs/language.md#tests).
   - Accept:
-    - `2 ^ -3 ^ 2`, `-x ^ 2`, `a .. b .. c`, and `1 + 2 << 3` group as in PUC-Rio.
+    - `2 ** -3 ** 2`, `-x ** 2`, `not a == b`, `a < b < c`, `1 + 2 << 3`, and
+      `x if a else y if b else z` group as the precedence table says.
+    - `x = f if c then g() end` parses as an assignment followed by an `if` statement.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
 - [ ] **M1.6 — syntax: error recovery and the diagnostic type**
@@ -163,7 +184,8 @@ and prints a lossless tree, which every later tool builds on.
   - Do:
     - Build the `Diagnostic` type of [`specs/diagnostics.md`](specs/diagnostics.md#the-diagnostic),
       and recovery as [`specs/syntax.md`](specs/syntax.md#parser-and-events) describes.
-    - Add `tests/conformance/syntax_errors.lua`, which loads broken chunks and prints each message.
+    - Add `tests/conformance/syntax_errors.lua`, which loads chunks that are broken alike in
+      Ferrolua and Lua 5.5 and prints each message.
   - Accept:
     - A file with three separate errors gets three diagnostics, and the statements between them
       still appear in the tree.
@@ -193,7 +215,7 @@ and prints a lossless tree, which every later tool builds on.
 - [ ] **M1.9 — fuzz: lexer and parser targets**
   - Depends: M0.4, M1.7
   - Do:
-    - Add the Lua 5.5 program generator to `ferrolua-testkit`, and the `lexer` and `parser`
+    - Add the Ferrolua program generator to `ferrolua-testkit`, and the `lexer` and `parser`
       targets, which check the round trip and that nothing panics.
   - Accept:
     - One million runs of each target from seed 0 find no crash, and every input they ever crashed on
@@ -210,15 +232,15 @@ and prints a lossless tree, which every later tool builds on.
       file exits with 2.
   - Verify: `cargo test -p ferrolua-cli --locked`
 
-**Exit criteria (M1):** `ferrolua parse` handles every script in `tests/conformance/`, reports
-errors in PUC-Rio's words, and the fuzz targets run clean.
+**Exit criteria (M1):** `ferrolua parse` handles every Ferrolua script in `tests/conformance/`,
+reports errors in PUC-Rio's words wherever the syntax is Lua's, and the fuzz targets run clean.
 
 ---
 
-## M2 — Run Lua 5.5 scripts in the interpreter
+## M2 — Run Ferrolua scripts in the interpreter
 
 **Goal:** `ferrolua run` runs scripts that use the core language and the base library, printing
-what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
+what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by reference counting.
 
 - [ ] **M2.1 — bytecode: instructions and prototypes**
   - Depends: M0.1
@@ -260,14 +282,15 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
 - [ ] **M2.4 — vm: tables**
   - Note: 2026-11-24, the owner's choice (ADR-0020): probe steps count against the instruction
     limit, not a cap.
+  - Note: 2026-11-24, the owner's choice (ADR-0023): the array part holds keys 0 to n − 1.
   - Depends: M2.3
   - Do:
-    - Build tables with array and hash parts, key normalization, `#` borders, `next`, reference
-      keys hashed by handle, and each probe step past the first counted as a work unit, as
-      [`specs/vm.md`](specs/vm.md#tables) describes.
+    - Build tables with an array part for keys 0 to n − 1 and a hash part, key normalization, `#`
+      borders, `next`, reference keys hashed by handle, and each probe step past the first counted
+      as a work unit, as [`specs/vm.md`](specs/vm.md#tables) describes.
   - Accept:
-    - `#t` returns the border PUC-Rio Lua 5.5.1 returns for each table in
-      `tests/conformance/length.lua`, once M2.14 can run it.
+    - For each table in `tests/conformance/length.lua`, `#t` returns the border PUC-Rio Lua 5.5.1
+      returns for its twin's table, whose integer keys are each one higher, once M2.14 can run it.
     - Two states given the same seed that build the same table, with strings, tables, and
       functions as keys, visit its keys in the same order.
     - Each table operation reports one work unit for each probe step past the first, for a set of
@@ -288,17 +311,21 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
 - [ ] **M2.6 — compiler: expressions, registers, and constant folding**
   - Depends: M2.5
   - Do:
-    - Compile every expression, allocate registers as [`specs/compiler.md`](specs/compiler.md#registers-and-expressions)
-      describes, and fold constants.
+    - Compile every expression, including chained comparisons that evaluate each middle operand once
+      and conditional expressions that evaluate one branch, allocate registers as
+      [`specs/compiler.md`](specs/compiler.md#registers-and-expressions) describes, and fold
+      constants.
   - Accept:
-    - Folded and unfolded constant expressions give the same values, including at overflow and
-      division by zero.
+    - Folded and unfolded constant expressions give the same values, including at overflow,
+      division by zero, and `**` of integers.
   - Verify: `cargo test -p ferrolua-compiler --locked`
 
 - [ ] **M2.7 — compiler: statements and control flow**
   - Depends: M2.6
   - Do:
-    - Compile every statement, including `goto`, both `for` forms, and `<close>` variables.
+    - Compile every statement, including `goto`, both `for` forms, with the numeric `for`'s
+      half-open range of [`specs/language.md`](specs/language.md#indexes-and-ranges-adr-0023), and
+      `<close>` variables.
   - Accept:
     - Every prototype the compiler emits for the conformance scripts passes the verifier.
   - Verify: `cargo test -p ferrolua-compiler --locked`
@@ -307,20 +334,26 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
   - Depends: M2.4, M2.7
   - Do:
     - Build the interpreter loop, frames, calls, returns, multiple results, varargs, named vararg
-      tables, and proper tail calls.
+      tables numbered from 0, and proper tail calls.
   - Accept:
     - 10,000,000 tail calls in a loop use the stack of one.
   - Verify: `cargo test -p ferrolua-vm --locked`
 
-- [ ] **M2.9 — vm: arithmetic, comparison, coercion, and number printing**
+- [ ] **M2.9 — vm: operators and number printing**
+  - Note: 2026-11-24, the owner's choice (ADR-0023): operators give Python's results, `+` joins
+    strings, and nothing converts between strings and numbers.
   - Depends: M2.8
   - Do:
-    - Build integer and float arithmetic, bitwise operations, comparisons, concatenation, string
-      to number coercion, and number to string conversion with PUC-Rio's exact rules, recording
-      those rules in [`specs/vm.md`](specs/vm.md#the-interpreter).
-    - Add `tests/conformance/arithmetic.lua` and `tests/conformance/tostring.lua`.
+    - Build the operators of [`specs/language.md`](specs/language.md#meanings) on numbers and
+      strings, `in`, `is`, and chained comparisons, and number to string conversion with PUC-Rio's
+      exact rules. Record each operator's edge cases and error messages, and the conversion rules,
+      in [`specs/vm.md`](specs/vm.md#the-interpreter).
+    - Add `tests/conformance/arithmetic.lua` and `tests/conformance/tostring.lua` for what Lua 5.5
+      shares, and `tests/extensions/operators.lua` for the rest.
   - Accept:
-    - Both scripts print their recorded output.
+    - Both conformance scripts print their recorded output, and `operators.lua` its written output.
+    - `"10" + 1`, `1 / 0`, `1 << -1`, and `3.0 | 1` raise their recorded errors, and `2 ** 10` is
+      the integer 1024.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M2.10 — vm: metatables, metamethods, finalizers, and weak tables**
@@ -387,13 +420,18 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
   - Depends: M2.11
   - Do:
     - Build the base library of [`specs/stdlib.md`](specs/stdlib.md#libraries), with the argument
-      checks shared by every library.
+      checks shared by every library, which convert nothing between strings and numbers, and with
+      `select` and `ipairs` counting from 0, as
+      [`specs/stdlib.md`](specs/stdlib.md#arguments-and-errors) describes.
     - Assign object IDs as [`specs/memory.md`](specs/memory.md#object-ids) describes, and print
       them from `tostring` and `print` in the formats of
       [`specs/stdlib.md`](specs/stdlib.md#object-ids-in-output) (ADR-0019).
-    - Add `tests/conformance/base.lua` and `tests/extensions/object_ids.lua`.
+    - Add `tests/conformance/base.lua`, `tests/extensions/object_ids.lua`, and
+      `tests/extensions/positions.lua` for `select` and `ipairs`.
   - Accept:
     - Every base function, and each of its argument errors, prints its recorded output.
+    - `positions.lua` prints its written output, and a numeric string passed where a base function
+      takes a number raises the wrong-type error.
     - `object_ids.lua` prints its written output, and no `tostring` result contains an address.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
@@ -403,11 +441,16 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
       [`specs/ferrolua.md`](specs/ferrolua.md) sketches.
     - Build the conformance runner in `crates/ferrolua/tests/conformance.rs`, as
-      [`04-quality.md`](04-quality.md#conformance-scripts) describes.
+      [`04-quality.md`](04-quality.md#conformance-scripts) describes, pairing each script with its
+      twin's `.out` file.
+    - Add the numeric `for` property test of [`specs/language.md`](specs/language.md#tests).
   - Accept:
     - Every script in `tests/conformance/` prints its recorded output, and every script in
       `tests/extensions/` its written output.
-  - Verify: `cargo test -p ferrolua --test conformance --locked`
+    - A script without a twin, or a twin without a script, fails the runner.
+    - Generated numeric `for` loops run as Python's `range` does, including `for i = 3, 0, -1 do`,
+      which visits 3, 2, and 1.
+  - Verify: `cargo test -p ferrolua --test conformance --locked`; `cargo test -p ferrolua --locked`
 
 - [ ] **M2.15 — cli: `ferrolua run`**
   - Depends: M2.14
@@ -426,15 +469,16 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
     - One million runs of each from seed 0 find no crash.
   - Verify: `cargo xtask fuzz interpreter --seed 0 --runs 1000000` (expect no new saved input)
 
-**Exit criteria (M2):** A person runs a few real Lua 5.5 scripts that use only the base library
-with `ferrolua run`, and their output matches `lua`'s.
+**Exit criteria (M2):** A person ports a few real Lua 5.5 scripts that use only the base library
+to Ferrolua, runs them with `ferrolua run`, and their output matches what `lua` prints for the
+originals.
 
 ---
 
 ## M3 — Embed Ferrolua with the full standard library and a sandbox
 
 **Goal:** A Rust program embeds Ferrolua, registers its own functions and types, runs untrusted
-scripts within limits, and gets every Lua 5.5 library it grants.
+scripts within limits, and gets every standard library it grants.
 
 - [ ] **M3.1 — ferrolua: the full embedding API**
   - Depends: M2.14
@@ -476,12 +520,16 @@ scripts within limits, and gets every Lua 5.5 library it grants.
 - [ ] **M3.3 — stdlib: strings and patterns**
   - Depends: M2.13, M3.2
   - Do:
-    - Build `string.byte` through `string.upper`, and the pattern functions of §6.4.1, counting
-      matcher steps.
-    - Add `tests/conformance/string.lua` and `tests/conformance/patterns.lua`.
+    - Build `string.byte` through `string.upper`, with the positions of
+      [`specs/stdlib.md`](specs/stdlib.md#positions-and-ranges), and the pattern functions of
+      §6.4.1, counting matcher steps.
+    - Add `tests/conformance/string.lua` and `tests/conformance/patterns.lua`, extend
+      `tests/extensions/positions.lua`, and add the `string.sub` property test of
+      [`specs/language.md`](specs/language.md#tests).
   - Accept:
     - Both scripts print their recorded output, and a backtracking pattern stops at the
       instruction limit.
+    - `string.sub` returns what Python's slices return in the property test.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.4 — stdlib: `string.format` and number formatting**
@@ -500,7 +548,8 @@ scripts within limits, and gets every Lua 5.5 library it grants.
 - [ ] **M3.5 — stdlib: `string.pack`, `string.packsize`, and `string.unpack`**
   - Depends: M3.3
   - Do:
-    - Build every format option of §6.4.2, and add `tests/conformance/pack.lua`.
+    - Build every format option of §6.4.2, with `string.unpack`'s positions counted from 0, and add
+      `tests/conformance/pack.lua`.
   - Accept:
     - The script prints its recorded output, including each error for a malformed format.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
@@ -508,8 +557,9 @@ scripts within limits, and gets every Lua 5.5 library it grants.
 - [ ] **M3.6 — stdlib: the `table` library**
   - Depends: M2.13
   - Do:
-    - Build `table.create` and the rest of §6.6, with `table.sort` following PUC-Rio's algorithm,
-      and add `tests/conformance/table.lua`.
+    - Build `table.create` and the rest of §6.6, with the positions of
+      [`specs/stdlib.md`](specs/stdlib.md#positions-and-ranges) and `table.sort` following PUC-Rio's
+      algorithm, and add `tests/conformance/table.lua`.
   - Accept:
     - The script prints its recorded output, including the order of equal elements after `sort`.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
@@ -518,9 +568,11 @@ scripts within limits, and gets every Lua 5.5 library it grants.
   - Depends: M2.13
   - Do:
     - Build §6.7 with xoshiro256** seeded as PUC-Rio seeds it, and §6.5 with Lua 5.5's `lax`
-      argument, and add `tests/conformance/math.lua` and `tests/conformance/utf8.lua`.
+      argument, both with the ranges of [`specs/stdlib.md`](specs/stdlib.md#positions-and-ranges),
+      and add `tests/conformance/math.lua` and `tests/conformance/utf8.lua`.
   - Accept:
-    - `math.randomseed(42)` followed by ten `math.random(1, 100)` calls prints PUC-Rio's numbers.
+    - `math.randomseed(42)` followed by ten `math.random(1, 101)` calls prints the numbers that
+      PUC-Rio's `math.random(1, 100)` gives, for the same range of 1 to 100.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.8 — stdlib: the `coroutine` library**
@@ -554,10 +606,11 @@ scripts within limits, and gets every Lua 5.5 library it grants.
 - [ ] **M3.11 — stdlib: the `debug` library**
   - Depends: M2.12
   - Do:
-    - Build §6.10 on Ferrolua's frames, and add `tests/conformance/debug.lua`.
+    - Build §6.10 on Ferrolua's frames, with locals and upvalues numbered from 0 (ADR-0024), and
+      add `tests/conformance/debug.lua`.
     - Make `debug.upvalueid` return the upvalue's ID as an integer (ADR-0019).
   - Accept:
-    - `debug.traceback` and `debug.getinfo` print PUC-Rio's output for the same script.
+    - `debug.traceback` and `debug.getinfo` print PUC-Rio's output for the script's twin.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.12 — bytecode: precompiled chunks and the verifier**
@@ -583,7 +636,8 @@ scripts within limits, and gets every Lua 5.5 library it grants.
 - [ ] **M3.14 — cli: options for `ferrolua run`**
   - Depends: M3.13
   - Do:
-    - Add `-e`, `-l`, `--sandbox`, `LUA_INIT_5_5`, and `LUA_INIT`, as PUC-Rio's `lua` handles them.
+    - Add `-e`, `-l`, and `--sandbox`, as PUC-Rio's `lua` handles them, and `FERROLUA_INIT` where
+      `lua` reads `LUA_INIT` (ADR-0024).
   - Accept:
     - `ferrolua run --sandbox` refuses `io.open`, and `-e` and `-l` behave as in `lua`.
   - Verify: `cargo test -p ferrolua-cli --locked`
@@ -593,30 +647,33 @@ a userdata type, and sees a hostile script stopped by each limit.
 
 ---
 
-## M4 — Write Ferrolua: operators, types, classes, and strict mode
+## M4 — Write Ferrolua: compound assignment, types, classes, and strict mode
 
-**Goal:** Scripts can use `++` and compound assignment, type annotations, classes, and strict
-mode, as [`specs/language.md`](specs/language.md) defines, while every Lua 5.5 script still runs
-unchanged.
+**Goal:** Scripts can use compound assignment, type annotations, classes, and strict mode, as
+[`specs/language.md`](specs/language.md) defines.
 
-- [ ] **M4.1 — syntax: compound assignment, `++`, and the superset test**
+- [ ] **M4.1 — syntax: compound assignment**
+  - Note: 2026-11-24, the owner's choice (ADR-0023): compound assignment follows Python's, with
+    `**=` for power and `^=` for XOR, and no `++` or `..=`. The superset test this task had is gone,
+    and the precedence test of M1.5 takes its place.
   - Depends: M1.9
   - Do:
-    - Lex and parse the tokens and statements of
-      [`specs/language.md`](specs/language.md#compound-assignment-and--adr-0005).
-    - Add the superset property test of [`specs/language.md`](specs/language.md#tests).
+    - Lex and parse the tokens and statement of
+      [`specs/language.md`](specs/language.md#compound-assignment-adr-0023).
   - Accept:
-    - `x--=1` is `x` followed by a comment, and generated Lua 5.5 programs tokenize as under Lua 5.5
-      alone.
+    - `x--=1` is `x` followed by a comment, `x **= 2` and `x ^= 1` are compound assignments, and
+      `x++` is a syntax error.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
-- [ ] **M4.2 — compiler: compound assignment and `++`**
+- [ ] **M4.2 — compiler: compound assignment**
+  - Note: 2026-11-24, the owner's choice (ADR-0023): no `++`.
   - Depends: M4.1, M2.14
   - Do:
-    - Compile both forms, evaluating the target's parts once, and add
+    - Compile compound assignment, evaluating the target's parts once, and add
       `tests/extensions/compound_assignment.lua`.
   - Accept:
-    - `t[f()] += g()` calls `f` once and `g` once, in that order, through metamethods too.
+    - `t[f()] += g()` calls `f` once and `g` once, in that order, through metamethods too, and
+      `s += "!"` joins strings.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M4.3 — syntax: type annotations**
@@ -657,7 +714,8 @@ unchanged.
       [`specs/language.md`](specs/language.md#undeclared-variable-errors) describes, recording
       PUC-Rio's message there.
   - Accept:
-    - The example in the spec gives its error, and the file runs unchanged on PUC-Rio Lua 5.5.1.
+    - The example in the spec gives its error, and without its `--!strict` line the same file runs
+      to its end.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M4.7 — vm: arity enforcement**
@@ -679,8 +737,8 @@ unchanged.
       nothing.
   - Verify: `cargo xtask fuzz interpreter --seed 1 --runs 1000000`
 
-**Exit criteria (M4):** A person writes a small program using each extension, runs it, and runs
-the same program's Lua 5.5 parts on PUC-Rio Lua 5.5.1.
+**Exit criteria (M4):** A person writes a small program using each extension, runs it, and checks
+its output against the spec.
 
 ---
 
@@ -693,7 +751,8 @@ output with the JIT on or forced, and the agreed budgets are checked.
   - ⏳ needs PUC-Rio Lua 5.5.1: running the comparison
   - Depends: M3.13
   - Do:
-    - Write the benchmark scripts in `benches/lua/` and `cargo xtask bench`, as
+    - Write the benchmark scripts in `benches/lua/`, each with a Lua 5.5 twin in
+      `benches/lua/reference/`, and `cargo xtask bench`, as
       [`04-quality.md`](04-quality.md#xtask) describes.
     - Record the benchmark machine and the first measurements in a note on this task and in
       [`00-overview.md`](00-overview.md#budgets).
@@ -786,7 +845,7 @@ interpreter and baseline budgets met.
 
 ## M6 — Type-check scripts before they run
 
-**Goal:** `ferrolua check` reports type errors in annotated Lua and Ferrolua code, using inline
+**Goal:** `ferrolua check` reports type errors in annotated Ferrolua code, using inline
 annotations, LuaCATS comments, and declarations for the standard library.
 
 - [ ] **M6.1 — analysis: names, scopes, and symbols**
@@ -905,13 +964,16 @@ formats files without changing what they do.
     - Each comment form suppresses exactly the codes and lines it names.
   - Verify: `cargo test -p ferrolua-lint --locked`
 
-- [ ] **M7.2 — lint: correctness and memory rules**
+- [ ] **M7.2 — lint: correctness, porting, and memory rules**
+  - Note: 2026-11-24, the owner's choice (ADR-0023): the porting rules join this task, to catch
+    Lua habits that Python's operators and 0-based indexes turn into bugs.
   - Depends: M7.1
   - Do:
-    - Build the correctness and memory rules of [`specs/lint.md`](specs/lint.md#rules), registering
-      each code.
+    - Build the correctness, porting, and memory rules of [`specs/lint.md`](specs/lint.md#rules),
+      registering each code.
   - Accept:
-    - Each rule has a triggering file and a near miss, and `Class.__index = Class` is reported.
+    - Each rule has a triggering file and a near miss, `Class.__index = Class` is reported, and so
+      are `x ^ 2` and `for i = 1, #t do`.
   - Verify: `cargo test -p ferrolua-lint --locked`
 
 - [ ] **M7.3 — lint: performance and style rules**
@@ -946,10 +1008,11 @@ formats files without changing what they do.
     - `ferrolua fmt --check` exits with 1 on an unformatted file and 0 after `ferrolua fmt`.
   - Verify: `cargo test -p ferrolua-cli --locked`
 
-- [ ] **M7.7 — ci: lint and format the repository's Lua scripts**
+- [ ] **M7.7 — ci: lint and format the repository's Ferrolua scripts**
   - Depends: M7.6, M0.6
   - Do:
-    - Format the scripts in `tests/` and `benches/`, run both commands on them in CI, and update the
+    - Format the Ferrolua scripts in `tests/` and `benches/`, excluding the Lua 5.5 twins in
+      `reference/` folders in `.ferrolua.lua`, run both commands on them in CI, and update the
       check commands in `.claude/rules/lua.md`.
   - Accept:
     - CI fails on a pull request that adds an unformatted script.
@@ -1222,7 +1285,8 @@ embed Ferrolua and use its language and tools.
 - [ ] **M12.3 — docs: user guide**
   - Depends: M12.2
   - Do:
-    - Write a guide to embedding Ferrolua and to its language extensions and tools, with examples
+    - Write a guide to embedding Ferrolua, to its language and how it differs from Lua 5.5, and to
+      its tools, with examples
       that run as doc tests or conformance scripts.
   - Accept:
     - Every example in the guide runs.
@@ -1251,7 +1315,8 @@ following the guide.
 | Incremental loop collection, which spreads one collection over several safe points to shorten pauses | A host measures a collection pause above the agreed budget that turning off automatic runs and scheduling collections can't avoid |
 | Spreading the freeing of one large structure over several safe points | A benchmark measures a pause over 1 ms from freeing one value |
 | Deferred counting of register references, which changes when `__gc` runs and needs a new record | M5.1 shows count updates above ADR-0018's threshold after M11.2 |
-| Running lua.org's official 5.5.1 test suite; it isn't part of the platform today | The owner adds it to the platform in a decision record |
+| Running lua.org's official 5.5.1 test suite, ported to Ferrolua; it isn't part of the platform today | The owner adds it to the platform in a decision record |
+| A tool that ports Lua 5.5 scripts to Ferrolua's operators, indexes, and ranges, and reports what it can't change safely (ADR-0023) | A user reports porting a Lua library by hand, or a host asks for one |
 | Coverage-guided fuzzing; stable Rust can't read coverage counters while running | A stable rustc option exposes coverage counters in process |
 | Branch coverage instead of regions | rustc stabilizes branch coverage |
 | A mutation testing tool of Ferrolua's own; none runs today | A bug ships past a test that ran its code without asserting on the result |

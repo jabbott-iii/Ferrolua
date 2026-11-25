@@ -8,7 +8,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0001 — Branch from Lua 5.5
 
-- **Status:** Accepted
+- **Status:** Accepted; ADR-0023 makes Ferrolua a language of its own, so PUC-Rio Lua 5.5.1 is the
+  reference only for what Ferrolua keeps from Lua 5.5, through paired scripts
 - **Date:** 2026-11-24
 - **Context:** Ferrolua implements an existing Lua version, so scripts written for it run on
   Ferrolua and its behavior can be checked against a reference. Lua 5.5 was released on
@@ -119,7 +120,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0004 — Extend Lua 5.5 as a superset, with strict checks turned on per chunk
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0023, which keeps strict mode turned on per chunk
 - **Date:** 2026-11-24
 - **Context:** Ferrolua adds optional types, classes, compound assignment and `++`, arity
   enforcement, and undeclared-variable errors to Lua 5.5. The new syntax is a syntax error in
@@ -149,7 +150,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0005 — Add `++` and compound assignment, but no `--` or XOR-assign
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0023
 - **Date:** 2026-11-24
 - **Context:** C, Java, and JavaScript programmers expect `x += 1` and `x++`. In Lua, `--` starts a
   comment, so `x--` can't mean "decrement" without breaking every comment written after code on a
@@ -170,7 +171,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0006 — Write optional types inline, check them before run, and use them only as guarded hints
 
-- **Status:** Accepted
+- **Status:** Accepted; under ADR-0023, plain Lua 5.5 files no longer parse as Ferrolua, so the
+  LuaCATS annotations it reads serve code ported from Lua 5.5
 - **Date:** 2026-11-24
 - **Context:** Optional types let a program declare what kind of value a variable holds, so a tool
   can report mistakes before the program runs. Untyped code keeps working, which is the "optional"
@@ -235,13 +237,13 @@ it is `Proposed`, and no code may depend on it.
 
 - **Status:** Proposed
 - **Date:** 2026-11-24
-- **Context:** ADR-0004 makes arity enforcement and undeclared-variable errors opt-in per chunk, by
-  the host or by a directive in the file. Lua 5.5's `global` declarations already make an
-  undeclared name an error inside their scope: a chunk that starts with `global none` may use only
-  the names it declares.
+- **Context:** ADR-0004, and ADR-0023 after it, make arity enforcement and undeclared-variable
+  errors opt-in per chunk, by the host or by a directive in the file. Lua 5.5's `global`
+  declarations already make an undeclared name an error inside their scope: a chunk that starts
+  with `global none` may use only the names it declares.
 - **Decision:**
-  - A chunk turns strict mode on with a first line of `--!strict`. It is a comment, so PUC-Rio Lua
-    5.5 ignores it, and the file still runs there.
+  - A chunk turns strict mode on with a first line of `--!strict`. It is a comment, so a tool that
+    doesn't know the directive reads an ordinary comment.
   - A host turns it on with an option when it loads a chunk, and can turn on either check alone.
   - Undeclared-variable errors work as if the chunk started with a `global` declaration that lists
     only the names the host registered. Using any other free name without declaring it is a
@@ -252,7 +254,7 @@ it is `Proposed`, and no code may depend on it.
     so it holds whoever calls it.
   - [`specs/language.md`](specs/language.md) gives the details.
 - **Consequences:**
-  - Good: a strict file still runs on PUC-Rio Lua 5.5, unchecked.
+  - Good: turning strict mode on or off changes one line and no code.
   - Good: undeclared-variable errors reuse Lua 5.5's own rules, so they need no new semantics.
   - Bad: arity enforcement adds a comparison to each call of a strict function.
 - **Alternatives considered:**
@@ -746,3 +748,166 @@ it is `Proposed`, and no code may depend on it.
     would collect at its own points, and its recordings wouldn't replay on the others.
 - **Revisit when:** a host measures a state whose real memory is more than twice its counted bytes,
   or needs a limit on a state's total work across calls.
+
+## ADR-0023 — Make Ferrolua a language of its own, with Python's operators and 0-based indexes
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:**
+  - ADR-0004 made Ferrolua's language a superset of Lua 5.5, so every valid Lua 5.5 script runs
+    unchanged, and ADR-0005 added `++` and compound assignment as C, Java, and JavaScript write
+    them. On 2026-11-24 the owner asked instead for operators that follow Python's, for simplicity,
+    and for indexes that start at 0 instead of 1.
+  - Neither change fits a superset, which can add only syntax that is an error in Lua 5.5 today.
+    Lua already gives `^` (power), `..` (concatenation), `~=` (not equal), and binary `~` (XOR)
+    meanings of their own, and a Lua script that reads `t[1]` expects a list's first element.
+  - Asked the same day how far the change should go, the owner chose a language of its own over two
+    other options: a mode that each chunk turns on, and Python's spellings only where Lua leaves
+    them unused, such as `!=` and `**`, which would keep indexes 1-based.
+  - The owner then chose, for each detail that choice raised: `+` joins strings, and no operator
+    converts between strings and numbers; `#` stays the length operator; Python's `in`, `not in`,
+    `is`, `is not`, chained comparisons, and conditional expressions join the language; a range
+    excludes its end, as Python's `range` does; operators on numbers give Python's results; and
+    library functions stop converting their arguments too.
+  - PUC-Rio Lua 5.5.1 is the reference for what Ferrolua shares with Lua 5.5 (ADR-0001), and 26
+    documents relied on running the same script on both.
+- **Decision** (the owner chose the first of three options for the scope, and one option for each
+  of six details, on 2026-11-24):
+  - **A language of its own.** Ferrolua's language derives from Lua 5.5. It keeps Lua's statements,
+    values, tables, metatables, closures, coroutines, and standard library, apart from the changes
+    below. It no longer promises to run Lua 5.5 scripts unchanged, and has no mode that does.
+    Strict mode stays off unless a chunk or its host turns it on, as ADR-0004 decided.
+  - **Python's operators.** Operators take Python's spellings, precedence, and associativity. `**`
+    raises to a power, `!=` tests inequality, `^` is bitwise XOR, and `+` also joins two strings.
+    `not` binds more loosely than a comparison, so `not a == b` means `not (a == b)`. Lua's `..`,
+    `~=`, and binary `~` are gone, and with `..` its metamethod `__concat`; unary `~` stays bitwise
+    NOT, and `#` stays the length operator.
+  - **Python's additions.** `k in t` is true when table `t` has the key `k`, or when string `t`
+    contains the string `k`, and `not in` is its negation. `a is b` is true when both sides are the
+    same object, as `rawequal(a, b)` tests, and `is not` is its negation. Comparisons chain:
+    `a < b < c` means `a < b and b < c`, with `b` evaluated once. `x if c else y` is a conditional
+    expression.
+  - **Compound assignment as in Python.** `+=`, `-=`, `*=`, `/=`, `//=`, `%=`, `**=`, `&=`, `|=`,
+    `^=`, `<<=`, and `>>=` stay statements with one target, as ADR-0005 made them. `++` and `..=`
+    are gone.
+  - **No implicit conversion.** Neither an operator nor a library function converts between strings
+    and numbers: `"10" + 1` and `string.rep("x", "3")` raise errors. `tostring` and `tonumber`
+    convert.
+  - **Python's results on numbers.** Integers stay 64-bit and wrap around on overflow, as in
+    Lua 5.5. An integer raised to a non-negative integer power gives an integer, `>>` keeps the
+    sign, a negative shift count raises an error, and division by zero with `/`, `//`, or `%` raises
+    an error, for integers and floats alike.
+  - **Indexes from 0, and ranges without their end.** Table constructors, `#`, `ipairs`, `select`,
+    varargs, and every library position count from 0, and a negative position counts back from the
+    end, with -1 the last. A range covers its start but not its end: `for i = 0, n do` runs n times,
+    and `string.sub(s, 0, 3)` gives the first three bytes.
+  - [`specs/language.md`](specs/language.md) gives the grammar and the meanings, and
+    [`specs/stdlib.md`](specs/stdlib.md) the positions each library function takes. ADR-0024
+    settles the details these choices leave open.
+- **Consequences:**
+  - Good: a reader who knows Python reads Ferrolua's expressions, indexes, and ranges without
+    learning Lua's spellings, and a loop over a list needs no `- 1`.
+  - Good: `"10" + 1` raises an error instead of giving 11, so a string that holds a number can't
+    change a sum unnoticed.
+  - Good: `x if c else y` gives `x` even when `x` is `false` or `nil`, where Lua's idiom
+    `c and x or y` gives `y`.
+  - Bad: a Lua 5.5 script runs unchanged only if it uses none of the changed operators, indexes, or
+    ranges. Existing Lua code and libraries need porting, and Lua tools such as lua-language-server,
+    StyLua, and luacheck misread Ferrolua files.
+  - Bad: `in` tests a table's keys, as Python's `in` does for a dictionary, so `3 in {1, 2, 3}` is
+    false: that table's keys are 0, 1, and 2. A Python programmer who reads the table as a list
+    expects true.
+  - Bad: PUC-Rio Lua can't run Ferrolua's conformance scripts. Each becomes a pair: a Lua 5.5
+    reference script that PUC-Rio runs to record the expected output, and its Ferrolua twin, which
+    must print the same ([`04-quality.md`](04-quality.md#conformance-scripts)). Behavior with no
+    Lua 5.5 counterpart is checked against output written from the spec.
+  - Bad: code ported from Lua that squares with `x ^ 2` now computes an XOR, with no error when `x`
+    is an integer. A porting rule of the linter reports it (M7.2).
+  - Bad: the `if` of a conditional expression can follow an expression at a place where an `if`
+    statement can also start, so the parser decides by the token after the condition
+    ([`specs/language.md`](specs/language.md#conditional-expressions)).
+  - Follow-up: M1.2 and M1.5 lex and parse the new operators; M2.4 numbers tables from 0; M2.6 and
+    M2.7 compile chained comparisons, conditional expressions, and half-open `for` loops; M2.9
+    builds the operators' results and records their messages; M2.13 and M3.3–M3.11 move the
+    libraries to 0-based, half-open positions with no conversion; M4.1 and M4.2 build Python's
+    compound assignment; M7.2 adds the porting rules; the owner decides whether Ferrolua files keep
+    the `.lua` extension.
+- **Alternatives considered:**
+  - A mode that each chunk turns on, with Lua 5.5 as the default: existing scripts keep running,
+    but every table passed between the two modes needs its integer keys shifted, in the VM, the JIT,
+    and every library function.
+  - Python's spellings only where Lua leaves them unused, such as `!=` and `**`: the superset holds,
+    but indexes stay 1-based, `^` stays power, and `..` stays.
+- **Revisit when:** a host needs to run Lua 5.5 code it can't port, such as a library it doesn't
+  maintain.
+
+## ADR-0024 — Settle what Python's operators and 0-based indexes leave open
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:** ADR-0023 records the owner's choices: Python's operators, indexes from 0, ranges
+  without their end, and no implicit conversion. Writing them into the language spec raised
+  questions those choices don't answer. Python and Lua disagree about which values are false.
+  Python's `in` works through a method that Lua's values don't have. Python never accepts a float
+  where it needs an integer, while Lua 5.5 accepts `3.0`. Some numbers in Lua count things that
+  aren't positions, such as lines and stack levels. The agent proposed these answers on
+  2026-11-24, and the owner accepted them the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
+  - **Truth stays Lua's.** Only `nil` and `false` are false. `0`, `""`, and an empty table are
+    true, unlike in Python.
+  - **Membership.** `k in v` calls `v`'s `__contains` metamethod, a new one, when `v` has it, and
+    converts the result to a boolean. Otherwise it is true when `v` is a table and `rawget(v, k)`
+    isn't `nil`, so `__index` isn't consulted, or when `v` and `k` are both strings and `k` occurs
+    in `v` as plain text, not as a pattern. Any other pair raises an error.
+  - **`is` is a reserved word,** so `a is b` can't also read as `a` followed by a statement that
+    starts with a variable named `is`.
+  - **Unary `+`** returns a number unchanged and raises an error for any other value. It has no
+    metamethod.
+  - **No float stands in for an integer.** A bitwise operand, a shift count, and a library
+    parameter that takes an integer reject a float, even one with an integer value such as `3.0`,
+    as Python does; `math.tointeger` and `math.floor` convert. A float key with an integer value,
+    such as `2.0`, still names the same field as `2`, as in Lua and in Python's dictionaries.
+  - **What still counts from 1:** line and column numbers; argument numbers in messages, such as
+    `bad argument #1`; stack levels in `error` and `debug.getinfo`; pattern capture numbers, where
+    `%1` is the first capture and `%0` the whole match, as Python's `re` numbers its groups; and the
+    month, day, and weekday fields of `os.date` and `os.time`, which are calendar values, not
+    positions.
+  - **`arg` keeps Lua's layout,** which Python's `sys.argv` shares: `arg[0]` is the script, and
+    `arg[1]` the first argument.
+  - **`debug` numbers locals and upvalues from 0,** in `getlocal`, `setlocal`, `getupvalue`,
+    `setupvalue`, `upvalueid`, and `upvaluejoin`. A negative number still names a vararg, with -1
+    the first.
+  - **`math.random(0)`** still returns an integer whose bits are all random, because the empty
+    range it would otherwise name has no use.
+  - **`ferrolua run` reads `FERROLUA_INIT`** instead of `LUA_INIT_5_5` and `LUA_INIT`, which hold
+    Lua 5.5 code for `lua`.
+  - **Not adopted from Python:** `@` (matrix multiplication), `:=` (assignment inside an
+    expression), slices such as `t[0:3]`, `lambda`, and `await`. Ferrolua has no matrices, its
+    assignments are statements, `:` already calls methods, `function` already makes an anonymous
+    function, and coroutines already suspend.
+- **Consequences:**
+  - Good: ported Lua code keeps every `if`, `while`, `and`, and `or` working as before.
+  - Good: `in` works on tables, strings, and a host's userdata, and needs no `__index` call that
+    could raise an error, such as a class instance's for an undeclared field.
+  - Bad: a Python programmer expects `0` and `""` to be false, but `if count then` runs its block
+    when `count` is 0.
+  - Bad: `string.rep("x", n / 2)` raises an error, because `/` gives a float; ported code writes
+    `n // 2`.
+  - Bad: a Lua script that names a variable `is` must rename it.
+  - Follow-up: M1.5 reserves `is`; M2.9 builds `in`, `is`, unary `+`, and the integer checks of the
+    bitwise operators; M2.13 rejects floats for integer parameters; M3.7 keeps `math.random(0)`;
+    M3.11 numbers locals and upvalues from 0; M3.14 reads `FERROLUA_INIT`.
+- **Alternatives considered:**
+  - Python's truth, where `0`, `""`, and empty containers are false: familiar to Python
+    programmers, but it changes every condition in ported code, and a table would be false when
+    empty whether it serves as a list or a dictionary.
+  - `in` that follows `__index`: it would see inherited fields, but it would also run code, and
+    raise an error for a class instance's undeclared field.
+  - `is` as a contextual keyword: old names keep working, but `a is (b)` would read both as an
+    identity test and as `a` followed by the call `is(b)`.
+  - Floats with integer values accepted as integers, as in Lua 5.5: fewer porting changes, but
+    `3.0 | 1` would work where Python raises an error, against the owner's choice of Python's
+    results.
+  - Reading `LUA_INIT`, as `lua` does: a user's Lua 5.5 startup code would fail to parse.
+- **Revisit when:** users report bugs from expecting `0` or `""` to be false, as in Python, or a
+  host needs `in` to see fields that `__index` provides.

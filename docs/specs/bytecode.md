@@ -26,9 +26,9 @@ these forms:
 | `AsBx` | an 8-bit register and a 16-bit signed operand, such as a jump offset |
 | `sJ` | a 24-bit signed jump offset |
 
-An instruction that needs a wider operand is followed by an `EXTRA` word. The instruction set
-covers moves and loads, upvalues, globals through `_ENV`, table access with constant-key forms,
-arithmetic, bitwise, comparison and concatenation with constant operands, jumps, calls and tail
+An instruction that needs a wider operand is followed by an `EXTRA` word. The instruction set covers
+moves and loads, upvalues, globals through `_ENV`, table access with constant-key forms, arithmetic,
+bitwise, and comparison with constant operands, membership and identity tests, jumps, calls and tail
 calls, returns, varargs, numeric and generic `for`, closures, `<close>` variables, and the
 extensions: `ARITY` checks, class construction, and field access by slot. M2.1 records the full
 list, with each opcode's operands and effect, in this section.

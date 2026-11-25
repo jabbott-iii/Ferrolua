@@ -1,10 +1,11 @@
 # Subsystem: `ferrolua-vm`
 
 `ferrolua-vm` runs bytecode. It owns the heap of reference-counted values and the deterministic
-loop collector ([`memory.md`](memory.md)), the tables, the interpreter loop, metamethods, error handling,
-coroutines, the limits of [`sandbox.md`](sandbox.md), and the hooks the debugger uses. It matches
-PUC-Rio Lua 5.5.1's results and error messages, and contains no `unsafe` code (ADR-0011, proposed:
-the heap is safe Rust with generational handles). It doesn't depend on the JIT: it defines a trait
+loop collector ([`memory.md`](memory.md)), the tables, the interpreter loop, metamethods, error
+handling, coroutines, the limits of [`sandbox.md`](sandbox.md), and the hooks the debugger uses.
+Where the language keeps Lua 5.5's behavior, it matches PUC-Rio Lua 5.5.1's results and error
+messages, and it contains no `unsafe` code (ADR-0011, proposed: the heap is safe Rust with
+generational handles). It doesn't depend on the JIT: it defines a trait
 that a compiled tier implements, and the `ferrolua` crate plugs the JIT in. It lands in M2.2–M2.12.
 
 ## Why an interpreter in safe Rust
@@ -26,7 +27,8 @@ keys that collide, or from `Options::hash_seed` when a host needs runs to repeat
 
 ## Tables
 
-A table has an array part for keys 1 to n and a hash part for the rest, as in PUC-Rio Lua. The
+A table has an array part for keys 0 to n − 1 and a hash part for the rest (ADR-0023: a language
+of its own, with Python's operators and 0-based indexes). The
 hash part uses open addressing with the seeded hash. Float keys with integer values, such as
 `2.0`, are stored as integers, and `nil` and NaN keys raise PUC-Rio's errors.
 
@@ -39,9 +41,10 @@ hash part uses open addressing with the seeded hash. Float keys with integer val
   over a cap on 2026-11-24. A cap would also bound a host that sets no limit, but it needs a
   fallback structure for keys that share a full hash, and more code in every table operation.
 
-- `#t` returns a border: an n where `t[n]` isn't `nil` and `t[n + 1]` is, or 0 when `t[1]` is
+- `#t` returns a border: an n where `t[n - 1]` isn't `nil` and `t[n]` is, or 0 when `t[0]` is
   `nil`. When a table has several borders, Ferrolua returns the one PUC-Rio Lua 5.5.1's algorithm
-  returns, so `#{1, nil, 3}` gives what PUC-Rio gives.
+  returns for the same table with every integer key one higher, so `#{1, nil, 3}` gives what
+  PUC-Rio gives for its own `{1, nil, 3}`.
 - `next` visits the array part in order, then the hash part, and continues correctly while the
   loop assigns `nil` to visited fields, as §6.1 of the manual allows.
 
@@ -52,27 +55,30 @@ A call pushes a frame with a base register and a return address; a tail call reu
 proper tail calls use no stack. Native functions, the ones written in Rust, are called with a view
 of their argument registers and return values the same way.
 
-Integer and float arithmetic follows §3.4.1 of the manual: integer operations wrap around on
-overflow, `//` and `%` round toward minus infinity, and strings convert to numbers in arithmetic.
-Number-to-string conversion prints floats with enough digits to read back the same value, as
+Operators follow [`language.md`](language.md#meanings): integer operations wrap around on
+overflow, `//` and `%` round toward minus infinity, `**` of two integers gives an integer when the
+exponent isn't negative, `>>` keeps the sign, division by zero raises an error, and nothing
+converts between strings and numbers. M2.9 records each operator's edge cases and error messages
+here. Number-to-string conversion prints floats with enough digits to read back the same value, as
 Lua 5.5 does, using PUC-Rio's exact rules, which M2.9 records here.
 
 ## Metamethods
 
-Every event in §2.4 of the manual is supported: arithmetic, bitwise, `__concat`, `__len`, `__eq`,
-`__lt`, `__le`, `__index`, `__newindex`, `__call`, `__close`, `__gc`, `__mode`, `__name`,
-`__tostring`, `__metatable`, and `__pairs`. A chain of `__index` or `__newindex` tables stops at
-PUC-Rio Lua 5.5.1's limit, with its message, which M2.10 records here. A chain of `__call` stops
-after 15 objects, as §8.1 of the manual says.
+Every event in §2.4 of the manual is supported: arithmetic, bitwise, `__len`, `__eq`, `__lt`,
+`__le`, `__index`, `__newindex`, `__call`, `__close`, `__gc`, `__mode`, `__name`, `__tostring`,
+`__metatable`, and `__pairs`, apart from `__concat`, which went with `..`. `__contains` is new, for
+`in` (ADR-0024: the details Python's operators and 0-based indexes leave open). A chain of
+`__index` or `__newindex` tables stops at PUC-Rio Lua 5.5.1's limit, with its message, which M2.10
+records here. A chain of `__call` stops after 15 objects, as §8.1 of the manual says.
 
 ## Errors
 
 A Lua error is a value carried in `Err` back through each frame, never a panic. Each frame on the
 way closes its `<close>` variables. `pcall` and `xpcall` catch errors, except the limit errors of
-[`sandbox.md`](sandbox.md). Runtime messages match PUC-Rio Lua 5.5.1's, including the variable
-description the bytecode allows, as in `attempt to index a nil value (global 'config')` and
-`attempt to call a nil value (method 'draw')`. An error with a `nil` value becomes a string, as
-Lua 5.5 does.
+[`sandbox.md`](sandbox.md). Runtime messages for the errors Ferrolua shares with Lua 5.5 match
+PUC-Rio Lua 5.5.1's, including the variable description the bytecode allows, as in
+`attempt to index a nil value (global 'config')` and `attempt to call a nil value (method 'draw')`.
+An error with a `nil` value becomes a string, as Lua 5.5 does.
 
 ## Coroutines
 
@@ -107,8 +113,10 @@ calls `run` when a function has compiled code. `Exit` says where the interpreter
 1. Every conformance script prints its recorded output.
 2. No input, script, or bytecode panics the VM.
 3. A proper tail call in a loop runs in constant stack: 10,000,000 tail calls use the stack of one.
-4. Every runtime error message matches PUC-Rio Lua 5.5.1's for the same script.
-5. `#t` returns the border PUC-Rio Lua 5.5.1 returns, for every table built by the same script.
+4. Every runtime error message that Lua 5.5 shares matches what PUC-Rio Lua 5.5.1 gives for the
+   conformance script's reference twin.
+5. `#t` returns the border PUC-Rio Lua 5.5.1 returns for the table the reference twin builds, whose
+   integer keys are each one higher.
 
 ## Tests
 

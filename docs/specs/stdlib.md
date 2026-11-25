@@ -1,13 +1,15 @@
 # Subsystem: `ferrolua-stdlib`
 
 `ferrolua-stdlib` implements Lua 5.5's standard libraries, §6 of the manual: the base library,
-`coroutine`, `package`, `string`, `utf8`, `table`, `math`, `io`, `os`, and `debug`. Each function
-returns what PUC-Rio Lua 5.5.1 returns and raises the errors it raises, word for word, apart from
-the intended differences in [`memory.md`](memory.md) (`collectgarbage`) and
-[`sandbox.md`](sandbox.md) (granted libraries, `os.exit`, and file access), and object IDs where
-PUC-Rio prints addresses ([Object IDs in output](#object-ids-in-output)). Every function that can
-run long counts its work against the instruction limit. The base library lands in M2.13, and the
-rest in M3.
+`coroutine`, `package`, `string`, `utf8`, `table`, `math`, `io`, `os`, and `debug`. Positions count
+from 0, ranges stop before their end, and no argument converts between strings and numbers
+(ADR-0023: a language of its own, with Python's operators and 0-based indexes). Apart from those
+changes, each function returns what PUC-Rio Lua 5.5.1 returns and raises the errors it raises,
+word for word, except for the intended differences in [`memory.md`](memory.md) (`collectgarbage`)
+and [`sandbox.md`](sandbox.md) (granted libraries, `os.exit`, and file access), and object IDs
+where PUC-Rio prints addresses ([Object IDs in output](#object-ids-in-output)). Every function that
+can run long counts its work against the instruction limit. The base library lands in M2.13, and
+the rest in M3.
 
 ## Why port behavior and never code
 
@@ -20,8 +22,50 @@ it does, and its conformance scripts then prove the Rust version does the same.
 ## Arguments and errors
 
 Every function checks its arguments as PUC-Rio's `luaL_check*` functions do, with the same
-messages, such as `bad argument #1 to 'insert' (table expected, got nil)`. A helper module
-gives every library the same checks, so the wording can't drift between them.
+messages, such as `bad argument #1 to 'insert' (table expected, got nil)`, except that it converts
+nothing:
+
+- A parameter that takes a number rejects a string, and one that takes a string rejects a number,
+  so `string.rep("x", "3")`, `string.len(123)`, and `table.concat({1, 2})` raise errors (ADR-0023).
+- A parameter that takes an integer rejects a float, even one with an integer value such as `3.0`
+  (ADR-0024: the details Python's operators and 0-based indexes leave open).
+- `print`, `tostring`, and `string.format`'s `%s` still turn any value into a string, because that
+  is what they are for, and `tonumber` still reads a number from a string.
+
+M2.13 records the message for each rejected argument here. Argument numbers in messages still
+count from 1, so `#1` is the first argument. A helper module gives every library the same checks,
+so the wording can't drift between them.
+
+## Positions and ranges
+
+A position counts from 0, and a negative position counts back from the end, with -1 the last. A
+range from i to j covers i and stops before j, as Python's slices do, and a range that runs past
+either end is cut to fit, as in Lua and Python
+([`language.md`](language.md#indexes-and-ranges-adr-0023)).
+
+| Function | What its positions name | Defaults |
+| :- | :- | :- |
+| `select(i, ...)` | The arguments from i on | None |
+| `ipairs(t)` | `t[0]`, `t[1]`, and so on, to the first `nil` | |
+| `string.sub(s, i, j)` | Bytes i to j − 1 | j is `#s` |
+| `string.byte(s, i, j)` | Bytes i to j − 1 | i is 0, j is i + 1 |
+| `string.find(s, p, init, plain)` | Searches from `init`, and returns the match's start and its end, so `s:sub(start, stop)` is the match | `init` is 0 |
+| `string.match` and `string.gmatch` | Search from `init`; a position capture `()` gives a 0-based position | `init` is 0 |
+| `string.unpack(fmt, s, pos)` | Reads from `pos`, and returns the next position after the values | `pos` is 0 |
+| `table.insert(t, pos, v)` | Inserts at `pos`, from 0 to `#t` | Without `pos`, appends at `#t` |
+| `table.remove(t, pos)` | Removes the element at `pos` | `pos` is `#t - 1` |
+| `table.concat(t, sep, i, j)` and `table.unpack(t, i, j)` | Elements i to j − 1 | i is 0, j is `#t` |
+| `table.move(a1, f, e, t, a2)` | Copies `a1[f]` to `a1[e - 1]` into `a2` from `a2[t]` on | `a2` is `a1` |
+| `table.pack(...)` | Stores the arguments at 0 to n − 1, and n in the field `n` | |
+| `utf8.codepoint(s, i, j)` and `utf8.len(s, i, j)` | Characters that start in bytes i to j − 1 | i is 0; j is i + 1 for `codepoint` and `#s` for `len` |
+| `utf8.offset(s, n, i)` | The start and the end of character n, counting from byte i; n = 0 is the character that contains byte i, and a negative n counts back | i is 0 when n ≥ 0, and `#s` otherwise |
+| `utf8.codes(s)` | Gives each character's 0-based byte position and its code point | |
+| `math.random(m, n)` | An integer from m to n − 1; `math.random(n)` is from 0 to n − 1, and `math.random(0)` an integer whose bits are all random (ADR-0024) | |
+| `debug.getlocal`, `setlocal`, `getupvalue`, `setupvalue`, `upvalueid`, and `upvaluejoin` | Locals and upvalues from 0; a negative number names a vararg, with -1 the first (ADR-0024) | |
+
+Pattern capture numbers, stack levels, line numbers, `file:seek` offsets, and the fields of
+`os.date` and `os.time` don't change: `%1` is still the first capture, and a month is still 1 to
+12.
 
 ## Libraries
 
@@ -67,19 +111,26 @@ The `#` keeps an ID from reading as a number or as an address.
 ## Invariants
 
 1. Every standard library function returns and raises what PUC-Rio Lua 5.5.1 does for the same
-   arguments.
+   arguments, once each position is moved to count from 0 and each range to stop before its end.
 2. Every function that can run long stops at the instruction limit.
 3. A library the host didn't grant has no function in the state.
 4. Formatting any float with `%.17g` and reading it back with `tonumber` gives the same float.
 5. No result of any library function contains a memory address.
+6. No library function, apart from `print`, `tostring`, `tonumber`, and `string.format`'s `%s`,
+   converts an argument between a string and a number.
 
 ## Tests
 
 - Invariant 1: one conformance script per library, `tests/conformance/string_format.lua` and so
-  on, with argument errors caught by `pcall` and printed.
+  on, each with a Lua 5.5 reference twin that PUC-Rio runs
+  ([`04-quality.md`](../04-quality.md#conformance-scripts)), with argument errors caught by `pcall`
+  and printed. The positions and ranges in the table above are checked against output written from
+  this spec in `tests/extensions/positions.lua`.
 - Invariant 2: the limit tests in [`sandbox.md`](sandbox.md#tests).
 - Invariant 3: the allowlist test in `hostile_sandbox.rs`.
 - Invariant 4: a property test on generated bit patterns, including every class of special value.
 - Invariant 5: `tests/extensions/object_ids.lua` prints the formats in the table above, and a
   test runs every conformance script and checks that no output contains `0x` followed by 12 or
   more hexadecimal digits.
+- Invariant 6: a test calls every library function with a numeric string where it takes a number,
+  and with a number where it takes a string, and checks that each call raises the wrong-type error.

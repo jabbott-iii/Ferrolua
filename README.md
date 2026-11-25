@@ -1,25 +1,29 @@
 # Ferrolua
 
-Ferrolua is a Lua 5.5 virtual machine with a just-in-time (JIT) compiler, written in Rust, for Rust
-programs that embed Lua. It is designed to keep memory safe whatever a script does, to use no
-third-party code, and to free memory deterministically: by reference counting, with a loop
-collector that runs at points the program fixes, so every run frees the same values in the same
-order.
+Ferrolua is a virtual machine with a just-in-time (JIT) compiler for a scripting language derived
+from Lua 5.5, written in Rust, for Rust programs that embed one. It is designed to keep memory safe
+whatever a script does, to use no third-party code, and to free memory deterministically: by
+reference counting, with a loop collector that runs at points the program fixes, so every run frees
+the same values in the same order.
 
 **Status:** design only. The design documents in [`docs/`](docs/) are written, and no code exists
 yet. The next task is M0.1 in the [roadmap](docs/roadmap.md), which creates the Cargo workspace.
 
 ## What is planned
 
-- **Lua 5.5:** every valid Lua 5.5 script will run as it does on PUC-Rio Lua 5.5.1, the reference
-  interpreter, apart from the differences the [decision log](docs/decisions.md) records.
+- **A language derived from Lua 5.5:** Lua's statements, values, and libraries, with Python's
+  operators, indexes that start at 0, and ranges that stop before their end, as the
+  [language spec](docs/specs/language.md) defines them. Where the language keeps Lua 5.5's
+  behavior, a script will print what PUC-Rio Lua 5.5.1, the reference interpreter, prints for the
+  same code written in Lua, apart from the differences the [decision log](docs/decisions.md)
+  records.
 - **Memory safety:** the heap will be safe Rust, and `unsafe` code will be confined to the JIT's
   executable memory.
 - **A sandbox:** hosts will choose which libraries each script gets, and the VM will enforce
   memory, instruction, and call-depth limits that a script can't catch. Objects will print as IDs
   such as `table: #42`, never as memory addresses.
-- **Language extensions:** optional type annotations, classes, `++` and compound assignment such as
-  `+=`, and a strict mode that reports wrong argument counts and undeclared variables.
+- **Language extensions:** optional type annotations, classes, compound assignment such as `+=`, and
+  a strict mode that reports wrong argument counts and undeclared variables.
 - **Tools in one binary:** `ferrolua run`, `check` (types), `lint`, `fmt`, and `sast` (security),
   plus a language server for editor auto complete and a debug adapter for editor debugging.
 

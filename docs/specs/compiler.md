@@ -1,11 +1,12 @@
 # Subsystem: `ferrolua-compiler`
 
 `ferrolua-compiler` turns the compact tree from `ferrolua-syntax` into a `Prototype` in
-`ferrolua-bytecode`'s format. It resolves every name as a local, an upvalue, or a global under
-Lua 5.5's `global` rules; applies strict mode where it is on (ADR-0008, proposed: `--!strict` or a
-host option); compiles self-recursion without an upvalue, so it makes no loop for the collector to find
-(ADR-0018: reference counting plus a deterministic loop collector); folds constants; and allocates registers. It reports compile errors in PUC-Rio's
-wording. It lands in M2.5–M2.7; the extensions land in M4.
+`ferrolua-bytecode`'s format. It resolves every name as a local, an upvalue, or a global under Lua
+5.5's `global` rules; applies strict mode where it is on (ADR-0008, proposed: `--!strict` or a host
+option); compiles self-recursion without an upvalue, so it makes no loop for the collector to find
+(ADR-0018: reference counting plus a deterministic loop collector); folds constants; and allocates
+registers. It reports compile errors in PUC-Rio's wording. It lands in M2.5–M2.7; compound
+assignment, classes, and strict mode land in M4.
 
 ## Why a separate compiler pass
 
@@ -43,17 +44,23 @@ Registers are allocated in a stack discipline: locals take the lowest free regis
 temporaries sit above them and are released at the end of each expression. A function may use
 at most 255 registers; more raises `function or expression needs too many registers`, as in
 PUC-Rio. Constant folding evaluates arithmetic and bitwise operations on numeric constants at
-compile time, except where the result would differ at run time: division by zero, and integer
-operations that would raise an error. String constants and `<const>` locals with constant values
-are folded too.
+compile time, and `+` on string constants, except where the operation would raise an error at run
+time: division by zero, a negative shift count, a float in a bitwise operation, or a string with a
+number ([`language.md`](language.md#meanings)). `<const>` locals with constant values are folded
+too.
+
+A chained comparison such as `a < b < c` evaluates each middle operand once into a register and
+jumps past the rest of the chain at the first comparison that is false. A conditional expression
+`x if c else y` compiles to a test of `c` and two branches that each write the same register.
 
 ## Statements
 
 Each statement in §3.3 of the manual compiles as PUC-Rio's does, including `goto` and labels with
-Lua 5.5's rules on jumping into a local's scope, numeric `for` with integer and float loops,
-generic `for` with its closing value, and `<close>` variables, which run `__close` on every exit
-from their block. Compound assignment evaluates the target's parts once
-([`language.md`](language.md#compound-assignment-and--adr-0005)).
+Lua 5.5's rules on jumping into a local's scope, generic `for` with its closing value, and `<close>`
+variables, which run `__close` on every exit from their block. The numeric `for`, with integer and
+float loops, stops before its end ([`language.md`](language.md#indexes-and-ranges-adr-0023)).
+Compound assignment evaluates the target's parts once
+([`language.md`](language.md#compound-assignment-adr-0023)).
 
 ## Type hints
 
@@ -67,7 +74,8 @@ Hints never change what the bytecode does.
 2. Compiling the same source twice gives the same bytes.
 3. A self-recursive local function that isn't reassigned has no upvalue for its own name.
 4. Folding a constant gives the value the VM would compute, or isn't done.
-5. Every compile error PUC-Rio Lua 5.5.1 reports, Ferrolua reports with the same message and line.
+5. Every compile error in code Ferrolua shares with Lua 5.5, Ferrolua reports with PUC-Rio
+   Lua 5.5.1's message and line.
 
 ## Tests
 
@@ -75,6 +83,6 @@ Hints never change what the bytecode does.
 - Invariant 3: unit tests inspect the prototypes of recursive, reassigned, and mutually recursive
   functions.
 - Invariant 4: a property test evaluates generated constant expressions both folded and at run
-  time, including `math.mininteger // -1` and `1 // 0`.
+  time, including `math.mininteger // -1`, `1 // 0`, `2 ** 63`, `-1 >> 1`, and `1 << -1`.
 - Invariant 5: `tests/conformance/compile_errors.lua` loads each error case with `load` and prints
   the message.

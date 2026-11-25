@@ -21,9 +21,9 @@ workspace exists, which task M0.1 creates.
    rustup prints `1.100.0-x86_64-unknown-linux-gnu installed` on Linux on x86-64, or `unchanged`
    if you have it already.
 
-2. To record the expected output of a Lua conformance script, install PUC-Rio Lua 5.5.1, the
-   reference interpreter, from [lua.org](https://www.lua.org/download.html) or your operating
-   system's package manager.
+2. To record the expected output of a conformance script, which comes from its Lua 5.5 twin, install
+   PUC-Rio Lua 5.5.1, the reference interpreter, from [lua.org](https://www.lua.org/download.html)
+   or your operating system's package manager.
 
 There is nothing else to install. Ferrolua uses no third-party code, including test, lint, and
 format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
@@ -34,10 +34,11 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
   [`rust.md`](.claude/rules/rust.md) and [`lua.md`](.claude/rules/lua.md):
   - unit tests in a `#[cfg(test)] mod tests` beside the code
   - integration tests that use only the public API in each crate's `tests/`
-  - Lua conformance scripts in `tests/conformance/`, each with a `.out` file that holds the output
-    PUC-Rio Lua 5.5.1 printed for it
-  - scripts for Ferrolua-only behavior in `tests/extensions/`, each with a `.out` file written
-    from the spec section it tests
+  - Ferrolua conformance scripts in `tests/conformance/`, each with a Lua 5.5 twin in
+    `tests/conformance/reference/` and a `.out` file beside the twin that holds the output PUC-Rio
+    Lua 5.5.1 printed for it
+  - scripts for behavior with no Lua 5.5 counterpart in `tests/extensions/`, each with a `.out`
+    file written from the spec section it tests
   - fuzz targets in `fuzz/`, with every input that ever crashed one in `fuzz/regressions/`
 - Write the tests in the same change as the code. Coverage stays at 100% of lines and regions, and
   a failing test means the code is wrong: fix the code, never the test.
@@ -70,9 +71,10 @@ feat(syntax): parse goto statements and labels (M1.4)
   `workspace`, `docs`, `ci`, or `claude`. Leave it out when a change spans several areas.
 - End the summary line with the roadmap task's ID in parentheses when the commit finishes or
   advances one.
-- Make each commit one logical change, and keep together the changes that belong together: a
-  task's code, tests, and ticked checkbox; a change to how Ferrolua runs Lua and the conformance
-  script that covers it; and an `unsafe` block, its `// SAFETY:` comment, and its test.
+- Make each commit one logical change, and keep together the changes that belong together: a task's
+  code, tests, and ticked checkbox; a change to how Ferrolua runs a script and the script that
+  covers it, with its Lua 5.5 twin if it has one; and an `unsafe` block, its `// SAFETY:` comment,
+  and its test.
 - Mark a breaking change with a `BREAKING CHANGE:` trailer that names the decision record behind
   it.
 - Write messages, comments, and documents as [`writing.md`](.claude/rules/writing.md) describes:

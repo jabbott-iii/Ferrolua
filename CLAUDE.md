@@ -19,9 +19,8 @@ crate of the crate map in `docs/01-architecture.md`. Each crate holds only its c
 `ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
 `ferrolua-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
 `cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and `cargo xtask record` (M0.5).
-`tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin. M0.5 stays open until
-someone records the twin's `hello.out` with PUC-Rio Lua 5.5.1. The next task is M0.6, which adds
-the CI workflow.
+`tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin with the twin's recorded
+`hello.out`. The next task is M0.6, which adds the CI workflow.
 
 ## Read before working
 

@@ -13,10 +13,9 @@ runner; the fuzzer, which runs its targets on mutated inputs and saves each inpu
 fail; and `xtask`, whose `cargo xtask coverage` measures which lines and regions of code the tests
 run, whose `cargo xtask fuzz` runs the fuzzer, and whose `cargo xtask record` saves what PUC-Rio
 Lua 5.5.1 prints for the Lua 5.5 twin of each conformance script. The fuzzer has only the two
-targets that test it so far, and the one conformance script, `hello.lua`, has no recorded output
-yet. M0.5 in the [roadmap](docs/roadmap.md), the conformance recorder, stays open until someone
-records that output with PUC-Rio Lua 5.5.1, and the next task is M0.6, which adds the continuous
-integration (CI) workflow.
+targets that test it so far. The one conformance script, `hello.lua`, has its twin's output
+recorded, and waits for the conformance runner that M2.14 builds. The next task is M0.6 in the
+[roadmap](docs/roadmap.md), which adds the continuous integration (CI) workflow.
 
 ## What is planned
 

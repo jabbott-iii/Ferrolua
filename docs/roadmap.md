@@ -161,25 +161,26 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - Verify: `cargo xtask fuzz fixture-panic --seed 0 --runs 100000` (expect one saved input);
     `cargo test -p ferrolua-fuzz --locked`
 
-- [ ] **M0.5 — xtask: conformance recorder**
-  - Note: Built on 2026-11-25, apart from the recording. `cargo xtask record` finds the workspace's
-    root with `cargo metadata`, as `cargo xtask coverage` does, then runs `lua -E -v`, and
-    `lua -E <name>` on each script, from `tests/conformance/reference/`. `-E` makes Lua ignore
-    `LUA_INIT` and its other environment variables. It accepts an interpreter whose first line of
-    output from `-v` is `Lua 5.5.1`, alone or followed by whitespace, so it refuses `Lua 5.5.10` and
-    LuaJIT. It saves the `.out` files only after every script exits with status 0, and prints
-    `new`, `changed`, or `unchanged` for each one. The 5.5.1 sources on lua.org, read on
-    2026-11-25, keep `-E`, and their `lua.h` defines the line that `-v` prints as
+- [x] **M0.5 — xtask: conformance recorder**
+  - Note: Built on 2026-11-25. `cargo xtask record` finds the workspace's root with
+    `cargo metadata`, as `cargo xtask coverage` does, then runs `lua -E -v`, and `lua -E <name>` on
+    each script, from `tests/conformance/reference/`. `-E` makes Lua ignore `LUA_INIT` and its other
+    environment variables. It accepts an interpreter whose first line of output from `-v` is
+    `Lua 5.5.1`, alone or followed by whitespace, so it refuses `Lua 5.5.10` and LuaJIT. It saves
+    the `.out` files only after every script exits with status 0, and prints `new`, `changed`, or
+    `unchanged` for each one. The 5.5.1 sources on lua.org, read on 2026-11-25, keep `-E`, and
+    their `lua.h` defines the line that `-v` prints as
     `Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio`.
-  - Note: This machine has no PUC-Rio Lua, so `xtask/tests/record.rs` runs the task with a stand-in
+  - Note: CI never installs PUC-Rio Lua, so `xtask/tests/record.rs` runs the task with a stand-in
     interpreter, a Rust program that the tests compile with `rustc`. The tests check that it
     refuses Lua 5.4.7, an interpreter that prints no version, and one whose `-v` fails, and that
-    recording a script twice reports its `.out` file `unchanged` the second time. Here,
-    `cargo xtask record tests/conformance/reference/hello.lua` stops with
-    ``couldn't start `lua`: No such file or directory (os error 2)``, followed by how to install it.
-  - ⏳ needs PUC-Rio Lua 5.5.1: run `cargo xtask record tests/conformance/reference/hello.lua`
-    twice, and check that the first run saves `tests/conformance/reference/hello.out` holding
-    `hello, world` and reports it `new`, and the second reports it `unchanged`
+    recording a script twice reports its `.out` file `unchanged` the second time.
+  - Note: On 2026-11-25, with the owner's go-ahead, PUC-Rio Lua 5.5.1 was built in a scratch folder
+    with `make linux` and GCC 13.3.0, from `lua-5.5.1.tar.gz` on lua.org: 398,643 bytes, SHA-256
+    `1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce`, as lua.org lists. Its
+    `lua -v` printed the line above. `cargo xtask record tests/conformance/reference/hello.lua`
+    saved `hello.out`, the 13 bytes `hello, world` and a newline, and reported it `new`. A second
+    run, and a run with no script named, reported it `unchanged`.
   - Depends: M0.1
   - Do:
     - Build `cargo xtask record`, which runs PUC-Rio Lua 5.5.1 on the reference scripts in

@@ -8,9 +8,12 @@ the same values in the same order.
 
 **Status:** design and the first test tools. The design documents in [`docs/`](docs/) are
 written, and the Cargo workspace has a crate for each part. Each holds only its documentation,
-except the test kit, which has a seeded random generator and a property-test runner, and `xtask`,
-whose `cargo xtask coverage` measures which lines and regions of code the tests run. The next task
-is M0.4 in the [roadmap](docs/roadmap.md), which builds the fuzzer.
+except the test tools: the test kit, which has a seeded random generator and a property-test
+runner; the fuzzer, which runs its targets on mutated inputs and saves each input that makes one
+fail; and `xtask`, whose `cargo xtask coverage` measures which lines and regions of code the tests
+run, and whose `cargo xtask fuzz` runs the fuzzer. The fuzzer has only the two targets that test it
+so far. The next task is M0.5 in the [roadmap](docs/roadmap.md), which builds the conformance
+recorder.
 
 ## What is planned
 

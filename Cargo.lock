@@ -33,6 +33,9 @@ version = "0.0.0"
 [[package]]
 name = "ferrolua-fuzz"
 version = "0.0.0"
+dependencies = [
+ "ferrolua-testkit",
+]
 
 [[package]]
 name = "ferrolua-jit"

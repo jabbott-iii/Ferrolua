@@ -16,9 +16,10 @@ commits. Read the rule for each kind of file you touch.
 
 Design and the first test tools: the documents in `docs/` exist, and the Cargo workspace has every
 crate of the crate map in `docs/01-architecture.md`. Each crate holds only its crate docs, except
-`ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2),
-and `xtask`, which holds `cargo xtask coverage` (M0.3). The next task is M0.4, which builds the
-fuzzer and replays its saved inputs.
+`ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
+`ferrolua-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
+`cargo xtask coverage` (M0.3) and `cargo xtask fuzz` (M0.4). The next task is M0.5, which builds
+the conformance recorder.
 
 ## Read before working
 

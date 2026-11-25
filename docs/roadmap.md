@@ -126,7 +126,28 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     - Its own test, on a fixture crate with one uncovered function, sees it fail.
   - Verify: `cargo xtask coverage` (expect 100% of lines and regions); `cargo test -p xtask --locked`
 
-- [ ] **M0.4 — fuzz: the fuzzer and regression replay**
+- [x] **M0.4 — fuzz: the fuzzer and regression replay**
+  - Note: Built on 2026-11-25. `ferrolua-fuzz` is a program, as `xtask` is, and `cargo xtask fuzz`
+    runs it with `cargo run --locked --package ferrolua-fuzz`, in Cargo's dev profile. It sends
+    1,000 runs to each child process, and gives each input 1,000 ms unless `--time-limit` says
+    otherwise. The parent hands a child its batch, and reads its progress, through two files in a
+    work folder, `ferrolua-fuzz-<process ID>` in the system's temporary folder, which it removes
+    when it ends. On this machine (x86-64 Linux, an Intel Core i7-11800H, Rust 1.100.0), one
+    million runs of `fixture-panic` from an empty corpus take 8.3 s.
+  - Note: Without coverage guidance, a fuzzer doesn't find a 4-byte prefix from nothing, so
+    `fixture-panic`'s corpus, `fuzz/corpus/fixture-panic/fuz.bin`, holds the text
+    `FUZ, one byte short of what fixture-panic panics on`. From seed 0, run 676 splices it into a
+    52-byte input that starts with `FUZZ`, which shrinks to `FUZZ`, saved as
+    `fuzz/regressions/fixture-panic/c6d0a3857a0d9820.bin`. The command exits with status 1, because
+    a run failed.
+  - Note: `fixture-hang` follows links through its input, where each byte is the index of the next,
+    with no bound on the steps. From seed 0 and no corpus, run 1750 hangs on a 3-byte input, which
+    shrinks to the single byte 0. Shrinking a hang costs the time limit for each smaller input that
+    still hangs, so the whole run takes about 3 s at 1,000 ms. A child that the runner stops never
+    writes its coverage profile, so every line of the fixture also runs on inputs that pass.
+  - Note: The saved `FUZZ` input stays in `fuzz/regressions/`, so `cargo test` replays it. Each
+    target says how its saved inputs must replay: a fixture's must still fail as it is built to,
+    and the input of a target that checks Ferrolua's code must pass.
   - Depends: M0.2
   - Do:
     - Build `ferrolua-fuzz` in `fuzz/` as [`04-quality.md`](04-quality.md#ferrolua-fuzz) describes:
@@ -156,6 +177,11 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     `cargo test -p xtask --locked`
 
 - [ ] **M0.6 — ci: the CI workflow**
+  - Note (from M0.4): The fuzzer stops after `--runs` runs, and has no option for a length of time,
+    so the run of 60 s per target needs one, such as `--seconds`, or a number of runs measured to
+    take about 60 s. `cargo xtask fuzz` exits with status 1 when a run fails, which fails the job.
+    The two fixture targets fail on purpose, so CI fuzzes only the others, and there are none
+    until M1.9.
   - Depends: M0.3, M0.4
   - Do:
     - Write `.github/workflows/ci.yml`, running the automated checks of
@@ -289,6 +315,11 @@ builds on.
     each choice with `Source::below`. The program generator shrinks well if a choice of 0 gives the
     simplest program, for example when alternative 0 of each grammar rule is its shortest. Only the
     property runner can make a `Source` today, so the fuzzer needs a way to make one as well.
+  - Note (from M0.4): A target is an entry in `TARGETS` in `fuzz/src/target.rs`, with
+    `replays_as: Kind::Passed`, and its corpus goes in `fuzz/corpus/<target>/`. The fuzzer makes
+    each run's input only by mutation, in `fuzz/src/campaign.rs`, which is where generation from
+    the run's seed joins it. The fuzzer runs in Cargo's dev profile, which keeps overflow checks but
+    doesn't optimize; whether a million parser runs need a profile that does both is open.
   - Depends: M0.4, M1.7
   - Do:
     - Add the Ferrolua program generator to `ferrolua-testkit`, and the `lexer` and `parser`

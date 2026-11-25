@@ -26,6 +26,11 @@ members = [
     "xtask",
 ]
 
+# The crates that other members depend on, declared once so that each member refers to them with
+# `workspace = true`.
+[workspace.dependencies]
+ferrolua-testkit = { path = "crates/testkit" }
+
 # No crate sets `version` yet, so Cargo gives each one 0.0.0 and refuses to publish it. The
 # release tasks of milestone M12 set the versions.
 [workspace.package]

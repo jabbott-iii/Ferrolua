@@ -102,23 +102,52 @@ the shrunk case, and the original case, which the test harness prints.
 
 ### `ferrolua-fuzz`
 
-The fuzzer, in `fuzz/` (M0.4). It isn't coverage-guided, because stable Rust offers no way to read
-coverage counters while a program runs. It makes up for that in three ways:
+The fuzzer, a program in `fuzz/` that `cargo xtask fuzz` builds and runs (M0.4). A fuzzer feeds a
+target, such as the parser, a large number of inputs, and reports each one that makes the target
+fail. Ferrolua's fuzzer isn't coverage-guided, because stable Rust offers no way to read coverage
+counters while a program runs. It makes up for that in three ways:
 
-- **Generation:** it builds valid programs from the grammar, which reach deep into the compiler and
-  the VM.
-- **Mutation:** it flips, inserts, and splices bytes in the inputs in `fuzz/corpus/<target>/`.
-- **Differential checks:** it runs each program interpreted and with the JIT forced on, and reports
-  any difference.
+- **Mutation:** each run takes an input from `fuzz/corpus/<target>/` and changes it with one to
+  eight edits. An edit flips one bit, inserts one byte, or splices: it keeps the input up to a
+  random point and appends the end of a corpus input from another random point. A corpus input
+  close to the inputs that reach deep code does the work that coverage guidance would. A target
+  without a corpus starts from the empty input.
+- **Generation:** from M1.9, it will build valid programs from the grammar, which reach deep into
+  the compiler and the VM.
+- **Differential checks:** from M5.8, it will run each program interpreted and with the JIT forced
+  on, and report any difference.
 
-Each run starts from a fixed seed, so a run repeats. It runs each batch of inputs in a child
-process with a time limit, so a hang is caught without a thread. When a target crashes, the fuzzer
-shrinks the input, saves it as `fuzz/regressions/<target>/<hash>.bin`, and prints the command to
-replay it. `cargo test` replays every saved input.
+A target fails an input when it panics, crashes the process, or runs longer than the time limit,
+1,000 ms unless `--time-limit` says otherwise. Run `n` of a campaign from seed `s` makes its input
+from the seed `s + n`, so every run repeats, on every target. The fuzzer runs each batch of 1,000
+inputs in a child process: its own program, started again with `--child`, so a crash or a hang ends
+only the child. The child writes a newline to a file before each input, so the parent knows which
+input was running when the child stopped, and the parent stops a child once one input runs past the
+time limit. Neither process needs a thread.
+
+At the first input that fails, the fuzzer stops and shrinks the input. It runs each smaller
+candidate in a child process of its own: it deletes runs of bytes and lowers each byte toward 0,
+and keeps each edit after which the input still fails in the same way (a panic, a crash, or a
+hang). It saves the result as `fuzz/regressions/<target>/<hash>.bin`, where `<hash>` is the 64-bit
+Fowler–Noll–Vo (FNV-1a) hash of its bytes in hex, so finding a failure again doesn't save a second
+copy. Then it prints the command that replays the input in one process, where a panic shows its
+location.
+
+`cargo test` replays every saved input, each in a child process under the time limit, through the
+test `every_input_saved_in_the_repository_runs_as_it_should` in `fuzz/tests/fuzzer.rs`. A saved
+input of a target that checks Ferrolua's code must pass. The two fixture targets, `fixture-panic`
+and `fixture-hang`, fail on purpose, to give the fuzzer's own tests something to find, and their
+saved inputs must still fail as each is built to.
 
 ```bash
 cargo xtask fuzz <target> --seed 0 --runs 100000
+cargo xtask fuzz <target> --replay fuzz/regressions/<target>/<hash>.bin
+cargo xtask fuzz --replay-saved
 ```
+
+`cargo xtask fuzz` with nothing after it lists every option and target. A target is a function in
+`fuzz/src/target.rs` that takes an input's bytes, and it must keep no state from one input to the
+next, because a child runs many inputs, and shrinking runs one again alone.
 
 ### `ferrolua-webtest`
 
@@ -156,7 +185,9 @@ Build tasks run with `cargo xtask`, written with the standard library alone:
   `tests/conformance/reference/`, from that folder, and writes their `.out` files. It refuses an
   interpreter whose `lua -v` doesn't report 5.5.1. It reads the interpreter's path from
   `FERROLUA_PUC_LUA`, or finds `lua` on the `PATH`.
-- `cargo xtask fuzz` (M0.4): runs the fuzzer.
+- `cargo xtask fuzz [arguments]` (M0.4): builds `ferrolua-fuzz` and runs it with the arguments
+  after `fuzz`, as the section above describes, and exits with its status. Unlike the other tasks,
+  it leaves the report to the fuzzer.
 - `cargo xtask test --target <triple>` (M3.17): runs the tests on any target in
   [`03-platforms.md`](03-platforms.md#how-tests-run-on-each-target), natively, in the Android
   emulator, in the iOS simulator, or in a headless browser through a harness of Ferrolua's own.

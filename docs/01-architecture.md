@@ -53,7 +53,7 @@ describes; the `ferrolua` crate's scope is `ferrolua`.
 | `ferrolua-testkit` | Seeded random generator, property tests, Lua source generator | — | No: a dev-dependency only | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.2 |
 | `ferrolua-fuzz` | The fuzzer and its targets, in `fuzz/` | testkit, the crates it targets | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.4 |
 | `ferrolua-webtest` | The WebAssembly test module the browser harness runs, in `xtask/webtest/` | ferrolua | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M3.17 |
-| `xtask` | `cargo xtask coverage`, `record`, `test`, and `bench` | — | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.3 |
+| `xtask` | `cargo xtask coverage`, `fuzz`, `record`, `test`, and `bench` | — | No | [04-quality](04-quality.md#the-projects-own-test-tools) | M0.3 |
 
 Four specs cover contracts that span crates: [`language.md`](specs/language.md) (Ferrolua's
 language), [`memory.md`](specs/memory.md) (reference counting and the heap),

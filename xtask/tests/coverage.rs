@@ -374,6 +374,8 @@ usage: cargo xtask <task>
 tasks:
   coverage  run the tests with coverage instrumentation, and fail unless they run every line
             and region
+  fuzz      run the fuzzer with the arguments after `fuzz`, which `cargo xtask fuzz` alone
+            lists
 "
     );
     assert_eq!(output.status.code(), Some(2));

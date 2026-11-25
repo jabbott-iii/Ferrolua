@@ -1538,11 +1538,15 @@ formats files without changing what they do.
   - Verify: `cargo test -p ferrolua-cli --locked`
 
 - [ ] **M7.7 — ci: lint and format the repository's Ferrolua scripts**
+  - Note: On 2026-11-25 the owner asked for the references to `.claude/rules/lua.md`, which M0.1
+    removed, to go, so this task adds the two commands to the checks in `04-quality.md` and
+    `CLAUDE.md` instead.
   - Depends: M7.6, M0.6
   - Do:
     - Format the Ferrolua scripts in `tests/` and `benches/`, excluding the Lua 5.5 twins in
-      `reference/` folders in `.ferrolua.lua`, run both commands on them in CI, and update the
-      check commands in `.claude/rules/lua.md`.
+      `reference/` folders in `.ferrolua.lua`, run both commands on them in CI, and add both to the
+      [automated checks](04-quality.md#automated-checks) and to "Definition of done" in
+      [`../CLAUDE.md`](../CLAUDE.md).
   - Accept:
     - CI fails on a pull request that adds an unformatted script.
   - Verify: `ferrolua fmt --check tests benches`; `ferrolua lint tests benches`

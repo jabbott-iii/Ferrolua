@@ -81,9 +81,10 @@ so they can fill them in.
 - **Test layout:** unit tests in a `#[cfg(test)] mod tests` beside the code; integration tests that
   use only the public API in each crate's `tests/`; Ferrolua scripts in `tests/conformance/`, with
   their Lua 5.5 twins in `tests/conformance/reference/`, and in `tests/extensions/`, which run once
-  interpreted and once with the JIT forced on, and must print their recorded output (see **Test
-  layout** in `lua.md`); benchmarks in each crate's `benches/`, timed with `std::time::Instant`; and
-  fuzz targets in `fuzz/`, as **Security checks** in `testing.md` describes
+  interpreted and once with the JIT forced on, and must print their recorded output (see
+  "Conformance scripts" in `docs/04-quality.md`); benchmarks in each crate's `benches/`, timed with
+  `std::time::Instant`; and fuzz targets in `fuzz/`, as **Security checks** in `testing.md`
+  describes
 
 ## Working as a pair
 

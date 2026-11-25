@@ -14,8 +14,8 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
 - **Git access:** "commit on request". The default is still a drafted message: stage or commit only
   when the user asks in the current conversation
 - **Done checks:** the "Before finishing" steps of each rule whose files the change touches: the
-  **Check commands** of `rust.md` and `lua.md`, the steps in `testing.md` and `dependencies.md` for
-  code, tests, and manifests, and the steps in `roadmap-and-docs.md` and `writing.md`
+  **Check commands** of `rust.md`, the steps in `testing.md` and `dependencies.md` for code, tests,
+  and manifests, and the steps in `roadmap-and-docs.md` and `writing.md`
 - **Never commit:** `target/`, `debug/`, `**/*.rs.bk`, `*.pdb`, `**/mutants.out*/`, and
   `rustc-ice-*.txt`, as `.gitignore` lists
 - **Push effect:** none yet: Ferrolua has no GitHub Actions workflows. The repository is public, so

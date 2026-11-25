@@ -8,8 +8,8 @@ every release of it, or it isn't added. A third-party dependency, from anyone el
 only when it is impossible to avoid, and only after the user approves it.
 
 Messages, records, and the reason for each exception follow `writing.md` in this folder. In each
-language rule adopted here, such as `rust.md` or `lua.md`, set **Dependency policy** to
-"`dependencies.md` in this folder", so the language rule defers to this one.
+language rule adopted here, such as `rust.md`, set **Dependency policy** to "`dependencies.md` in
+this folder", so the language rule defers to this one.
 
 Apply these rules to dependencies you add, update, or suggest. Don't remove an existing one only
 to make the repository conform; "Dependencies already here" says what to do instead.

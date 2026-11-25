@@ -40,7 +40,7 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
 ## Make a change
 
 - Put tests beside the code they cover, following the test layout in
-  [`rust.md`](.claude/rules/rust.md) and [`lua.md`](.claude/rules/lua.md):
+  [`rust.md`](.claude/rules/rust.md):
   - unit tests in a `#[cfg(test)] mod tests` beside the code
   - integration tests that use only the public API in each crate's `tests/`
   - Ferrolua conformance scripts in `tests/conformance/`, each with a Lua 5.5 twin in

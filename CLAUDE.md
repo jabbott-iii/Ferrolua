@@ -53,7 +53,7 @@ crate of the crate map in `docs/01-architecture.md`. Each crate holds only its c
 | `crates/dap` | [`docs/specs/dap.md`](docs/specs/dap.md) |
 | `crates/cli` | [`docs/specs/cli.md`](docs/specs/cli.md) |
 | `crates/testkit`, `fuzz/`, `xtask/` | [`docs/04-quality.md`](docs/04-quality.md#the-projects-own-test-tools) |
-| Ferrolua scripts and their Lua 5.5 twins in `tests/` and `benches/` | `.claude/rules/lua.md` and [`docs/04-quality.md`](docs/04-quality.md#conformance-scripts) |
+| Ferrolua scripts and their Lua 5.5 twins in `tests/` and `benches/` | [`docs/04-quality.md`](docs/04-quality.md#conformance-scripts) |
 | Documents, prose, commits | `.claude/rules/roadmap-and-docs.md`, `.claude/rules/writing.md`, and `.claude/rules/commits.md` |
 
 ## Definition of done

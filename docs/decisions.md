@@ -430,8 +430,7 @@ it is `Proposed`, and no code may depend on it.
 - **Date:** 2026-11-24
 - **Context:** Hosts run scripts they didn't write, such as game mods and user plugins. A script
   must not reach files, processes, or the host's memory unless the host allows it, and must not
-  hang the host or exhaust its memory. `.claude/rules/lua.md` requires a record to settle this
-  design before the standard library lands.
+  hang the host or exhaust its memory.
 - **Decision:**
   - A host picks each state's libraries from an allowlist. `io`, `os`, `debug`, `package`,
     `string.dump`, and loading precompiled chunks are off unless the host turns them on.

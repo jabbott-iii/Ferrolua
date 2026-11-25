@@ -134,10 +134,24 @@ results (ADR-0027: a browser harness of Ferrolua's own).
 
 Build tasks run with `cargo xtask`, written with the standard library alone:
 
-- `cargo xtask coverage` (M0.3): builds the tests with `-C instrument-coverage`, merges the
-  profiles with `llvm-profdata` from the `llvm-tools` component, reports with `llvm-cov`, and fails
-  when lines or regions fall below 100%. Stable Rust can't measure branch coverage, so regions
-  stand in for it.
+- `cargo xtask coverage` (M0.3): builds the tests with `-C instrument-coverage` in
+  `target/coverage/`, runs them, merges the profiles with `llvm-profdata` from the `llvm-tools`
+  component, and reads which lines and regions ran from `llvm-cov export`. A region is a span of
+  code that the compiler counts as one unit, such as the body of one `if` branch. The command
+  prints each crate's lines and regions, then each line and region that no test ran, and exits with
+  status 1 unless the tests ran all of them. Stable Rust can't measure branch coverage, so regions
+  stand in for it. Its rules for what counts:
+  - It counts each crate's files outside its `tests/`, `benches/`, and `examples/` folders, so a
+    `#[cfg(test)]` module beside the code counts, and an integration test doesn't. Doc tests don't
+    run, because stable Rust can't instrument them.
+  - A region counts as covered when any copy of its function ran it. A generic function has a copy
+    for each type it is used with, and a library's code is compiled once for its unit tests and
+    once for its integration tests. `llvm-cov report` scores a function by its one copy that ran
+    the most regions, so a region that only another copy ran shows as missed there. A line counts
+    as covered when `llvm-cov`'s view of the whole file, which adds up the counts of every copy,
+    shows that it ran.
+  - Every `?` is a region of its own, which runs only when it returns an error, so each `?` needs a
+    test that makes it return one.
 - `cargo xtask record [script]` (M0.5): runs PUC-Rio Lua 5.5.1 on the reference scripts in
   `tests/conformance/reference/`, from that folder, and writes their `.out` files. It refuses an
   interpreter whose `lua -v` doesn't report 5.5.1. It reads the interpreter's path from

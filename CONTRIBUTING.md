@@ -4,11 +4,9 @@ Ferrolua welcomes bug reports, fixes, tests, and documentation. For anything bey
 open an issue first, so the design is agreed before you write the code.
 
 Ferrolua is at its start. The repository holds its design in `docs/`, the rules its code, tests,
-and documents follow in `.claude/rules/`, and a Cargo workspace whose crates hold only their
-documentation so far. [`docs/00-overview.md`](docs/00-overview.md) says what Ferrolua is for, and
-[`docs/roadmap.md`](docs/roadmap.md) what comes next. Every command below works except
-`cargo xtask coverage`, which task M0.3 builds. Until then, `cargo xtask` does nothing and exits
-with status 0.
+and documents follow in `.claude/rules/`, and a Cargo workspace whose crates, apart from the test
+tools, hold only their documentation so far. [`docs/00-overview.md`](docs/00-overview.md) says what
+Ferrolua is for, and [`docs/roadmap.md`](docs/roadmap.md) what comes next.
 
 ## Set up
 
@@ -58,7 +56,9 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
   ```
 
   A passing run prints no warnings, and each command exits with status 0. `cargo test` ends the
-  summary of each test binary with `test result: ok.` and `0 failed`.
+  summary of each test binary with `test result: ok.` and `0 failed`, and `cargo xtask coverage`
+  ends its report with `every line and region is covered`. When it doesn't, it lists each line and
+  region that no test ran, as [`docs/04-quality.md`](docs/04-quality.md#xtask) describes.
 
 ## Commit
 

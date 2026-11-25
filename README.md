@@ -6,10 +6,11 @@ whatever a script does, to use no third-party code, and to free memory determini
 reference counting, with a loop collector that runs at points the program fixes, so every run frees
 the same values in the same order.
 
-**Status:** design and the first test tool. The design documents in [`docs/`](docs/) are written,
-and the Cargo workspace has a crate for each part. Each holds only its documentation, except the
-test kit, which has a seeded random generator and a property-test runner. The next task is M0.3 in
-the [roadmap](docs/roadmap.md), which builds a command that measures test coverage.
+**Status:** design and the first test tools. The design documents in [`docs/`](docs/) are
+written, and the Cargo workspace has a crate for each part. Each holds only its documentation,
+except the test kit, which has a seeded random generator and a property-test runner, and `xtask`,
+whose `cargo xtask coverage` measures which lines and regions of code the tests run. The next task
+is M0.4 in the [roadmap](docs/roadmap.md), which builds the fuzzer.
 
 ## What is planned
 

@@ -1,0 +1,380 @@
+//! Runs `cargo xtask coverage` on small workspaces that each test writes, and checks what it
+//! reports. Each workspace is a Cargo workspace of its own, in a folder of its own under the
+//! target folder, so its build never touches Ferrolua's.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+/// The exit status that Cargo gives a command that failed, as Rust prints it.
+#[cfg(not(windows))]
+const STATUS_101: &str = "exit status: 101";
+#[cfg(windows)]
+const STATUS_101: &str = "exit code: 101";
+
+/// A crate whose tests run each branch of a generic function in a different copy of it, so
+/// `llvm-cov report` would count one region as missed. Its integration test ends with a line that
+/// never runs, which isn't counted.
+const ALPHA: [(&str, &str); 3] = [
+    (
+        "alpha/Cargo.toml",
+        "[package]\nname = \"alpha\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    ),
+    (
+        "alpha/src/lib.rs",
+        "//! A crate whose tests run every line and region.
+
+/// Returns 1 when `test` returns true, and 2 otherwise.
+pub fn pick(test: impl Fn() -> bool) -> u32 {
+    if test() { 1 } else { 2 }
+}
+",
+    ),
+    (
+        "alpha/tests/pick.rs",
+        "#[test]
+fn picks_1() {
+    assert_eq!(alpha::pick(|| true), 1);
+}
+
+#[test]
+fn picks_2() {
+    assert_eq!(alpha::pick(|| false), 2);
+}
+
+#[test]
+#[should_panic(expected = \"picked 1\")]
+fn stops_at_its_first_failure() {
+    assert_eq!(alpha::pick(|| true), 2, \"picked 1\");
+    assert_eq!(alpha::pick(|| false), 2);
+}
+",
+    ),
+];
+
+/// A crate whose tests miss one function.
+const BETA: [(&str, &str); 2] = [
+    (
+        "beta/Cargo.toml",
+        "[package]\nname = \"beta\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    ),
+    (
+        "beta/src/lib.rs",
+        "//! A crate whose tests miss one function.
+
+/// Returns `n` plus 1.
+pub fn increment(n: u32) -> u32 {
+    n + 1
+}
+
+/// Returns `n` minus 1. No test calls it.
+pub fn decrement(n: u32) -> u32 {
+    n - 1
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn increments() {
+        assert_eq!(super::increment(1), 2);
+    }
+}
+",
+    ),
+];
+
+/// A crate with no code.
+const GAMMA: [(&str, &str); 2] = [
+    (
+        "gamma/Cargo.toml",
+        "[package]\nname = \"gamma\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    ),
+    ("gamma/src/lib.rs", "//! A crate with no code.\n"),
+];
+
+/// A workspace that a test writes into a folder of its own.
+struct Workspace {
+    dir: PathBuf,
+}
+
+impl Workspace {
+    /// Writes a workspace named `name` whose members are the crates in `crates`, from their files.
+    fn new(name: &str, crates: &[&[(&str, &str)]]) -> Workspace {
+        let members: Vec<&str> = crates
+            .iter()
+            .flat_map(|files| files.iter())
+            .filter_map(|(path, _)| path.strip_suffix("/Cargo.toml"))
+            .collect();
+        let manifest = format!(
+            "[workspace]\nresolver = \"3\"\nmembers = [{}]\n",
+            members
+                .iter()
+                .map(|member| format!("\"{member}\""))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        let workspace = Workspace::empty(name);
+        workspace.write("Cargo.toml", &manifest);
+        workspace.write("Cargo.lock", &lock_file(&members));
+        for (path, text) in crates.iter().flat_map(|files| files.iter()) {
+            workspace.write(path, text);
+        }
+        workspace
+    }
+
+    /// Makes an empty folder for a workspace named `name`.
+    fn empty(name: &str) -> Workspace {
+        let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+            .join("coverage")
+            .join(name);
+        if dir.exists() {
+            fs::remove_dir_all(&dir).expect("the folder of an earlier run can be removed");
+        }
+        fs::create_dir_all(&dir).expect("the workspace's folder can be made");
+        Workspace { dir }
+    }
+
+    fn write(&self, path: &str, text: &str) {
+        let path = self.dir.join(path);
+        fs::create_dir_all(path.parent().expect("a file is in a folder"))
+            .expect("the file's folder can be made");
+        fs::write(path, text).expect("the file can be written");
+    }
+
+    /// Where `cargo xtask coverage` builds this workspace.
+    fn target(&self) -> PathBuf {
+        self.dir.join("target")
+    }
+
+    /// A `cargo xtask coverage` command that measures this workspace.
+    fn coverage(&self) -> Command {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_xtask"));
+        command
+            .arg("coverage")
+            .current_dir(&self.dir)
+            .env("CARGO_TARGET_DIR", self.target())
+            .env_remove("RUSTC");
+        command
+    }
+}
+
+/// The `Cargo.lock` of a workspace whose packages, at version 0.0.0, have no dependencies.
+fn lock_file(packages: &[&str]) -> String {
+    let mut packages = packages.to_vec();
+    packages.sort_unstable();
+    let mut lock = "# This file is automatically @generated by Cargo.\n\
+                    # It is not intended for manual editing.\n\
+                    version = 4\n"
+        .to_owned();
+    for package in packages {
+        lock.push_str(&format!(
+            "\n[[package]]\nname = \"{package}\"\nversion = \"0.0.0\"\n"
+        ));
+    }
+    lock
+}
+
+fn run(command: &mut Command) -> Output {
+    command.output().expect("`cargo xtask` runs")
+}
+
+fn stdout(output: &Output) -> &str {
+    std::str::from_utf8(&output.stdout).expect("the report is UTF-8")
+}
+
+fn stderr(output: &Output) -> &str {
+    std::str::from_utf8(&output.stderr).expect("the errors are UTF-8")
+}
+
+/// The report for a workspace of `alpha` and `gamma`, whose tests run every line and region.
+const PASSING_REPORT: &str = "\
+crate        lines      regions
+alpha  3/3 100.00%  5/5 100.00%
+gamma  0/0       -  0/0       -
+total  3/3 100.00%  5/5 100.00%
+
+every line and region is covered
+";
+
+#[test]
+fn reports_each_crate_and_fails_when_a_function_is_not_covered() {
+    let workspace = Workspace::new("uncovered", &[&ALPHA, &BETA, &GAMMA]);
+    let output = run(&mut workspace.coverage());
+    let lib = Path::new("beta").join("src").join("lib.rs");
+    assert_eq!(
+        stdout(&output),
+        format!(
+            "\
+crate         lines        regions
+alpha   3/3 100.00%    5/5 100.00%
+beta    6/9  66.66%   8/11  72.72%
+gamma   0/0       -    0/0       -
+total  9/12  75.00%  13/16  81.25%
+
+not covered:
+  {}: lines 9-11; regions 9:1-9:32, 10:5-10:10, 11:1-11:2
+
+coverage is below 100% of lines and regions
+",
+            lib.display()
+        )
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn passes_when_the_tests_run_every_line_and_region() {
+    let workspace = Workspace::new("covered", &[&ALPHA, &GAMMA]);
+    let output = run(&mut workspace.coverage());
+    assert_eq!(stdout(&output), PASSING_REPORT);
+    assert_eq!(output.status.code(), Some(0));
+}
+
+#[test]
+fn gives_the_same_report_when_run_again() {
+    let workspace = Workspace::new("again", &[&ALPHA, &GAMMA]);
+    let first = run(&mut workspace.coverage());
+    let second = run(&mut workspace.coverage());
+    assert_eq!(stdout(&first), PASSING_REPORT);
+    assert_eq!(stdout(&second), PASSING_REPORT);
+    assert_eq!(second.status.code(), Some(0));
+}
+
+#[test]
+fn finds_cargo_on_the_path_when_cargo_is_not_set() {
+    let workspace = Workspace::new("cargo-on-path", &[&ALPHA, &GAMMA]);
+    let output = run(workspace.coverage().env_remove("CARGO"));
+    assert_eq!(stdout(&output), PASSING_REPORT);
+    assert_eq!(output.status.code(), Some(0));
+}
+
+#[test]
+fn fails_when_rustc_cannot_start() {
+    let workspace = Workspace::empty("no-rustc");
+    let rustc = workspace.dir.join("no-such-rustc");
+    let source = Command::new(&rustc)
+        .output()
+        .expect_err("the program doesn't exist");
+    let output = run(workspace.coverage().env("RUSTC", &rustc));
+    assert_eq!(stdout(&output), "");
+    assert_eq!(
+        stderr(&output),
+        format!("error: couldn't start `rustc`: {source}\n")
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn fails_when_cargo_cannot_read_the_workspace() {
+    let workspace = Workspace::empty("broken-manifest");
+    workspace.write("Cargo.toml", "this isn't a manifest\n");
+    let output = run(&mut workspace.coverage());
+    assert_eq!(stdout(&output), "");
+    assert!(
+        stderr(&output).ends_with(&format!("\nerror: `cargo metadata` failed: {STATUS_101}\n")),
+        "{}",
+        stderr(&output)
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn fails_when_the_profiles_of_an_earlier_run_cannot_be_removed() {
+    let workspace = Workspace::new("blocked-profiles", &[&ALPHA]);
+    let profiles = workspace.target().join("coverage").join("profiles");
+    fs::create_dir_all(profiles.parent().expect("the profiles are in a folder"))
+        .expect("the coverage folder can be made");
+    fs::write(&profiles, "a file where the folder of profiles goes\n")
+        .expect("the file can be written");
+    let source = fs::remove_dir_all(&profiles).expect_err("a file isn't a folder");
+    let output = run(&mut workspace.coverage());
+    assert_eq!(stdout(&output), "");
+    assert_eq!(
+        stderr(&output),
+        format!(
+            "error: couldn't remove `{}`: {source}\n",
+            profiles.display()
+        )
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn fails_when_the_tests_do_not_build() {
+    let broken = [
+        BETA[0],
+        (
+            "beta/src/lib.rs",
+            "pub fn broken() -> u32 { \"not a number\" }\n",
+        ),
+    ];
+    let workspace = Workspace::new("no-build", &[&broken]);
+    let output = run(&mut workspace.coverage());
+    assert_eq!(stdout(&output), "");
+    assert!(
+        stderr(&output).ends_with(&format!(
+            "\nerror: `cargo test --no-run` failed: {STATUS_101}\n"
+        )),
+        "{}",
+        stderr(&output)
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn fails_when_a_test_fails() {
+    let failing = [
+        BETA[0],
+        (
+            "beta/src/lib.rs",
+            "#[test]\nfn fails() {\n    assert_eq!(1 + 1, 3);\n}\n",
+        ),
+    ];
+    let workspace = Workspace::new("failing-test", &[&failing]);
+    let output = run(&mut workspace.coverage());
+    assert_eq!(stdout(&output), "");
+    assert!(
+        stderr(&output).ends_with(&format!("\nerror: `cargo test` failed: {STATUS_101}\n")),
+        "{}",
+        stderr(&output)
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn fails_when_the_workspace_has_no_tests() {
+    let untested = [
+        (
+            "gamma/Cargo.toml",
+            "[package]\nname = \"gamma\"\nversion = \"0.0.0\"\nedition = \"2024\"\n\n\
+             [lib]\ntest = false\n",
+        ),
+        GAMMA[1],
+    ];
+    let workspace = Workspace::new("no-tests", &[&untested]);
+    let output = run(&mut workspace.coverage());
+    assert_eq!(stdout(&output), "");
+    assert!(
+        stderr(&output).ends_with("\nerror: the workspace has no tests to measure\n"),
+        "{}",
+        stderr(&output)
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn prints_usage_and_exits_with_status_2_without_a_task() {
+    let output = run(&mut Command::new(env!("CARGO_BIN_EXE_xtask")));
+    assert_eq!(stdout(&output), "");
+    assert_eq!(
+        stderr(&output),
+        "\
+usage: cargo xtask <task>
+
+tasks:
+  coverage  run the tests with coverage instrumentation, and fail unless they run every line
+            and region
+"
+    );
+    assert_eq!(output.status.code(), Some(2));
+}

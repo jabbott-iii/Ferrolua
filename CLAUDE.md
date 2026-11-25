@@ -14,10 +14,11 @@ commits. Read the rule for each kind of file you touch.
 
 ## Status
 
-Design and the first test tool: the documents in `docs/` exist, and the Cargo workspace has every
+Design and the first test tools: the documents in `docs/` exist, and the Cargo workspace has every
 crate of the crate map in `docs/01-architecture.md`. Each crate holds only its crate docs, except
-`ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2).
-The next task is M0.3, which builds `cargo xtask coverage`.
+`ferrolua-testkit`, which holds the seeded random generator and the property-test runner (M0.2),
+and `xtask`, which holds `cargo xtask coverage` (M0.3). The next task is M0.4, which builds the
+fuzzer and replays its saved inputs.
 
 ## Read before working
 
@@ -55,8 +56,7 @@ The next task is M0.3, which builds `cargo xtask coverage`.
 
 ## Definition of done
 
-A task is done when every step below passes. Step 3 applies once M0.3 builds
-`cargo xtask coverage`; until then, report it as not run.
+A task is done when every step below passes.
 
 1. The task's `Accept` results hold, and its `Verify` commands pass.
 2. The check commands of `.claude/rules/rust.md` pass:

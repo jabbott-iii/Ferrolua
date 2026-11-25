@@ -85,7 +85,29 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     - A property that fails for values above 1,000 is reported with a shrunk case of 1,001.
   - Verify: `cargo test -p ferrolua-testkit --locked`
 
-- [ ] **M0.3 — xtask: coverage command**
+- [x] **M0.3 — xtask: coverage command**
+  - Note: Built on 2026-11-25. `cargo xtask coverage` runs `cargo test --workspace --locked --tests`
+    with `RUSTFLAGS="-C instrument-coverage"` in `target/coverage/`, twice: once with `--no-run`,
+    to list the programs Cargo built, and once to run them. It merges the profiles with
+    `llvm-profdata merge -sparse`, then reads the regions from `llvm-cov export -format=text` and the
+    lines from `llvm-cov export -format=lcov`. It finds both tools from
+    `rustc --print sysroot --print host-tuple`, in `lib/rustlib/<host>/bin/`. It reads Cargo's and
+    `llvm-cov`'s JSON with a reader of its own, in `xtask/src/json.rs`.
+  - Note: It takes the union of every instantiation, the second option in M0.2's note: a region
+    counts as covered when any copy of its function ran it, and a line when `llvm-cov`'s view of
+    the whole file, which adds up every copy, shows that it ran. In the fixture of `xtask/tests/coverage.rs`, whose tests run
+    each branch of a generic function in a different copy, `llvm-cov report` gives the function 4
+    of its 5 regions, and the command gives all 5.
+  - Note: It counts each crate's files outside `tests/`, `benches/`, and `examples/`, the same
+    files M0.2 measured by hand. Integration tests can hold code that never runs by design, such
+    as the end of a `#[should_panic]` test, or a generator that a run of 0 cases never calls, as in
+    `crates/testkit/tests/property.rs`. Doc tests don't run under it, because stable Rust can't
+    instrument them. Build scripts aren't measured either, and no crate has one yet.
+  - Note: On 2026-11-25, on this machine (x86-64 Linux, Rust 1.100.0), a run from an empty
+    `target/coverage/` took 2.1 s and covered all 1,691 lines and 1,986 regions, in `ferrolua-cli`,
+    `ferrolua-testkit`, and `xtask`.
+    `crates/cli/tests/cli.rs` runs the `ferrolua-cli` binary, and `xtask/tests/coverage.rs` runs
+    the `xtask` binary, so each `main` runs under the tests.
   - Note (from M0.1): `crates/cli/src/main.rs` and `xtask/src/main.rs` each hold an empty
     `fn main` that no test calls, so the coverage run has to reach both, for example by running
     each binary from an integration test.
@@ -927,6 +949,9 @@ scripts within limits, and gets every standard library it grants.
 - [ ] **M3.18 — ci: the interpreter on every target**
   - Note: added on 2026-11-24, when the owner chose all six platforms by the first release
     (ADR-0027).
+  - Note (from M0.3): `cargo xtask coverage` and its tests have run only on x86-64 Linux so far. It
+    adds `EXE_SUFFIX` to the names of the LLVM tools, and `xtask/tests/coverage.rs` expects Windows to
+    print Cargo's failure status as `exit code: 101`.
   - Depends: M3.17, M0.6
   - Do:
     - Add a CI job for each target in [`03-platforms.md`](03-platforms.md#targets) that runs
@@ -1114,6 +1139,9 @@ output with the JIT on or forced, and the agreed budgets are checked.
 - [ ] **M5.4 — jit: entry, exits, and the `Tier` trait**
   - Note: 2026-11-24, the owner's choice: `JitMode` and the conformance runner's forced pass moved
     here from M5.8, because M5.5 to M5.7 check their work in `JitMode::Forced`.
+  - Note (from M0.3): `cargo xtask coverage` takes no options. It runs `cargo test --workspace` with
+    each crate's default features, so covering `ferrolua` with the `jit` feature off, as well as on,
+    needs an option for it, such as `-p ferrolua`.
   - Depends: M5.3, M2.14
   - Do:
     - Build `jit::entry`, the `Tier` trait in `ferrolua-vm`, and exits to the interpreter, with

@@ -25,10 +25,12 @@ branches".
 
 - **Test commands:** `cargo test --workspace --locked`. It runs the Rust tests, the conformance and
   extension scripts, and every saved fuzz input
-- **Coverage command:** `cargo xtask coverage`, once M0.3 builds it. A std-only `xtask` crate in the
-  workspace builds the tests with `-C instrument-coverage`, merges the profiles with
-  `llvm-profdata` from the `llvm-tools` rustup component, and fails when `llvm-cov` reports less
-  than the **Coverage floor**
+- **Coverage command:** `cargo xtask coverage`. The std-only `xtask` crate in the workspace builds
+  the tests with `-C instrument-coverage`, merges the profiles with `llvm-profdata` from the
+  `llvm-tools` rustup component, and fails when `llvm-cov export` shows less than the **Coverage
+  floor**. It counts each crate's code outside its `tests/`, `benches/`, and `examples/` folders,
+  and counts a region as covered when any copy of its function ran it, as `docs/04-quality.md`
+  describes
 - **Coverage floor:** 100% of lines and regions. Stable Rust can't measure branches, so regions
   stand in: each `if` and `match` arm and each operand of `&&` and `||` is a region of its own, but
   a region doesn't show whether a condition was both true and false

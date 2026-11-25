@@ -19,9 +19,9 @@ host allows, within limits the VM enforces (ADR-0014).
 ## Goals
 
 1. Every valid Lua 5.5 script prints on Ferrolua what it prints on PUC-Rio Lua 5.5.1, apart from
-   the intended differences that ADR-0018 (memory is freed by reference counting and a loop
-   collector) and ADR-0010
-   (precompiled chunks use Ferrolua's own format) record. The conformance scripts in
+   the intended differences the decision log records: ADR-0018 (memory is freed by reference
+   counting and a loop collector), ADR-0010 (precompiled chunks use Ferrolua's own format), and
+   ADR-0019 (objects print as IDs, never addresses). The conformance scripts in
    `tests/conformance/` check this, interpreted and with the JIT forced on.
 2. No script, precompiled chunk, or call from the host can read freed memory, panic, or crash the
    host process. Hostile-input tests and fuzz targets check every parser and loader of outside
@@ -50,6 +50,7 @@ host allows, within limits the VM enforces (ADR-0014).
 - Lua 5.1, 5.4, or LuaJIT compatibility beyond what Lua 5.5 shares with them (ADR-0001).
 - Changing how a valid Lua 5.5 script runs unless the script or its host opts in (ADR-0004).
 - Checking types at run time (ADR-0006).
+- Printing memory addresses, from `tostring`, `%p`, or anything else (ADR-0019).
 - Loading chunks compiled by PUC-Rio's `luac` (ADR-0010).
 - The Lua C API, and C modules built for PUC-Rio Lua (ADR-0017).
 

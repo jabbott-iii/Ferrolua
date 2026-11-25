@@ -169,6 +169,8 @@ print(p:length())  --> 5.0, because length is Point's method and reads only x an
   parent's method `m`.
 - A method named after a metamethod, such as `__tostring`, `__eq`, or `__add`, works as that
   metamethod for instances.
+- Without a `__tostring` method, an instance prints as its class name and its ID, such as
+  `Point: #7` (ADR-0019: objects print as IDs, never addresses).
 - An instance refers to its class, and a class to its parent, each with a counted reference.
   Nothing refers back, so classes and instances make no reference loops, and an instance is
   freed as soon as it is dropped, without the loop collector (ADR-0018).

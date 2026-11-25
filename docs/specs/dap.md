@@ -27,6 +27,8 @@ on, and listens only on the loopback address.
 | Evaluate an expression in a frame | `evaluate` |
 | Change a variable's value | `setVariable` |
 
+- Variables show objects by the IDs `tostring` prints, such as `table: #42`, so what the editor
+  shows matches what the script prints.
 - A function with a breakpoint runs interpreted, so the JIT never needs to stop inside machine
   code.
 - `evaluate` compiles the expression with the frame's locals and upvalues in scope and runs it under

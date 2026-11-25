@@ -16,7 +16,8 @@ yet. The next task is M0.1 in the [roadmap](docs/roadmap.md), which creates the 
 - **Memory safety:** the heap will be safe Rust, and `unsafe` code will be confined to the JIT's
   executable memory.
 - **A sandbox:** hosts will choose which libraries each script gets, and the VM will enforce
-  memory, instruction, and call-depth limits that a script can't catch.
+  memory, instruction, and call-depth limits that a script can't catch. Objects will print as IDs
+  such as `table: #42`, never as memory addresses.
 - **Language extensions:** optional type annotations, classes, `++` and compound assignment such as
   `+=`, and a strict mode that reports wrong argument counts and undeclared variables.
 - **Tools in one binary:** `ferrolua run`, `check` (types), `lint`, `fmt`, and `sast` (security),

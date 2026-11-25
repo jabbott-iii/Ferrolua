@@ -77,6 +77,20 @@ A `Value` is 16 bytes, the same size as PUC-Rio's. Ferrolua has no light userdat
 no C API (ADR-0017). Classes and instances appear as variants of their own once ADR-0007 settles
 how `type` reports them.
 
+## Object IDs
+
+Lua code never sees a handle or an address. Wherever PUC-Rio would show an object's address,
+Ferrolua shows the object's ID instead (ADR-0019: objects print as IDs, never addresses).
+
+- An object has no ID until `tostring`, `string.format("%p")`, `debug.upvalueid`, or the debugger
+  asks for one. Then the state's counter, which starts at 1, gives it the next number.
+- A side table maps the object's handle to its ID, and a flag in the slot says the object has an
+  entry, so freeing the object removes the entry.
+- The counter only goes up, so an ID is never reused in its state, even after its object is freed.
+  The counter is 64 bits wide, so it can't run out.
+- IDs depend only on the order of requests, so they repeat from run to run with the rest of the
+  program (see "Determinism" below).
+
 ## Counting
 
 Every place that holds a `Value` holds a counted reference:
@@ -271,6 +285,8 @@ frees every value left.
    collection run in the reverse of the order their objects were marked.
 10. A self-recursive local function makes no loop.
 11. `ferrolua-vm` contains no `unsafe` code.
+12. No two objects in a state ever get the same ID, and no ID is reused after its object is
+    freed.
 
 ## Tests
 
@@ -295,3 +311,5 @@ frees every value left.
 - Invariant 9: `tests/extensions/gc/` covers resurrection, re-marking, errors in finalizers, the
   order within a collection, and the order at state drop.
 - Invariant 11: the workspace lint `unsafe_code = "forbid"` applies to `ferrolua-vm`.
+- Invariant 12: a property test creates, names, and frees objects in generated orders, and
+  checks that every ID it saw is distinct.

@@ -367,9 +367,13 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
   - Do:
     - Build the base library of [`specs/stdlib.md`](specs/stdlib.md#libraries), with the argument
       checks shared by every library.
-    - Add `tests/conformance/base.lua`.
+    - Assign object IDs as [`specs/memory.md`](specs/memory.md#object-ids) describes, and print
+      them from `tostring` and `print` in the formats of
+      [`specs/stdlib.md`](specs/stdlib.md#object-ids-in-output) (ADR-0019).
+    - Add `tests/conformance/base.lua` and `tests/extensions/object_ids.lua`.
   - Accept:
     - Every base function, and each of its argument errors, prints its recorded output.
+    - `object_ids.lua` prints its written output, and no `tostring` result contains an address.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M2.14 — ferrolua: a minimal embedding API and the conformance runner**
@@ -456,6 +460,8 @@ scripts within limits, and gets every Lua 5.5 library it grants.
   - Do:
     - Build float formatting and every `string.format` conversion, as
       [`specs/stdlib.md`](specs/stdlib.md#number-formatting) describes.
+    - Make `%p` print object IDs (ADR-0019), and record what it prints for values with no
+      address.
     - Add `tests/conformance/string_format.lua`, with subnormal numbers, the largest and smallest
       floats, `inf`, and `nan`.
   - Accept:
@@ -501,6 +507,7 @@ scripts within limits, and gets every Lua 5.5 library it grants.
   - Do:
     - Build §6.8 and §6.9, the file access policies of [`specs/sandbox.md`](specs/sandbox.md#file-access),
       and `os.exit` returning an exit error.
+    - Show file handles by their IDs in `tostring` (ADR-0019).
   - Accept:
     - Every escape path in the sandbox spec's tests is refused under a directory policy.
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
@@ -519,6 +526,7 @@ scripts within limits, and gets every Lua 5.5 library it grants.
   - Depends: M2.12
   - Do:
     - Build §6.10 on Ferrolua's frames, and add `tests/conformance/debug.lua`.
+    - Make `debug.upvalueid` return the upvalue's ID as an integer (ADR-0019).
   - Accept:
     - `debug.traceback` and `debug.getinfo` print PUC-Rio's output for the same script.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
@@ -1081,6 +1089,7 @@ launched by `ferrolua dap` or running inside a host.
   - Do:
     - Build stack traces, scopes, variables with expansion, `evaluate`, `setVariable`, and stopping
       on errors.
+    - Show objects by the IDs `tostring` prints (ADR-0019).
   - Accept:
     - Variables shown for a frame are exactly the locals and upvalues in scope.
   - Verify: `cargo test -p ferrolua-dap --locked`

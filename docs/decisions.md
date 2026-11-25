@@ -554,3 +554,48 @@ it is `Proposed`, and no code may depend on it.
 - **Revisit when:** a host measures a collection pause above the budget in
   [`00-overview.md`](00-overview.md#budgets) that scheduling collections can't avoid, or M5.1 shows
   counting and candidate tracking together cost more than a third of the interpreter's run time.
+
+## ADR-0019 — Print object IDs, never memory addresses
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:** PUC-Rio Lua prints an object's memory address wherever it names an object:
+  `tostring({})` gives something like `table: 0x5581f1a3c2a0`, and `string.format("%p", t)` and
+  `debug.upvalueid` expose addresses too. An address tells a script where the host's memory is.
+  That weakens address space layout randomization (ASLR), the operating system's defense of placing
+  memory at unpredictable addresses, and helps an attacker exploit any memory bug in the host.
+  Addresses also change from run to run, so output that contains one can't repeat, which breaks the
+  determinism ADR-0018 promises and keeps such output out of tests. Ferrolua's values are handles
+  into arenas, not pointers (ADR-0011, proposed), so it has no reason to print addresses at all.
+- **Decision** (the owner chose IDs instead of addresses on 2026-11-24):
+  - Every object that Lua code can name, such as a table, a function, a thread, a userdata, or a
+    string, gets a per-state ID: a positive integer from a counter that starts at 1, assigned the
+    first time something asks for the object's ID.
+  - An ID is never reused in its state, even after its object is freed.
+  - `tostring` and `print` show the ID where PUC-Rio shows an address, as in `table: #42`.
+    `string.format("%p")` prints the ID, and `debug.upvalueid` returns an upvalue's ID as an
+    integer. The debugger shows the same IDs.
+  - No output Ferrolua produces contains a memory address.
+  - [`specs/memory.md`](specs/memory.md#object-ids) says how IDs are assigned, and
+    [`specs/stdlib.md`](specs/stdlib.md#object-ids-in-output) gives the exact formats.
+- **Consequences:**
+  - Good: a script learns nothing about the host's memory layout from anything it prints or
+    computes.
+  - Good: with a fixed hash seed, output that names objects repeats exactly, interpreted and
+    compiled, so tests can check it.
+  - Good: two objects never print alike within a state, while PUC-Rio can reuse an address after
+    collecting the first object.
+  - Bad: this is an intended difference from PUC-Rio Lua 5.5.1. Code that parses hexadecimal out of
+    `tostring`'s result, or expects `debug.upvalueid` to return a light userdata, behaves
+    differently.
+  - Bad: each object that has been given an ID costs an entry in a side table until it is freed.
+  - Follow-up: M2.13 assigns IDs and prints them from `tostring`, M3.4 from `%p`, M3.9 for file
+    handles, M3.11 from `debug.upvalueid`, and M10.3 in the debugger.
+- **Alternatives considered:**
+  - Print addresses, as PUC-Rio does: compatible, but it leaks the memory layout and never repeats.
+  - Print the handle's slot index and generation: no address, but it reveals how the heap is laid
+    out, and the same slot prints alike once its generation wraps.
+  - Print the ID in hexadecimal with a `0x` prefix: code that parses addresses keeps working, but
+    the output would pass for an address and mislead readers.
+- **Revisit when:** a widely used Lua library breaks on Ferrolua because it parses `tostring`'s
+  output.

@@ -81,7 +81,8 @@ call into the state again.
 States share nothing. Each has its own registry, globals, string metatable, loaded modules, and
 string hash seed, so one script changing `getmetatable("").__index` affects only its own state.
 The seed comes from the standard library's `RandomState`, so a script can't predict hash
-collisions to slow its table lookups.
+collisions to slow its table lookups. No output reveals a memory address: objects print as IDs
+(ADR-0019), so a script learns nothing about where the host's memory is.
 
 ## Invariants
 
@@ -91,6 +92,7 @@ collisions to slow its table lookups.
 4. Under a directory policy, no path outside the directory opens, whatever its form.
 5. `os.exit` never ends the host process.
 6. A change to one state's globals, metatables, or modules is invisible to every other state.
+7. Nothing a script can print or compute contains a memory address.
 
 ## Tests
 
@@ -106,3 +108,6 @@ collisions to slow its table lookups.
   with NUL bytes.
 - Invariant 5: `os.exit` with and without a status, inside `pcall` and a coroutine.
 - Invariant 6: two states in one test, one changing shared names, the other checking them.
+- Invariant 7: scripts pass every kind of object to `tostring`, `print`, `string.format` with
+  `%p` and `%s`, `debug.upvalueid`, and error messages, and check that no result contains an
+  address of the test process, read from `/proc/self/maps`.

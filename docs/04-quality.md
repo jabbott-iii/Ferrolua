@@ -38,7 +38,9 @@ A script's output must not depend on what Lua leaves unspecified, or the recorde
 repeat:
 
 - the order `pairs` and `next` visit keys, so scripts sort keys before printing them;
-- addresses, which `tostring` prints for tables and functions;
+- how objects print: `tostring` shows an ID for a table or a function on Ferrolua (ADR-0019:
+  objects print as IDs, never addresses) but an address on PUC-Rio, so conformance scripts never
+  print one, while extension scripts may;
 - the time, and `math.random` without a fixed seed;
 - when a value outside a loop is freed, which is earlier on Ferrolua by design (ADR-0018:
   reference counting plus a deterministic loop collector). A script that observes freeing only

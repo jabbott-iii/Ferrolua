@@ -95,19 +95,19 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     `llvm-cov`'s JSON with a reader of its own, in `xtask/src/json.rs`.
   - Note: It takes the union of every instantiation, the second option in M0.2's note: a region
     counts as covered when any copy of its function ran it, and a line when `llvm-cov`'s view of
-    the whole file, which adds up every copy, shows that it ran. In the fixture of `xtask/tests/coverage.rs`, whose tests run
-    each branch of a generic function in a different copy, `llvm-cov report` gives the function 4
-    of its 5 regions, and the command gives all 5.
+    the whole file, which adds up every copy, shows that it ran. In the fixture of
+    `xtask/tests/coverage.rs`, whose tests run each branch of a generic function in a different
+    copy, `llvm-cov report` gives the function 4 of its 5 regions, and the command gives all 5.
   - Note: It counts each crate's files outside `tests/`, `benches/`, and `examples/`, the same
-    files M0.2 measured by hand. Integration tests can hold code that never runs by design, such
-    as the end of a `#[should_panic]` test, or a generator that a run of 0 cases never calls, as in
-    `crates/testkit/tests/property.rs`. Doc tests don't run under it, because stable Rust can't
-    instrument them. Build scripts aren't measured either, and no crate has one yet.
+    files M0.2 measured by hand. The owner confirmed this rule on 2026-11-25. Integration tests can
+    hold code that never runs by design, such as the end of a `#[should_panic]` test, or a
+    generator that a run of 0 cases never calls, as in `crates/testkit/tests/property.rs`. Doc
+    tests don't run under it, because stable Rust can't instrument them. Build scripts aren't
+    measured either, and no crate has one yet.
   - Note: On 2026-11-25, on this machine (x86-64 Linux, Rust 1.100.0), a run from an empty
     `target/coverage/` took 2.1 s and covered all 1,691 lines and 1,986 regions, in `ferrolua-cli`,
-    `ferrolua-testkit`, and `xtask`.
-    `crates/cli/tests/cli.rs` runs the `ferrolua-cli` binary, and `xtask/tests/coverage.rs` runs
-    the `xtask` binary, so each `main` runs under the tests.
+    `ferrolua-testkit`, and `xtask`. `crates/cli/tests/cli.rs` runs the `ferrolua-cli` binary, and
+    `xtask/tests/coverage.rs` runs the `xtask` binary, so each `main` runs under the tests.
   - Note (from M0.1): `crates/cli/src/main.rs` and `xtask/src/main.rs` each hold an empty
     `fn main` that no test calls, so the coverage run has to reach both, for example by running
     each binary from an integration test.

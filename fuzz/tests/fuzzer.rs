@@ -181,6 +181,56 @@ fn reports_no_failure_when_no_run_fails() {
 }
 
 #[test]
+fn starts_no_run_once_its_seconds_are_up() {
+    let folder = folder("no-seconds");
+    let output = run(&mut fuzzer(&[
+        "fixture-panic",
+        "--seconds",
+        "0",
+        "--regressions",
+        text(&folder.join("regressions")),
+    ]));
+    assert_eq!(
+        stdout(&output),
+        "fixture-panic: no run failed (runs: 0, first seed: 0)\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(output.status.code(), Some(0));
+    assert!(!folder.join("regressions").exists());
+}
+
+#[test]
+fn stops_after_its_runs_when_they_end_before_its_seconds() {
+    let folder = folder("runs-before-seconds");
+    let output = run(&mut fuzzer(&[
+        "fixture-panic",
+        "--runs",
+        "2500",
+        "--seconds",
+        "3600",
+        "--corpus",
+        text(&folder.join("corpus")),
+        "--regressions",
+        text(&folder.join("regressions")),
+    ]));
+    assert_eq!(
+        stdout(&output),
+        "fixture-panic: no run failed (runs: 2500, first seed: 0)\n"
+    );
+    assert_eq!(stderr(&output), "");
+    assert_eq!(output.status.code(), Some(0));
+}
+
+#[test]
+fn lists_no_target_while_only_the_fixtures_exist() {
+    // The lexer and parser targets of task M1.9 will be the first that `--list` prints.
+    let output = run(&mut fuzzer(&["--list"]));
+    assert_eq!(stdout(&output), "");
+    assert_eq!(stderr(&output), "");
+    assert_eq!(output.status.code(), Some(0));
+}
+
+#[test]
 fn fails_when_the_corpus_cannot_be_read() {
     let folder = folder("corpus-file");
     let corpus = folder.join("corpus");
@@ -389,21 +439,25 @@ fn prints_usage_and_exits_with_status_2_without_a_command() {
     assert_eq!(
         stderr(&output),
         "\
-usage: cargo xtask fuzz <target> [--seed <n>] [--runs <n>] [--time-limit <ms>]
-                        [--corpus <folder>] [--regressions <folder>]
+usage: cargo xtask fuzz <target> [--seed <n>] [--runs <n>] [--seconds <n>]
+                        [--time-limit <ms>] [--corpus <folder>] [--regressions <folder>]
        cargo xtask fuzz <target> --replay <file>
        cargo xtask fuzz --replay-saved [--regressions <folder>] [--time-limit <ms>]
+       cargo xtask fuzz --list
 
 The fuzzer runs <target> on inputs mutated from its corpus until one panics, crashes, or runs
 past the time limit. Then it shrinks that input, saves it, and stops.
 
   --seed <n>              the seed of the first run; run i uses seed <n> + i (default 0)
-  --runs <n>              how many inputs to run (default 100000)
+  --runs <n>              how many inputs to run (default 100000, or no limit with --seconds)
+  --seconds <n>           start no batch of 1000 runs after <n> seconds (default no limit)
   --time-limit <ms>       how long one input may run (default 1000)
   --corpus <folder>       the folder of each target's corpus folder (default fuzz/corpus)
   --regressions <folder>  the folder of each target's saved inputs (default fuzz/regressions)
   --replay <file>         run <target> on one input, in this process
   --replay-saved          run every saved input, and check that each runs as it should
+  --list                  print each target that checks Lunaferra's code, one name per line,
+                          leaving out the fixtures
 
 targets:
   fixture-panic  panics on an input that starts with FUZZ, to test the fuzzer

@@ -195,11 +195,35 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     `cargo test -p xtask --locked`
 
 - [ ] **M0.6 — ci: the CI workflow**
+  - Note: Written on 2026-11-25. `.github/workflows/ci.yml` runs seven jobs on `ubuntu-latest`, one
+    for each automated check of [`04-quality.md`](04-quality.md#automated-checks) and one that
+    fuzzes: Format, Clippy, Test, Documentation, Coverage, Dependencies, and Fuzz. Each job checks
+    out the code with `actions/checkout` v7.0.1, the newest release that `git ls-remote` listed on
+    2026-11-25, pinned to its commit `3d3c42e5aac5ba805825da76410c181273ba90b1`. It then runs
+    `rustup toolchain install`, which with no toolchain named installs the one that
+    `rust-toolchain.toml` pins, with its components, as rustup 1.29.3's help says. Each job has only
+    `contents: read`, runs its steps in `bash` with `-e` and `-o pipefail`, and fails if it runs
+    longer than 30 minutes.
+  - Note: The fuzzer has two new options for the Fuzz job. `--seconds <n>` stops a campaign once
+    `n` seconds have passed, checking the time before each batch of 1,000 runs, and without
+    `--runs` it sets no limit on the runs. On this machine (x86-64 Linux, an Intel Core i7-11800H),
+    `cargo xtask fuzz fixture-panic --seconds 5` with an empty corpus made 2,438,000 runs in 5.04 s.
+    `--list` prints each target whose saved inputs replay as `Kind::Passed`, which leaves out the
+    fixtures. The job runs `cargo xtask fuzz <target> --seed 0 --seconds 60` on each, so it fuzzes
+    nothing until M1.9. With a stand-in `--list` that printed `fixture-panic`, the job's script
+    stopped with status 1 at the panic in run 676, and `--seed 676 --runs 1` found it again.
+  - Note: The Dependencies job fails when `cargo tree` prints a line that is neither empty nor a
+    crate named `lunaferra`, `lunaferra-<part>`, or `xtask` with a path under `$GITHUB_WORKSPACE`.
+    Run on this workspace, its script passed. On a made-up list with a crates.io package and a Git
+    package, it printed those two lines and stopped with status 1.
   - Note (from M0.4): The fuzzer stops after `--runs` runs, and has no option for a length of time,
     so the run of 60 s per target needs one, such as `--seconds`, or a number of runs measured to
     take about 60 s. `cargo xtask fuzz` exits with status 1 when a run fails, which fails the job.
     The two fixture targets fail on purpose, so CI fuzzes only the others, and there are none
     until M1.9.
+  - ⏳ needs GitHub: open a pull request to `main` and observe that all seven jobs run and pass,
+    then push a formatting error to it and observe that the Format job fails; then the owner makes
+    each job required for `main`.
   - Depends: M0.3, M0.4
   - Do:
     - Write `.github/workflows/ci.yml`, running the automated checks of
@@ -338,6 +362,11 @@ builds on.
     each run's input only by mutation, in `fuzz/src/campaign.rs`, which is where generation from
     the run's seed joins it. The fuzzer runs in Cargo's dev profile, which keeps overflow checks but
     doesn't optimize; whether a million parser runs need a profile that does both is open.
+  - Note (from M0.6): CI's Fuzz job runs `cargo xtask fuzz <target> --seed 0 --seconds 60` on each
+    target that `cargo xtask fuzz --list` prints, so the `lexer` and `parser` targets join it with no
+    change to `.github/workflows/ci.yml`. The test `lists_no_target_while_only_the_fixtures_exist`
+    in `fuzz/tests/fuzzer.rs` expects `--list` to print nothing, so this task changes it to expect
+    the two names.
   - Depends: M0.4, M1.7
   - Do:
     - Add the Lunaferra program generator to `lunaferra-testkit`, and the `lexer` and `parser`

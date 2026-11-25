@@ -22,7 +22,8 @@ generator and the property-test runner (M0.2); `lunaferra-fuzz`, the fuzzer, wit
 fixture targets (M0.4); and `xtask`, which holds `cargo xtask coverage` (M0.3), `cargo xtask fuzz`
 (M0.4), and `cargo xtask record` (M0.5).
 `tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin with the twin's recorded
-`hello.out`. The next task is M0.6, which adds the CI workflow.
+`hello.out`. `.github/workflows/ci.yml` holds a CI job for each automated check and a fuzz job, and M0.6 stays
+open until a pull request shows its jobs passing on GitHub.
 
 ## Read before working
 

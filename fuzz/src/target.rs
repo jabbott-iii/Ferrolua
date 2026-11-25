@@ -81,6 +81,17 @@ pub(crate) fn find(name: &str) -> Option<&'static Target> {
     TARGETS.iter().find(|target| target.name == name)
 }
 
+/// The names of the targets in `targets` that check Lunaferra's code, one per line, which
+/// `cargo xtask fuzz --list` prints, so CI can fuzz each one. They are the targets whose saved
+/// inputs replay as [`Kind::Passed`], which leaves out the fixtures, because they fail on purpose.
+pub(crate) fn list(targets: &[Target]) -> String {
+    targets
+        .iter()
+        .filter(|target| target.replays_as == Kind::Passed)
+        .map(|target| format!("{}\n", target.name))
+        .collect()
+}
+
 /// Panics on an input that starts with `FUZZ`, and passes every other input.
 fn fixture_panic(input: &[u8]) {
     assert!(!input.starts_with(b"FUZZ"), "the input starts with FUZZ");
@@ -101,7 +112,7 @@ fn fixture_hang(input: &[u8]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Kind, TARGETS, find};
+    use super::{Kind, TARGETS, Target, find, list};
 
     #[test]
     fn finds_each_target_by_its_name() {
@@ -113,6 +124,26 @@ mod tests {
     #[test]
     fn finds_no_target_for_an_unknown_name() {
         assert!(find("fixture").is_none());
+    }
+
+    #[test]
+    fn lists_the_targets_that_check_lunaferras_code_and_leaves_out_the_fixtures() {
+        let run = find("fixture-panic").unwrap().run;
+        let target = |name, replays_as| Target {
+            name,
+            about: "",
+            replays_as,
+            run,
+        };
+        let targets = [
+            target("lexer", Kind::Passed),
+            target("fixture-panic", Kind::Panicked),
+            target("fixture-hang", Kind::Hung),
+            target("fixture-crash", Kind::Crashed),
+            target("parser", Kind::Passed),
+        ];
+        assert_eq!(list(&targets), "lexer\nparser\n");
+        assert_eq!(list(&[]), "");
     }
 
     #[test]

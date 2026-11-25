@@ -27,7 +27,8 @@
 //! # Output
 //!
 //! The fuzzer writes its report to standard output, and its errors to standard error. It exits
-//! with status 0 when no run failed, or when every saved input ran as it should; 1 when a run
+//! with status 0 when no run failed, when every saved input ran as it should, or after it lists
+//! the targets with `--list`; 1 when a run
 //! failed, when a saved input didn't run as it should, or on an error; and 2, after printing its
 //! usage, when it isn't given a command it knows. `--replay` exits with status 101 when the input
 //! panics, as Rust does for any program that a panic ends.
@@ -121,6 +122,7 @@ fn run(args: &[OsString]) -> Outcome {
             Ok(()) => Outcome::report(format!("{}: {} passed\n", target.name, path.display()), 0),
             Err(error) => Outcome::error(&error),
         },
+        Some(Command::List) => Outcome::report(target::list(target::TARGETS), 0),
         Some(Command::Child(target)) => {
             // The child reports each panic's message to its parent, so the hook prints nothing.
             panic::set_hook(Box::new(|_| {}));

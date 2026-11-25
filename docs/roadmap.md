@@ -478,9 +478,9 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 - [ ] **M2.20 — vm: spans and hints for runtime errors**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0029). It
     is listed where it is to be done, after M2.11.
+  - Note: 2026-11-24, the owner accepted ADR-0029 (runtime errors with their source line, a caret,
+    and a hint).
   - Depends: M2.11, M2.14
-  - Decide first: the owner accepts ADR-0029 (runtime errors with their source line, a caret, and a
-    hint).
   - Do:
     - Have the compiler record each instruction's span in its debug information, and carry the span
       and the hints of ADR-0029 in `ferrolua::Error`, working out each hint only when the error
@@ -548,7 +548,6 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 - [ ] **M2.21 — cli: runtime errors with their source line, a caret, and a hint**
   - Note: added on 2026-11-24 with M2.20 (ADR-0029).
   - Depends: M2.15, M2.20
-  - Decide first: the owner accepts ADR-0029.
   - Do:
     - Print runtime errors from `ferrolua run` in the text format of
       [`specs/diagnostics.md`](specs/diagnostics.md#output-formats).
@@ -773,8 +772,8 @@ scripts within limits, and gets every standard library it grants.
 - [ ] **M3.20 — ferrolua: finite limits by default**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0030). It
     is listed where it is to be done, after M3.13.
+  - Note: 2026-11-24, the owner accepted ADR-0030 (finite limits by default).
   - Depends: M3.2, M3.13
-  - Decide first: the owner accepts ADR-0030 (finite limits by default).
   - Do:
     - Set the default limits of ADR-0030, add `Options::trusted()` and `Limits::none()`, and name
       the setting that raises a limit in each limit error, as
@@ -788,7 +787,7 @@ scripts within limits, and gets every standard library it grants.
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
 
 - [ ] **M3.14 — cli: options for `ferrolua run`**
-  - Note: 2026-11-24: if the owner accepts ADR-0030 (finite limits by default), `ferrolua run` uses
+  - Note: 2026-11-24, the owner accepted ADR-0030 (finite limits by default): `ferrolua run` uses
     `Options::trusted()`, and `--sandbox` the defaults.
   - Depends: M3.13
   - Do:
@@ -801,15 +800,16 @@ scripts within limits, and gets every standard library it grants.
 - [ ] **M3.19 — cli: an interactive prompt**
   - Note: moved here from the backlog on 2026-11-24, when the owner asked for five improvements to
     draft (ADR-0033). The backlog row becomes one for line editing at the prompt.
+  - Note: 2026-11-24, the owner accepted ADR-0033 (an interactive prompt in M3).
   - Depends: M3.14, M2.21
-  - Decide first: the owner accepts ADR-0033 (an interactive prompt in M3).
   - Do:
     - Build the prompt of
-      [`specs/cli.md`](specs/cli.md#the-interactive-prompt-adr-0033-proposed).
+      [`specs/cli.md`](specs/cli.md#the-interactive-prompt-adr-0033).
   - Accept:
     - Typing `x = 1` and then `x + 1` prints `2`, and a line that ends inside a function body
       continues after `...`.
-    - Piping a script into `ferrolua` runs it without a prompt.
+    - Piping a script into `ferrolua` runs it without a prompt, and piping the same two lines into
+      `ferrolua -i` prints `2`.
   - Verify: `cargo test -p ferrolua-cli --locked`
 
 - [ ] **M3.17 — xtask: test runners for Android, iOS, and the web**
@@ -884,8 +884,8 @@ on every target.
 - [ ] **M4.9 — vm: grow strings and lists in place when only one place holds them**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0032). It
     is listed where it is to be done, after M4.2, which compiles `+=`.
+  - Note: 2026-11-24, the owner accepted ADR-0032 (strings and lists grown in place).
   - Depends: M4.2, M2.18
-  - Decide first: the owner accepts ADR-0032 (strings and lists grown in place).
   - Do:
     - Build the rule of ADR-0032 in the VM, and add a benchmark to `benches/lua/`, with its Lua 5.5
       twin, that builds a string from many parts with `s += part`.
@@ -985,8 +985,8 @@ output with the JIT on or forced, and the agreed budgets are checked.
 - [ ] **M5.10 — vm: specialize instructions in place**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0031). It
     is listed where it is to be done, after M5.1, whose benchmarks measure it.
+  - Note: 2026-11-24, the owner accepted ADR-0031 (instructions specialized in place).
   - Depends: M5.1
-  - Decide first: the owner accepts ADR-0031 (instructions specialized in place).
   - Do:
     - Build specialized forms of the instructions M5.1's benchmarks spend the most time in, with the
       rewriting and rewriting back of ADR-0031, the verifier's rule against specialized opcodes,
@@ -1651,7 +1651,7 @@ following the guide, on any of the six platforms.
 | A WebAssembly JIT, which compiles hot functions to WebAssembly modules in the browser; the web runs interpreted today (ADR-0027) | A web host measures its scripts too slow interpreted |
 | `wasm32-wasip1`, the WebAssembly System Interface, as a target | A host asks to run Ferrolua under WASI |
 | 32-bit targets, such as Android on ARMv7 | A host asks for one |
-| Arrow-key history and line editing at the interactive prompt, which need the terminal's raw mode and so `unsafe` system calls (ADR-0033, proposed) | The standard library gains a way to set raw mode, or the owner allows `unsafe` in `ferrolua-cli` |
+| Arrow-key history and line editing at the interactive prompt, which need the terminal's raw mode and so `unsafe` system calls (ADR-0033) | The standard library gains a way to set raw mode, or the owner allows `unsafe` in `ferrolua-cli` |
 | The Lua C API and C modules; today hosts must be Rust programs (ADR-0017) | A C or C++ host asks to embed Ferrolua |
 | Incremental loop collection, which spreads one collection over several safe points to shorten pauses | A host measures a collection pause above the agreed budget that turning off automatic runs and scheduling collections can't avoid |
 | Spreading the freeing of one large structure over several safe points | A benchmark measures a pause over 1 ms from freeing one value |

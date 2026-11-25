@@ -55,17 +55,17 @@ status to the host, which the command-line tool turns into the process's exit st
 
 | Limit | Counts | Default without a host limit |
 | :- | :- | :- |
-| Memory | Bytes the state has allocated ([`memory.md`](memory.md)) | None; a failed allocation runs the loop collector, then raises a catchable `not enough memory` |
-| Instructions | Bytecode instructions one call from the host runs, plus work units inside library calls and table operations | None |
+| Memory | Bytes the state has allocated ([`memory.md`](memory.md)) | 256 MB. Without a limit, as under `Options::trusted()`, a failed allocation runs the loop collector, then raises a catchable `not enough memory` |
+| Instructions | Bytecode instructions one call from the host runs, plus work units inside library calls and table operations | 1,000,000,000 |
 | Call depth | Nested calls, Lua and native | PUC-Rio Lua 5.5.1's limits on nested native calls and stack slots, which M3.2 records |
 | String size | Bytes in one string | `2^63 - 1`, limited by memory in practice |
-| Source size | Bytes of one chunk passed to `load` | None |
+| Source size | Bytes of one chunk passed to `load` | 16 MB |
 | Nesting depth | Nested blocks and expressions in the parser | PUC-Rio Lua 5.5.1's limit, which M1.8 records |
 
-ADR-0030 (proposed: finite limits by default) would give a state these limits unless its host
-sets others: 256 MB of memory, 1,000,000,000 instructions for each call from the host, and 16 MB
-of source for one chunk. `Options::trusted()` would keep today's defaults, with no limit and every
-library, and each limit error would name the setting that raises it (M3.20).
+These defaults come from ADR-0030 (finite limits by default), so a host that sets no limits still
+bounds every script. `Options::trusted()` sets no memory, instruction, or source-size limit and
+grants every library, for a host that runs only its own scripts, and each limit error names the
+setting that raises it (M3.20).
 
 Library functions that can run long count their work against the instruction limit: one unit per
 byte that `string.rep`, `table.concat`, `string.format`, `string.join`, `format`, and f-string
@@ -122,6 +122,8 @@ is.
 7. Nothing a script can print or compute contains a memory address.
 8. Each call from the host starts its instruction count at zero, and a finalizer counts against
    the call it runs in.
+9. A state made with `Options::default()` stops an endless loop at the instruction limit and an
+   endlessly growing table at the memory limit.
 
 ## Tests
 
@@ -145,3 +147,5 @@ is.
   `Lua::collect` whose finalizers pass its limit, one of them looping forever, which stops at the
   limit, after which the host's next call runs none of the rest and the next `Lua::collect` runs
   them first, in order.
+- Invariant 9: `hostile_sandbox.rs` runs both scripts in a state made with `Options::default()`,
+  and checks each error and the setting it names (M3.20).

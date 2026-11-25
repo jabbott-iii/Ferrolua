@@ -25,10 +25,10 @@ seeded per state: from the standard library's `RandomState` by default, so a scr
 keys that collide, or from `Options::hash_seed` when a host needs runs to repeat exactly
 ([`ferrolua.md`](ferrolua.md)).
 
-ADR-0032 (proposed: grow strings and lists in place when only one place holds them) would let
-`s = s + t` and `s += t` on a local append to `s` in place when its count shows nothing else holds
-it and it is longer than 40 bytes, so it isn't interned. The result is the value a copy would give,
-the append drops the cached hash, and lists follow the same rule (M4.9).
+`s = s + t` and `s += t` on a local append to `s` in place when its count shows that nothing else
+holds it and it is longer than 40 bytes, so it isn't interned (ADR-0032: strings and lists grow in
+place when only one place holds them). The result is the value a copy would give, the append drops
+the cached hash, and lists follow the same rule (M4.9).
 
 ## Tables
 
@@ -89,11 +89,11 @@ operator's edge cases and error messages here. Number-to-string conversion print
 digits to read back the same value, as Lua 5.5 does, using PUC-Rio's exact rules, which M2.9 records
 here.
 
-ADR-0031 (proposed: specialize instructions in place) would let the interpreter rewrite an
-instruction that keeps seeing the same kinds of operands into a form for them, such as an integer
-add, and rewrite it back when they change. Both forms give the same results and count the same
-work units, so limits stop a script at the same point, and specialized opcodes never leave the
-state: `string.dump` writes the generic ones (M5.10).
+The interpreter rewrites an instruction that keeps seeing the same kinds of operands into a form
+for them, such as an integer add, and rewrites it back when they change (ADR-0031: instructions
+specialized in place). Both forms give the same results and count the same work units, so limits
+stop a script at the same point, and specialized opcodes never leave the state: `string.dump`
+writes the generic ones (M5.10).
 
 ## Metamethods
 
@@ -115,10 +115,10 @@ PUC-Rio Lua 5.5.1's, including the variable description the bytecode allows, as 
 `attempt to index a nil value (global 'config')` and `attempt to call a nil value (method 'draw')`.
 An error with a `nil` value becomes a string, as Lua 5.5 does.
 
-ADR-0029 (proposed: runtime errors with their source line, a caret, and a hint) would keep each
-message as it is and add, beside it, the span of the failing expression from the debug
-information and, once the error reaches the host, a hint such as "did you mean `print`?". The VM
-works out no hint while the script runs, so `pcall` and its cost don't change (M2.20).
+Beside each message, which stays as it is, an error carries the span of the failing expression
+from the debug information and, once it reaches the host, a hint such as "did you mean `print`?"
+(ADR-0029: runtime errors with their source line, a caret, and a hint). The VM works out no hint
+while the script runs, so `pcall` and its cost don't change (M2.20).
 
 ## Coroutines
 
@@ -157,6 +157,10 @@ calls `run` when a function has compiled code. `Exit` says where the interpreter
    conformance script's reference twin.
 5. `#t` returns the border PUC-Rio Lua 5.5.1 returns for the table the reference twin builds, whose
    integer keys are each one higher.
+6. A script gives the same output, errors, work units, and collection log with specialization on
+   and off.
+7. An append in place gives the value a copy would, and only when nothing else holds the value.
+8. Working out a hint never changes an error's message or what the script sees.
 
 ## Tests
 
@@ -165,3 +169,9 @@ calls `run` when a function has compiled code. `Exit` says where the interpreter
 - Invariant 2: the `interpreter` fuzz target runs generated programs under instruction and memory
   limits.
 - Invariant 3: `tests/conformance/tail_calls.lua`, and a unit test that measures the frame count.
+- Invariant 6: the conformance runner runs every script with specialization on and off and
+  compares both outputs and logs (M5.10).
+- Invariant 7: a property test builds strings and lists by `+` with and without other holders and
+  compares each result with a copy (M4.9).
+- Invariant 8: `tests/conformance/errors.lua` prints each caught message, which stays its recorded
+  output with hints on (M2.20).

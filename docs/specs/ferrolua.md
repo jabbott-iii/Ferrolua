@@ -75,12 +75,13 @@ assert_eq!(result, "hello, world");
   `crypto.getRandomValues` (ADR-0028).
 - The crate builds for every target in [`03-platforms.md`](../03-platforms.md#targets) (ADR-0027:
   six platforms).
-- ADR-0030 (proposed: finite limits by default) would make `Options::default()` set 256 MB of
-  memory, 1,000,000,000 instructions for each call, and 16 MB of source for one chunk, and add
-  `Options::trusted()`, with every library and no limits, for a host that runs only its own
-  scripts (M3.20).
-- ADR-0029 (proposed: runtime errors with their source line, a caret, and a hint) would add the
-  failing expression's span and a hint to each runtime error, beside its unchanged message (M2.20).
+- `Options::default()` sets 256 MB of memory, 1,000,000,000 instructions for each call, and 16 MB
+  of source for one chunk, and `Options::trusted()` gives every library and no limits, for a host
+  that runs only its own scripts (ADR-0030: finite limits by default; M3.20). `Limits::none()`
+  turns the limits off and leaves the libraries as they are.
+- A runtime error carries the failing expression's span and, where Ferrolua can work one out, a
+  hint, beside its unchanged message (ADR-0029: runtime errors with their source line, a caret, and
+  a hint; M2.20).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests
   from `os.exit`, a JIT mode asked for without the `jit` feature or on a target without a JIT, and
   internal errors.

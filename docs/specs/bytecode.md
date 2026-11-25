@@ -68,8 +68,8 @@ The verifier runs on every chunk `load` reads in binary mode, before any of it r
 - every jump lands on an instruction inside the function, and never in the middle of an
   instruction and its `EXTRA` word;
 - every opcode is defined, and an `EXTRA` word follows only instructions that take one;
-- no opcode is one of the specialized forms that exist only inside a state, if ADR-0031
-  (proposed: specialize instructions in place) is accepted;
+- no opcode is one of the specialized forms that exist only inside a state (ADR-0031: instructions
+  specialized in place);
 - the code ends with a return on every path;
 - the debug information has one line entry per instruction.
 

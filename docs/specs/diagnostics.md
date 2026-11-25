@@ -60,9 +60,9 @@ diagnostic adds its row to the registry below, in the same change.
 | SARIF 2.1.0 | `--format sarif` | Code scanning: one Static Analysis Results Interchange Format (SARIF) log, which GitHub accepts as an upload |
 
 Runtime errors from a running script aren't diagnostics. They keep PUC-Rio Lua 5.5.1's wording,
-because scripts match on them. ADR-0029 (proposed: runtime errors with their source line, a caret,
-and a hint) would print them in the text format all the same: the message, the file, line, and
-column, the source line with carets under the failing expression, and a hint.
+because scripts match on them. The `ferrolua` command and the debugger still print them in the text
+format: the message, the file, line, and column, the source line with carets under the failing
+expression, and a hint (ADR-0029: runtime errors with their source line, a caret, and a hint).
 
 ## Suppression comments
 

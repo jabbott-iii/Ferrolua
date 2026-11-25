@@ -26,24 +26,25 @@ the logic lives.
 | `ferrolua sast [paths...]` | Runs the security rules | M8.6 |
 | `ferrolua lsp` | Starts the language server on standard input and output | M9.7 |
 | `ferrolua dap` | Starts the debug adapter on standard input and output | M10.5 |
-| `ferrolua` | With no arguments, starts an interactive prompt when standard input is a terminal, and otherwise runs standard input as a script (ADR-0033, proposed) | M3.19 |
+| `ferrolua` | With no arguments, starts an interactive prompt when standard input is a terminal, and otherwise runs standard input as a script (ADR-0033) | M3.19 |
 
 The checking commands share `--format text|json|sarif` and `--config <file>`. With no paths, they
 check the files `.ferrolua.lua` includes, or every `.lua` file under the current directory.
 
-## The interactive prompt (ADR-0033, proposed)
+## The interactive prompt (ADR-0033)
 
-This section stays a proposal until the owner accepts ADR-0033.
+ADR-0033 (an interactive prompt in M3) gives learners a place to try code before they write a file.
 
 - A line that parses as an expression prints its value, written as an f-string's `!r` writes it,
   as Python's prompt does. A chunk that isn't finished continues after a `...` prompt.
 - Each line compiles as if `global *` covered its top level, into a table for the session that
   falls back to the real globals, so a name one line assigns is there on the next.
-- Errors print with their source line, a caret, and a hint (ADR-0029, proposed).
+- Errors print with their source line, a caret, and a hint (ADR-0029).
+- `ferrolua -i` starts the prompt whatever standard input is, as `lua -i` does, so tests can pipe
+  lines into it.
 - Line editing is the terminal's own: arrow-key history needs raw mode, which takes `unsafe`
   system calls, and the backlog holds it.
-- The prompt and `ferrolua run` use `Options::trusted()`, and `--sandbox` the defaults (ADR-0030,
-  proposed).
+- The prompt and `ferrolua run` use `Options::trusted()`, and `--sandbox` the defaults (ADR-0030).
 
 ## Exit status
 
@@ -68,6 +69,7 @@ leave open). It reads no other environment variable.
 2. No argument list makes the binary panic.
 3. `ferrolua run` prints what PUC-Rio's `lua` prints for the script's Lua 5.5 twin and the same
    arguments.
+4. At the interactive prompt, a name one line assigns has its value on every later line.
 
 ## Tests
 
@@ -76,3 +78,5 @@ leave open). It reads no other environment variable.
 - Invariant 2: a property test passes generated argument lists.
 - Invariant 3: the conformance runner also runs each conformance script through the binary, and
   compares the output with its twin's `.out` file.
+- Invariant 4: an end-to-end test pipes lines into `ferrolua -i`, assigning in one line and reading
+  in the next (M3.19).

@@ -1356,11 +1356,11 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0029 — Show runtime errors with their source line, a caret, and a hint
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
-  - The owner wants Ferrolua to stay easy to learn, and on 2026-11-24 asked the agent to draft
-    this record as one of five improvements.
+  - The owner wants Ferrolua to stay easy to learn. On 2026-11-24 the owner asked the agent to
+    draft this record as one of five improvements, and accepted it the same day.
   - A runtime error keeps PUC-Rio Lua 5.5.1's wording where Ferrolua shares the error, because
     scripts match on it ([`specs/vm.md`](specs/vm.md#errors)), and it names only a line:
     `game.lua:12: attempt to call a nil value (global 'pirnt')`.
@@ -1369,7 +1369,7 @@ it is `Proposed`, and no code may depend on it.
     hints. A learner who sees the expression and a likely fix spends less time on the error.
   - The tools' diagnostics already carry spans, labels, and notes
     ([`specs/diagnostics.md`](specs/diagnostics.md#the-diagnostic)), but runtime errors don't.
-- **Decision:**
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - Each instruction's debug information records the byte span of the expression it came from, not
     only its line.
   - A runtime error's message stays exactly as it is, so `pcall` and scripts see no change. Beside
@@ -1398,11 +1398,12 @@ it is `Proposed`, and no code may depend on it.
   - The hint inside the message string: every tool would show it, but scripts that match messages
     would break, and so would the comparison with PUC-Rio's wording.
   - Carets from line numbers alone: no new debug data, but a caret couldn't point inside a line.
-- **Revisit when:** the owner accepts or changes this record, which M2.20 needs first.
+- **Revisit when:** a user reports a hint that sent them the wrong way, or the spans make the
+  conformance scripts' precompiled chunks more than a quarter larger.
 
 ## ADR-0030 — Give every state finite limits by default
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - Without a host limit, a state has no memory, instruction, or source-size limit
@@ -1411,8 +1412,9 @@ it is `Proposed`, and no code may depend on it.
     sandbox, and ADR-0021 counts the instruction limit for each call from the host.
   - A host that forgets to set limits runs untrusted scripts with no bound: `while true do end`
     hangs it, and a table that keeps growing exhausts its memory.
-  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
-- **Decision:**
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements, and
+    accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - `Options::default()` sets finite limits: 256 MB of memory, 1,000,000,000 instructions for each
     call from the host, and 16 MB for one chunk's source. Call depth and nesting keep their limits.
   - `Options::trusted()` grants every library and sets no limits, for a host that runs only its
@@ -1437,11 +1439,11 @@ it is `Proposed`, and no code may depend on it.
     needs a page of settings.
   - A time limit: easy to understand, but wall-clock time differs between runs and machines, which
     the determinism of ADR-0018 forbids.
-- **Revisit when:** the owner accepts or changes this record, which M3.20 needs first.
+- **Revisit when:** a benchmark script, or a host's ordinary script, reaches a default limit.
 
 ## ADR-0031 — Specialize instructions in place in the interpreter
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - iOS and the web run only the interpreter (ADR-0027), and everywhere else so does every function
@@ -1452,8 +1454,9 @@ it is `Proposed`, and no code may depend on it.
     largest part of a release that its notes say ran about 25% faster on average.
   - The baseline JIT needs to know which types each instruction saw
     ([`specs/jit.md`](specs/jit.md#baseline-tier)).
-  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
-- **Decision:**
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements, and
+    accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - A prototype's code starts generic. After an instruction runs a fixed number of times with the
     same kinds of operands, the interpreter rewrites its opcode in place to a specialized form,
     such as an integer add, a float add, a read of a class instance's field slot, or a table read
@@ -1483,11 +1486,12 @@ it is `Proposed`, and no code may depend on it.
     annotations, and the VM never trusts them (ADR-0006).
   - A side table of caches without rewriting the opcode: the code stays fixed, but each
     instruction pays an extra lookup to find its cache.
-- **Revisit when:** the owner accepts or changes this record, which M5.10 needs first.
+- **Revisit when:** M5.10 measures the interpreted benchmarks less than 10% faster, or a bug traces
+  to a specialized form that disagrees with its generic one.
 
 ## ADR-0032 — Grow strings and lists in place when only one place holds them
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - Strings can't change, and `+` joins two strings into a new one (ADR-0023), so `s += part` in a
@@ -1496,8 +1500,9 @@ it is `Proposed`, and no code may depend on it.
     f-strings and `string.join` avoid it, but learners write the loop first.
   - CPython appends to a string in place when nothing else refers to it. Ferrolua counts
     references (ADR-0018), so it knows the same fact at no extra cost.
-  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
-- **Decision:**
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements, and
+    accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - When the left operand of `+` is a string or a list that only the register receiving the result
     holds, as in `s = s + t` or `s += t` on a local, the VM appends to it in place instead of
     copying it. A string of 40 bytes or fewer, which the state interns, and any value with another
@@ -1526,11 +1531,12 @@ it is `Proposed`, and no code may depend on it.
     would show through every other that holds the list, which `+=` on strings and numbers never
     does.
   - The lint rule alone: no VM change, but the slow loop stays the one learners write first.
-- **Revisit when:** the owner accepts or changes this record, which M4.9 needs first.
+- **Revisit when:** a benchmark shows the check for a single owner slowing `+` on shared strings, or
+  a host reports a loop that stays slow because its string is shared.
 
 ## ADR-0033 — Start an interactive prompt from `ferrolua` with no arguments, in M3
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-24
 - **Context:**
   - The backlog holds "an interactive prompt for `ferrolua` with no arguments, as `lua` has",
@@ -1540,8 +1546,9 @@ it is `Proposed`, and no code may depend on it.
     name a line assigns would be gone on the next line.
   - Arrow-key history and line editing need the terminal's raw mode, which takes `tcsetattr` or
     `SetConsoleMode`, and so `unsafe` code outside the JIT, which ADR-0013 (proposed) forbids.
-  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements.
-- **Decision:**
+  - On 2026-11-24 the owner asked the agent to draft this record as one of five improvements, and
+    accepted it the same day.
+- **Decision** (the owner accepted the agent's proposal on 2026-11-24):
   - `ferrolua` with no arguments starts a prompt when standard input is a terminal, which
     `std::io::IsTerminal` tells. Otherwise it runs standard input as a script, as `lua -` does.
   - A line that parses as an expression prints its value as an f-string's `!r` would write it, as
@@ -1550,10 +1557,10 @@ it is `Proposed`, and no code may depend on it.
   - Each line compiles as if `global *` (ADR-0026) covered its top level, into a table for the
     session that falls back to the real globals, so `x = 1` on one line and `x` on the next work.
     Functions defined at the prompt keep local scoping inside.
-  - Errors print as ADR-0029 (proposed) shows them.
+  - Errors print as ADR-0029 shows them.
   - Line editing is the terminal's own until a way to set raw mode without `unsafe` code exists,
     which the backlog tracks.
-  - The prompt uses `Options::trusted()` (ADR-0030, proposed), and `--sandbox` gives the defaults.
+  - The prompt uses `Options::trusted()` (ADR-0030), and `--sandbox` gives the defaults.
 - **Consequences:**
   - Good: a learner tries code at once, and names persist between lines as in Python's prompt.
   - Bad: no arrow-key history at first; a user who wants it runs the prompt under a line-editing
@@ -1567,4 +1574,5 @@ it is `Proposed`, and no code may depend on it.
     locals by default.
   - Raw mode with `unsafe` code in `ferrolua-cli`: history from the start, but a second crate with
     `unsafe`, which ADR-0013 rules out.
-- **Revisit when:** the owner accepts or changes this record, which M3.19 needs first.
+- **Revisit when:** the standard library gains a way to set the terminal's raw mode, or a user
+  reports being misled because a line behaves differently at the prompt than in a file.

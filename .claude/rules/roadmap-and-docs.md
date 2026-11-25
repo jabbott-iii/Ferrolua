@@ -28,26 +28,26 @@ so they can fill them in.
 
 - **Docs folder:** `docs/`
 - **Core documents:** `00-overview.md`, `01-architecture.md`, `02-dependency-policy.md`,
-  `03-platforms.md`, and `04-quality.md`, none written yet. `05-release.md` comes before the first
-  crates.io release
-- **Specs:** `docs/specs/<name>.md`: one for each crate, plus one for each contract that spans
-  crates, such as the bytecode format and the sandbox
+  `03-platforms.md`, and `04-quality.md`. `05-release.md` comes before the first crates.io release
+  (M12.1)
+- **Specs:** `docs/specs/<name>.md`: one for each crate except the test tools (`ferrolua-testkit`,
+  `ferrolua-fuzz`, and `xtask`), which `docs/04-quality.md` describes, plus one for each contract
+  that spans crates: `language`, `memory`, `sandbox`, and `diagnostics`
 - **Task IDs:** `M<milestone>.<task>`, with areas taken from the **Scopes** in `commits.md`, for
-  example `M1.2 — parser: expressions and operator precedence`
+  example `M1.5 — syntax: expressions and operator precedence`
 - **Environments:** Linux on x86-64 first. As of 2026-11-24 this machine has Rust 1.100.0 with
-  Clippy, rustfmt, and the `llvm-tools` component, but not PUC-Rio Lua 5.4. Other targets, such as
+  Clippy, rustfmt, and the `llvm-tools` component, but not PUC-Rio Lua 5.5.1. Other targets, such as
   AArch64, macOS, and Windows, follow in the order `docs/03-platforms.md` sets, and run the
   interpreter until their JIT backends land
-- **Definition of done:** "Definition of done" in `CLAUDE.md`, once it's written; until then, the
-  **Done checks** in `commits.md`. No single command runs every check yet
+- **Definition of done:** "Definition of done" in `CLAUDE.md`. No single command runs every check
+  yet
 - **Decision log:** `docs/decisions.md`, with `ADR-NNNN` records
 - **Feature list:** none: the roadmap's tasks track features until the first release
-- **Status locations:** the roadmap's ticks and a status line in `README.md`, plus the "Status"
-  section of `CLAUDE.md` once it's written
+- **Status locations:** the roadmap's ticks, the status line in `README.md`, and the "Status"
+  section of `CLAUDE.md`
 - **Checked documents:** none
-- **Agent guide:** the "Read before working" table in `CLAUDE.md`, once it's written
-- **Update map:** "Documentation" in `CONTRIBUTING.md`, once it's written; until then, "Keeping the
-  documents true" in this rule
+- **Agent guide:** the "Read before working" table in `CLAUDE.md`
+- **Update map:** "Documentation" in `CONTRIBUTING.md`
 - **Diagrams:** Mermaid in `docs/01-architecture.md`, with built parts drawn solid and planned parts
   dashed
 - **Gate evidence:** none: milestones keep free-form exit criteria

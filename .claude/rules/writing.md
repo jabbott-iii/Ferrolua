@@ -29,8 +29,8 @@ so they can fill them in.
   linting, type checking, and static application security testing (SAST)
 - **Code block tags:** `bash`, `rust`, `lua`, `toml`, `json`, `asm` for x86-64 assembly, `mermaid`,
   and `text`
-- **Sources of truth:** the code; the [Lua 5.4 Reference Manual](https://www.lua.org/manual/5.4/)
-  and what PUC-Rio Lua 5.4 does with the same script; `docs/specs/`; `docs/decisions.md`;
+- **Sources of truth:** the code; the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/)
+  and what PUC-Rio Lua 5.5.1 does with the same script; `docs/specs/`; `docs/decisions.md`;
   `docs/roadmap.md`; and a command's real output
 - **Preview command:** `cargo doc --workspace --no-deps --open` for doc comments, once the Cargo
   workspace exists; none for Markdown

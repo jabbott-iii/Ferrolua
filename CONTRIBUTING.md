@@ -3,9 +3,11 @@
 Ferrolua welcomes bug reports, fixes, tests, and documentation. For anything beyond a small fix,
 open an issue first, so the design is agreed before you write the code.
 
-Ferrolua is at its start. The repository holds the rules its code, tests, and documents follow, in
-`.claude/rules/`, but no Rust or Lua code yet. The commands below work once the Cargo workspace
-exists.
+Ferrolua is at its start. The repository holds its design in `docs/` and the rules its code, tests,
+and documents follow in `.claude/rules/`, but no Rust or Lua code yet.
+[`docs/00-overview.md`](docs/00-overview.md) says what Ferrolua is for, and
+[`docs/roadmap.md`](docs/roadmap.md) what comes next. The commands below work once the Cargo
+workspace exists, which task M0.1 creates.
 
 ## Set up
 
@@ -19,7 +21,7 @@ exists.
    rustup prints `1.100.0-x86_64-unknown-linux-gnu installed` on Linux on x86-64, or `unchanged`
    if you have it already.
 
-2. To record the expected output of a Lua conformance script, install PUC-Rio Lua 5.4, the
+2. To record the expected output of a Lua conformance script, install PUC-Rio Lua 5.5.1, the
    reference interpreter, from [lua.org](https://www.lua.org/download.html) or your operating
    system's package manager.
 
@@ -33,7 +35,9 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
   - unit tests in a `#[cfg(test)] mod tests` beside the code
   - integration tests that use only the public API in each crate's `tests/`
   - Lua conformance scripts in `tests/conformance/`, each with a `.out` file that holds the output
-    PUC-Rio Lua 5.4 printed for it
+    PUC-Rio Lua 5.5.1 printed for it
+  - scripts for Ferrolua-only behavior in `tests/extensions/`, each with a `.out` file written
+    from the spec section it tests
   - fuzz targets in `fuzz/`, with every input that ever crashed one in `fuzz/regressions/`
 - Write the tests in the same change as the code. Coverage stays at 100% of lines and regions, and
   a failing test means the code is wrong: fix the code, never the test.
@@ -59,11 +63,11 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/), as
 [`commits.md`](.claude/rules/commits.md) describes:
 
 ```text
-feat(parser): parse goto statements and labels (M1.3)
+feat(syntax): parse goto statements and labels (M1.4)
 ```
 
-- The scope is a crate's name without any `ferrolua-` prefix, or `docs`, `ci`, or `claude`. Leave
-  it out when a change spans several areas.
+- The scope is a crate's name without any `ferrolua-` prefix, such as `syntax` or `vm`, or
+  `workspace`, `docs`, `ci`, or `claude`. Leave it out when a change spans several areas.
 - End the summary line with the roadmap task's ID in parentheses when the commit finishes or
   advances one.
 - Make each commit one logical change, and keep together the changes that belong together: a
@@ -77,8 +81,7 @@ feat(parser): parse goto statements and labels (M1.3)
 ## Documentation
 
 This section is the project's update map: it lists the documents each kind of change updates.
-Update them in the same change. The `docs/` folder doesn't exist yet, so the first change that
-needs one of its documents writes it, in the shape
+Update them in the same change, in the shape
 [`roadmap-and-docs.md`](.claude/rules/roadmap-and-docs.md) gives.
 
 | Change | Update |
@@ -89,6 +92,7 @@ needs one of its documents writes it, in the shape
 | A new command, module, or rule | The "Read before working" table in `CLAUDE.md` |
 | A change to the workflow or the checks | This guide, the pull request template, and the issue forms in `.github/` |
 | An approved exception to the dependency rule | `docs/02-dependency-policy.md` |
+| A goal, budget, milestone, or task changed, once the owner agrees | `docs/00-overview.md` or `docs/roadmap.md` |
 
 ## Pull requests
 
@@ -115,5 +119,5 @@ contribution is released under the same license.
 ## Coding agents
 
 Coding agents such as Claude Code follow the rules in `.claude/rules/` and can run the skills in
-`.claude/skills/`. Once `CLAUDE.md` is written, its "Read before working" table lists the
-documents to read before working in each area.
+`.claude/skills/`. [`CLAUDE.md`](CLAUDE.md) lists the documents to read before working in each
+area, and the checks a task must pass to be done.

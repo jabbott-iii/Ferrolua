@@ -35,9 +35,9 @@ branches".
 - **Coverage exclusions:** none
 - **Mutation command:** none: cargo-mutants is third party, and Ferrolua has no mutation tool of its
   own yet
-- **Performance budgets:** none yet. Benchmarks in each crate's `benches/` and in `benches/lua/`
-  will compare Ferrolua with PUC-Rio Lua 5.4 on the same x86-64 Linux machine, and the budgets they
-  lead to go in `docs/00-overview.md`
+- **Performance budgets:** none agreed yet. `docs/00-overview.md` proposes them, measured against
+  PUC-Rio Lua 5.5.1 on the same x86-64 Linux machine by the benchmarks in each crate's `benches/`
+  and in `benches/lua/`, and M5.9 makes each agreed budget a check that fails the build
 - **Security checks:** hostile-input tests for the lexer, parser, compiler, bytecode loader, and
   sandbox limits in each crate's `tests/`; and fuzz targets for every parser of outside data, in
   `fuzz/`, run by Ferrolua's own std-only fuzzer from a fixed seed. Every input that ever crashed a

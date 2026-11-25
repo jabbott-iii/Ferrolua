@@ -27,11 +27,13 @@ each value by its bold name. If a value still reads `[FILL IN: …]`, the rule i
 yet. Work out that value from the repository itself, and tell the user which values are missing
 so they can fill them in.
 
-- **Crates:** none yet. The task that creates the Cargo workspace records the crate map in
-  `docs/01-architecture.md`. The planned parts are the parser, the bytecode compiler, the
-  interpreter, the just-in-time (JIT) compiler for x86-64, the garbage collector, the standard
-  library, the embedding API, and the analysis tools: a linter, a type checker, a formatter, and
-  static application security testing (SAST)
+- **Crates:** none yet. The crate map in `docs/01-architecture.md` lists the planned crates, the job
+  of each, and the task that builds it, and M0.1 creates the workspace with them. They are the
+  parser, the bytecode format, the compiler, the VM with its reference-counted heap, the
+  just-in-time (JIT) compiler for x86-64, the standard library, the embedding API, the analysis
+  crates (a semantic model, a type checker, a linter, a formatter, and static application security
+  testing (SAST)), JSON, the language server, the debug adapter, the command-line tool, and the test
+  tools
 - **Toolchain:** edition 2024, Rust 1.100.0 pinned in `rust-toolchain.toml`, and
   `rust-version = "1.100"` in `[workspace.package]`
 - **Check commands:** `cargo fmt --all --check`,
@@ -44,24 +46,25 @@ so they can fill them in.
   the workspace lints in a `[lints]` table of its own with `unsafe_code` at `deny`; change both
   tables together
 - **Dependency policy:** `dependencies.md` in this folder
-- **Unsafe policy:** forbidden in every crate by default. The JIT needs `unsafe` to map executable
-  memory and to call the code it generates, and the garbage collector may need it for its heap. A
-  crate may use `unsafe` only after an accepted architecture decision record (ADR) names the crate,
-  the modules, and the invariants its `unsafe` code relies on. Every `unsafe` block has a
-  `// SAFETY:` comment, and every `unsafe fn` a `# Safety` doc section. Memory that holds generated
-  code is never writable and executable at the same time
+- **Unsafe policy:** forbidden in every crate by default. A crate may use `unsafe` only after an
+  accepted architecture decision record (ADR) names the crate, the modules, and the invariants its
+  `unsafe` code relies on. The JIT needs `unsafe` to map executable memory and to call the code it
+  generates; ADR-0013, still proposed, limits it to the `jit::memory` and `jit::entry` modules of
+  `ferrolua-jit`, and the heap needs none (ADR-0011). Every `unsafe` block has a `// SAFETY:`
+  comment, and every `unsafe fn` a `# Safety` doc section. Memory that holds generated code is never
+  writable and executable at the same time
 - **Untrusted input:** every Lua script Ferrolua loads, as source text or as a precompiled chunk,
   every value a script passes to the host, and the files the analysis tools read. Limits on source
   size, nesting depth, string length, memory, and instruction count go in each part's spec in
   `docs/specs/`
 - **Errors:** one error enum per library crate, implementing `Display` and `std::error::Error`. A
   Lua runtime error carries a Lua value, as `error` allows, and Ferrolua's own messages match
-  PUC-Rio Lua 5.4's wording, such as `attempt to index a nil value`, because scripts match on them.
-  Each analysis diagnostic carries a stable code
+  PUC-Rio Lua 5.5.1's wording, such as `attempt to index a nil value`, because scripts match on
+  them. Each analysis diagnostic carries a stable code, as `docs/specs/diagnostics.md` defines
 - **Logging:** none: library crates return errors and diagnostics to the host, and never print or
   log. Only a command-line binary, if one is added, writes to stdout and stderr, from its entry
   point
-- **Languages:** English only. Runtime error messages keep PUC-Rio Lua 5.4's English wording,
+- **Languages:** English only. Runtime error messages keep PUC-Rio Lua 5.5.1's English wording,
   because scripts match on them
 - **Concurrency:** none: no crate starts a thread or an async runtime. Lua coroutines run on the
   thread that resumes them, inside one Lua state
@@ -70,13 +73,15 @@ so they can fill them in.
   with the previous release's by hand
 - **Published crates:** none published yet. Each crate that the crate map in
   `docs/01-architecture.md` marks for crates.io needs a README of its own and docs.rs settings
-- **Design docs:** `docs/specs/<crate>.md`, one for each crate
+- **Design docs:** `docs/specs/<crate>.md`, one for each crate except the test tools, which
+  `docs/04-quality.md` describes, plus the specs for contracts that span crates: `language`,
+  `memory`, `sandbox`, and `diagnostics`
 - **Test layout:** unit tests in a `#[cfg(test)] mod tests` beside the code; integration tests that
-  use only the public API in each crate's `tests/`; Lua conformance scripts in `tests/conformance/`,
-  which run once interpreted and once with the JIT forced on, and must print what PUC-Rio Lua 5.4
-  printed (see **Test layout** in `lua.md`); benchmarks in each crate's `benches/`, timed with
-  `std::time::Instant`; and fuzz targets in `fuzz/`, as **Security checks** in `testing.md`
-  describes
+  use only the public API in each crate's `tests/`; Lua conformance scripts in `tests/conformance/`
+  and `tests/extensions/`, which run once interpreted and once with the JIT forced on, and must
+  print their recorded output (see **Test layout** in `lua.md`); benchmarks in each crate's
+  `benches/`, timed with `std::time::Instant`; and fuzz targets in `fuzz/`, as **Security checks**
+  in `testing.md` describes
 
 ## Working as a pair
 

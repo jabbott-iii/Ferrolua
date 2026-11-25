@@ -27,48 +27,56 @@ each value by its bold name. If a value still reads `[FILL IN: …]`, the rule i
 yet. Work out that value from the repository itself, and tell the user which values are missing
 so they can fill them in.
 
-- **Lua version:** Lua 5.4. Ferrolua implements it, so every `.lua` file in this repository must run
-  the same on Ferrolua and on PUC-Rio Lua 5.4, the reference interpreter, unless it tests something
-  only Ferrolua has, such as its embedding API
-- **Host:** Ferrolua itself, which provides Lua 5.4's standard libraries and whatever an embedding
-  host registers. The repository's scripts also run on PUC-Rio's standalone `lua` 5.4 interpreter,
+- **Lua version:** Lua 5.5, which Ferrolua implements and extends (architecture decision records
+  ADR-0001 and ADR-0004 in `docs/decisions.md`). Every `.lua` file in this repository must run the
+  same on Ferrolua and on PUC-Rio Lua 5.5.1, the reference interpreter, unless it tests something
+  only Ferrolua has, such as its embedding API, its language extensions, or an intended difference
+  the decision log records; those files go in `tests/extensions/`
+- **Host:** Ferrolua itself, which provides Lua 5.5's standard libraries and whatever an embedding
+  host registers. The conformance scripts also run on PUC-Rio's standalone `lua` 5.5.1 interpreter,
   to record the output Ferrolua must match
-- **Modules:** none yet. The repository's Lua is test and benchmark scripts in `tests/conformance/`
-  and `benches/lua/`, each run as a main chunk; none loads another with `require`
+- **Modules:** none yet. The repository's Lua is test and benchmark scripts in `tests/conformance/`,
+  `tests/extensions/`, and `benches/lua/`, each run as a main chunk; none loads another with
+  `require`, except the scripts M3.10 adds to `tests/conformance/require/`
 - **Check commands:** the conformance run in `cargo test --workspace --locked`. Once Ferrolua's own
   formatter, linter, and type checker exist, they check every script too
 - **Lint configuration:** none yet. Third-party tools such as StyLua and luacheck aren't allowed
   (see `dependencies.md`), so Ferrolua's own formatter and linter will check the scripts once they
   exist, configured as their specs in `docs/specs/` describe
 - **Annotations:** LuaCATS (Lua Comment And Type System) annotations, such as `---@param` and
-  `---@return`, which Ferrolua's type checker will read. lua-language-server reads them too, but the
-  project doesn't require it
+  `---@return`, which Ferrolua's type checker will read, because these scripts must also run on
+  PUC-Rio Lua 5.5.1. Scripts in `tests/extensions/` may use Ferrolua's inline annotations instead,
+  as `docs/specs/language.md` defines them. lua-language-server reads LuaCATS too, but the project
+  doesn't require it
 - **Errors:** raise with `error` for bugs and broken contracts, and return `nil, message` for
-  failures a caller expects, as Lua 5.4's standard library does. Conformance scripts catch errors
-  with `pcall` and print the message, so it is compared with PUC-Rio Lua 5.4's
+  failures a caller expects, as Lua 5.5's standard library does. Conformance scripts catch errors
+  with `pcall` and print the message, so it is compared with PUC-Rio Lua 5.5.1's
 - **Dependency policy:** `dependencies.md` in this folder
 - **C boundary:** none: Ferrolua is written in Rust and has no Lua C API (`lua.h`), so C modules
   built for PUC-Rio Lua don't load in it. Hosts reach Lua through Ferrolua's Rust embedding API,
   which `rust.md` and its **Unsafe policy** cover
-- **Languages:** English only. Runtime error messages keep PUC-Rio Lua 5.4's English wording,
+- **Languages:** English only. Runtime error messages keep PUC-Rio Lua 5.5.1's English wording,
   because scripts match on them
 - **Untrusted input:** none in the repository's own scripts. The scripts that hosts give Ferrolua
   are untrusted, and **Untrusted input** in `rust.md` covers them
 - **Sandbox:** Ferrolua runs Lua its hosts didn't write, so the VM is the sandbox. A host must pick
   each state's libraries from an allowlist. `io`, `os`, `debug`, `package`, and loading precompiled
   chunks must stay off unless the host turns them on. Limits on memory and instructions must be
-  enforced inside the VM, so they also stop a long call such as `string.find`. An architecture
-  decision record (ADR) will settle the design before the standard library lands
-- **Performance budgets:** none yet. Benchmarks in `benches/lua/` will compare Ferrolua with PUC-Rio
-  Lua 5.4 on the same x86-64 Linux machine, and the budgets they lead to go in `docs/00-overview.md`
+  enforced inside the VM, so they also stop a long call such as `string.find`. ADR-0014, still
+  proposed, sets the design, and `docs/specs/sandbox.md` gives the details; the owner accepts it
+  before the limits land in M3.2
+- **Performance budgets:** none agreed yet. Benchmarks in `benches/lua/` will compare Ferrolua with
+  PUC-Rio Lua 5.5.1 on the same x86-64 Linux machine (M5.1), and `docs/00-overview.md` proposes the
+  budgets
 - **Published rocks:** none
-- **Design docs:** `docs/specs/<crate>.md`, as in `rust.md`; the test and benchmark scripts have
-  none of their own
+- **Design docs:** `docs/specs/<name>.md`, as in `rust.md`, with `docs/specs/language.md` for the
+  language itself; the test and benchmark scripts have none of their own
 - **Test layout:** conformance scripts in `tests/conformance/`, named after the feature they cover,
-  such as `goto.lua`, each with the output PUC-Rio Lua 5.4 printed in a `.out` file beside it. A
-  Rust integration test runs each script on Ferrolua, interpreted and with the JIT forced on, and
-  compares the output. busted isn't used, because it needs C modules such as LuaFileSystem, which
-  Ferrolua can't load. Lua benchmark scripts go in `benches/lua/`
+  such as `goto.lua`, each with the output PUC-Rio Lua 5.5.1 printed in a `.out` file beside it;
+  scripts for Ferrolua-only behavior in `tests/extensions/`, each with a `.out` file written from
+  the spec section it tests. A Rust integration test runs each script on Ferrolua, interpreted and
+  with the JIT forced on, and compares the output. busted isn't used, because it needs C modules
+  such as LuaFileSystem, which Ferrolua can't load. Lua benchmark scripts go in `benches/lua/`
 
 ## Working as a pair
 

@@ -1,0 +1,75 @@
+# Ferrolua
+
+Ferrolua is a Lua 5.5 virtual machine with a just-in-time (JIT) compiler, written in Rust with no
+third-party code, for Rust programs that embed Lua. It frees memory by reference counting instead of
+a garbage collector, and adds optional types, classes, compound assignment, and a strict mode. It
+also ships a type checker, a linter, a formatter, a security scanner, a language server, and a
+debugger. [`docs/00-overview.md`](docs/00-overview.md) gives the goals, and
+[`docs/roadmap.md`](docs/roadmap.md) the plan.
+
+The rules in `.claude/rules/` govern all work here: code, tests, dependencies, documents, prose, and
+commits. Read the rule for each kind of file you touch.
+
+## Status
+
+Design only: the documents in `docs/` exist, and no code does. The next task is M0.1, which creates
+the Cargo workspace.
+
+## Read before working
+
+| Area | Read first |
+| :- | :- |
+| Anything | [`docs/00-overview.md`](docs/00-overview.md), [`docs/01-architecture.md`](docs/01-architecture.md), and the task in [`docs/roadmap.md`](docs/roadmap.md) |
+| A decision, or a change to one | [`docs/decisions.md`](docs/decisions.md) |
+| Dependencies, `Cargo.toml`, workflows | [`docs/02-dependency-policy.md`](docs/02-dependency-policy.md) and `.claude/rules/dependencies.md` |
+| A new target or platform-specific code | [`docs/03-platforms.md`](docs/03-platforms.md) |
+| Tests, fuzzing, coverage, CI | [`docs/04-quality.md`](docs/04-quality.md) and `.claude/rules/testing.md` |
+| Lua syntax or semantics, extensions | [`docs/specs/language.md`](docs/specs/language.md) and the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) |
+| Memory, reference counting, `__gc`, weak tables | [`docs/specs/memory.md`](docs/specs/memory.md) |
+| Libraries a host grants, limits, untrusted input | [`docs/specs/sandbox.md`](docs/specs/sandbox.md) |
+| Diagnostics, codes, `.ferrolua.lua` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
+| `crates/syntax` | [`docs/specs/syntax.md`](docs/specs/syntax.md) |
+| `crates/bytecode` | [`docs/specs/bytecode.md`](docs/specs/bytecode.md) |
+| `crates/compiler` | [`docs/specs/compiler.md`](docs/specs/compiler.md) |
+| `crates/vm` | [`docs/specs/vm.md`](docs/specs/vm.md) and [`docs/specs/memory.md`](docs/specs/memory.md) |
+| `crates/jit`, or any `unsafe` | [`docs/specs/jit.md`](docs/specs/jit.md), and ADR-0013 in [`docs/decisions.md`](docs/decisions.md) |
+| `crates/stdlib` | [`docs/specs/stdlib.md`](docs/specs/stdlib.md) |
+| `crates/ferrolua` | [`docs/specs/ferrolua.md`](docs/specs/ferrolua.md) |
+| `crates/analysis` | [`docs/specs/analysis.md`](docs/specs/analysis.md) |
+| `crates/types` | [`docs/specs/types.md`](docs/specs/types.md) |
+| `crates/lint` | [`docs/specs/lint.md`](docs/specs/lint.md) |
+| `crates/fmt` | [`docs/specs/fmt.md`](docs/specs/fmt.md) |
+| `crates/sast` | [`docs/specs/sast.md`](docs/specs/sast.md) |
+| `crates/json` | [`docs/specs/json.md`](docs/specs/json.md) |
+| `crates/lsp` | [`docs/specs/lsp.md`](docs/specs/lsp.md) |
+| `crates/dap` | [`docs/specs/dap.md`](docs/specs/dap.md) |
+| `crates/cli` | [`docs/specs/cli.md`](docs/specs/cli.md) |
+| `crates/testkit`, `fuzz/`, `xtask/` | [`docs/04-quality.md`](docs/04-quality.md#the-projects-own-test-tools) |
+| Lua scripts in `tests/` and `benches/` | `.claude/rules/lua.md` and [`docs/04-quality.md`](docs/04-quality.md#conformance-scripts) |
+| Documents, prose, commits | `.claude/rules/roadmap-and-docs.md`, `.claude/rules/writing.md`, and `.claude/rules/commits.md` |
+
+## Definition of done
+
+A task is done when every step below passes. Until the Cargo workspace exists, only steps 5–7
+apply.
+
+1. The task's `Accept` results hold, and its `Verify` commands pass.
+2. The check commands of `.claude/rules/rust.md` pass:
+
+   ```bash
+   cargo fmt --all --check
+   cargo clippy --workspace --all-targets --locked -- -D warnings
+   cargo test --workspace --locked
+   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+   ```
+
+3. `cargo xtask coverage` reports 100% of lines and regions, and the steps in "Before finishing" in
+   `.claude/rules/testing.md` find no weakened test.
+4. `cargo tree --workspace --edges normal,build,dev --target all --prefix none` lists only
+   Ferrolua's own crates, and the steps in "Before finishing" in `.claude/rules/dependencies.md`
+   pass.
+5. Every document the change affects is updated in the same change, as "Documentation" in
+   [`CONTRIBUTING.md`](CONTRIBUTING.md#documentation) lists, and the steps in "Before finishing" in
+   `.claude/rules/roadmap-and-docs.md` pass.
+6. The steps in "Before finishing" in `.claude/rules/writing.md` pass for every changed text.
+7. The reply ends with a commit message for each commit, as `.claude/rules/commits.md` describes.

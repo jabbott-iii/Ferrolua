@@ -4,7 +4,7 @@ labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
-      value: "Ferrolua implements Lua 5.4. A request to change how a valid Lua 5.4 script runs is a
+      value: "Ferrolua implements Lua 5.5. A request to change how a valid Lua 5.5 script runs is a
         breaking change, and needs an architecture decision record before any code changes."
   - type: textarea
     id: problem
@@ -23,7 +23,7 @@ body:
   - type: dropdown
     id: semantics
     attributes:
-      label: "Does it change how a valid Lua 5.4 script runs?"
+      label: "Does it change how a valid Lua 5.5 script runs?"
       options:
         - "No"
         - "Yes"

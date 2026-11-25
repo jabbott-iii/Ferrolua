@@ -21,9 +21,10 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
   `rustc-ice-*.txt`, as `.gitignore` lists
 - **Push effect:** none yet: Ferrolua has no GitHub Actions workflows. The repository is public, so
   a push to `main` publishes the code
-- **Scopes:** the crate names in the crate map (see **Crates** in `rust.md`), without any
-  `ferrolua-` prefix, once the workspace exists; and `docs`, `ci`, and `claude` for `.claude/` and
-  `CLAUDE.md`
+- **Scopes:** the crate names in the crate map of `docs/01-architecture.md`, without any `ferrolua-`
+  prefix, once the workspace exists; `workspace` for the root `Cargo.toml`, `Cargo.lock`,
+  `rust-toolchain.toml`, `clippy.toml`, and `.cargo/config.toml`; and `docs`, `ci`, and `claude` for
+  `.claude/` and `CLAUDE.md`
 - **Changes that travel together:** a roadmap task's code, tests, ticked checkbox, and the **Status
   locations** of `roadmap-and-docs.md`; a change to how Ferrolua runs Lua with the conformance
   script that covers it; an `unsafe` block with its `// SAFETY:` comment and the test that exercises
@@ -31,7 +32,7 @@ so they can fill them in. Until **Git access** is filled in, treat it as "read-o
 - **Task IDs:** end the summary with the roadmap task's ID in parentheses, for example
   `feat: parse goto statements and labels (M1.3)`, when the commit finishes or advances one
 - **Breaking changes:** a break in a published crate's public API (see **Public API** in `rust.md`);
-  an intended difference from how PUC-Rio Lua 5.4 runs a valid script; and a renamed or removed
+  an intended difference from how PUC-Rio Lua 5.5.1 runs a valid script; and a renamed or removed
   diagnostic code that users' lint settings refer to. Each adds `BREAKING CHANGE:` and names the
   architecture decision record (ADR) in `docs/decisions.md` that records it
 

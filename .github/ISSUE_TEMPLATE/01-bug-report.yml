@@ -1,5 +1,5 @@
 name: "Bug report"
-description: "Report a crash, a wrong result, or a difference from how PUC-Rio Lua 5.4 runs a script."
+description: "Report a crash, a wrong result, or a difference from how PUC-Rio Lua 5.5.1 runs a script."
 labels: ["bug"]
 body:
   - type: markdown
@@ -62,7 +62,7 @@ body:
     id: result
     attributes:
       label: "What you expected, and what happened instead"
-      description: "If PUC-Rio Lua 5.4 runs the same script differently, paste what it printed."
+      description: "If PUC-Rio Lua 5.5.1 runs the same script differently, paste what it printed."
     validations:
       required: true
   - type: textarea

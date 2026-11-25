@@ -170,7 +170,8 @@ print(p:length())  --> 5.0, because length is Point's method and reads only x an
 - A method named after a metamethod, such as `__tostring`, `__eq`, or `__add`, works as that
   metamethod for instances.
 - An instance refers to its class, and a class to its parent, each with a counted reference.
-  Nothing refers back, so classes and instances make no reference loops (ADR-0003).
+  Nothing refers back, so classes and instances make no reference loops, and an instance is
+  freed as soon as it is dropped, without the loop collector (ADR-0018).
 - Open questions for M4.4: what `type`, `pairs`, `rawget`, `getmetatable`, and `setmetatable` do with
   an instance; whether classes have static functions; and how code checks that a value is an
   instance of a class.
@@ -233,7 +234,7 @@ area(2, 3, 4)  -- error: bad argument count to 'area' (expected 1 to 2, got 3)
 4. **Strict mode only adds errors:** a program that runs to the end in strict mode prints the same
    output with strict mode off.
 5. **Classes make no loops:** creating and dropping any number of instances returns the heap to its
-   size before.
+   size before, with no collection.
 
 ## Tests
 

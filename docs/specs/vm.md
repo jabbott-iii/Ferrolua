@@ -1,7 +1,7 @@
 # Subsystem: `ferrolua-vm`
 
-`ferrolua-vm` runs bytecode. It owns the heap of reference-counted values
-([`memory.md`](memory.md)), the tables, the interpreter loop, metamethods, error handling,
+`ferrolua-vm` runs bytecode. It owns the heap of reference-counted values and the deterministic
+loop collector ([`memory.md`](memory.md)), the tables, the interpreter loop, metamethods, error handling,
 coroutines, the limits of [`sandbox.md`](sandbox.md), and the hooks the debugger uses. It matches
 PUC-Rio Lua 5.5.1's results and error messages, and contains no `unsafe` code (ADR-0011, proposed:
 the heap is safe Rust with generational handles). It doesn't depend on the JIT: it defines a trait

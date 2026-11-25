@@ -15,7 +15,8 @@ pass and sets coverage at 100% of lines and regions.
 | Integration tests | Each crate's `tests/` | The crate through its public API only |
 | Conformance scripts | `tests/conformance/` | Lua 5.5 behavior, against output recorded from PUC-Rio Lua 5.5.1, interpreted and with the JIT forced on |
 | Extension scripts | `tests/extensions/` | Ferrolua-only behavior: the language extensions and the intended differences, against output written from the spec |
-| Differential tests | `crates/ferrolua/tests/` and a fuzz target | The interpreter and the JIT print the same output and raise the same errors |
+| Differential tests | `crates/ferrolua/tests/` and a fuzz target | The interpreter and the JIT print the same output, raise the same errors, and give the same collection log |
+| Determinism tests | `crates/ferrolua/tests/` | Two runs with a fixed hash seed give the same collection log ([`specs/memory.md`](specs/memory.md#determinism)) |
 | Property tests | Beside the code, using `ferrolua-testkit` | Laws that hold for every input, such as "formatting doesn't change the bytecode" |
 | Hostile-input tests | `tests/hostile_*.rs` in each crate that reads outside data | Empty, oversized, malformed, truncated, and deeply nested input, and each limit one past its value |
 | Fuzzing | `fuzz/`, with crashes saved in `fuzz/regressions/` | Every parser and loader of outside data, for crashes and hangs |
@@ -39,8 +40,10 @@ repeat:
 - the order `pairs` and `next` visit keys, so scripts sort keys before printing them;
 - addresses, which `tostring` prints for tables and functions;
 - the time, and `math.random` without a fixed seed;
-- when the collector runs, which differs by design (ADR-0003: Ferrolua frees memory by reference
-  counting). Scripts about freeing go in `tests/extensions/`.
+- when a value outside a loop is freed, which is earlier on Ferrolua by design (ADR-0018:
+  reference counting plus a deterministic loop collector). A script that observes freeing only
+  after calling `collectgarbage()` behaves as on PUC-Rio and stays in `tests/conformance/`;
+  one that observes it earlier goes in `tests/extensions/`.
 
 Never edit a `.out` file by hand. Record it again with `cargo xtask record`, and read the
 difference before committing it.

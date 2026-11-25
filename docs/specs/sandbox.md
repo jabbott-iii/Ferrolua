@@ -54,7 +54,7 @@ status to the host, which the command-line tool turns into the process's exit st
 
 | Limit | Counts | Default without a host limit |
 | :- | :- | :- |
-| Memory | Bytes the state has allocated ([`memory.md`](memory.md)) | None; a failed allocation raises a catchable `not enough memory` |
+| Memory | Bytes the state has allocated ([`memory.md`](memory.md)) | None; a failed allocation runs the loop collector, then raises a catchable `not enough memory` |
 | Instructions | Bytecode instructions run, plus work units inside library calls | None |
 | Call depth | Nested calls, Lua and native | PUC-Rio Lua 5.5.1's limits on nested native calls and stack slots, which M3.2 records |
 | String size | Bytes in one string | `2^63 - 1`, limited by memory in practice |
@@ -68,7 +68,9 @@ built to make the matcher backtrack is stopped like a loop.
 
 ### When a limit is reached
 
-The VM stops the script and returns `Error::Limit` to the host, naming the limit. `pcall` and
+Before the memory limit stops a script, the VM runs the loop collector once, so garbage loops
+never cause a limit error. The VM then stops the script and returns `Error::Limit` to the host,
+naming the limit. `pcall` and
 `xpcall` don't catch it, so a script can't catch the error and keep going. Pending finalizers and
 `<close>` variables still need to run; M3.2 decides, before work starts, whether they run with a
 small reserve of instructions or are skipped. After a limit error, the host may raise the limit and

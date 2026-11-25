@@ -3,8 +3,8 @@
 `ferrolua-compiler` turns the compact tree from `ferrolua-syntax` into a `Prototype` in
 `ferrolua-bytecode`'s format. It resolves every name as a local, an upvalue, or a global under
 Lua 5.5's `global` rules; applies strict mode where it is on (ADR-0008, proposed: `--!strict` or a
-host option); compiles self-recursion without an upvalue (ADR-0003: memory is freed by reference
-counting); folds constants; and allocates registers. It reports compile errors in PUC-Rio's
+host option); compiles self-recursion without an upvalue, so it makes no loop for the collector to find
+(ADR-0018: reference counting plus a deterministic loop collector); folds constants; and allocates registers. It reports compile errors in PUC-Rio's
 wording. It lands in M2.5–M2.7; the extensions land in M4.
 
 ## Why a separate compiler pass

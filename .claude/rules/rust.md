@@ -29,11 +29,11 @@ so they can fill them in.
 
 - **Crates:** none yet. The crate map in `docs/01-architecture.md` lists the planned crates, the job
   of each, and the task that builds it, and M0.1 creates the workspace with them. They are the
-  parser, the bytecode format, the compiler, the VM with its reference-counted heap, the
-  just-in-time (JIT) compiler for x86-64, the standard library, the embedding API, the analysis
-  crates (a semantic model, a type checker, a linter, a formatter, and static application security
-  testing (SAST)), JSON, the language server, the debug adapter, the command-line tool, and the test
-  tools
+  parser, the bytecode format, the compiler, the VM with its reference-counted heap and
+  deterministic loop collector, the just-in-time (JIT) compiler for x86-64, the standard library,
+  the embedding API, the analysis crates (a semantic model, a type checker, a linter, a formatter,
+  and static application security testing (SAST)), JSON, the language server, the debug adapter, the
+  command-line tool, and the test tools
 - **Toolchain:** edition 2024, Rust 1.100.0 pinned in `rust-toolchain.toml`, and
   `rust-version = "1.100"` in `[workspace.package]`
 - **Check commands:** `cargo fmt --all --check`,

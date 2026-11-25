@@ -65,6 +65,8 @@ memory and entry modules may use `unsafe`) says to revisit for new system calls.
 - No memory mapping is writable and executable at the same time. On Linux, a test reads
   `/proc/self/maps` while generated code exists and finds no mapping with both `w` and `x`.
 - Every limit in [`specs/sandbox.md`](specs/sandbox.md) stops a script that exceeds it.
+- With a fixed hash seed, every conformance script gives the same collection log on every run,
+  interpreted and compiled ([`specs/memory.md`](specs/memory.md#determinism)).
 - Every saved fuzz input in `fuzz/regressions/` runs without a crash.
 - `cargo tree --workspace --edges normal,build,dev --target all --prefix none` lists only
   Ferrolua's own crates.

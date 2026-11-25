@@ -21,12 +21,14 @@ The sketch below shows the shape; M3.1 settles the names, and the crate's docume
 becomes the reference.
 
 ```rust
-use ferrolua::{Lua, Options, Libraries, Limits, JitMode, Value};
+use ferrolua::{Gc, JitMode, Libraries, Limits, Lua, Options, Value};
 
 let lua = Lua::new(Options {
     libraries: Libraries::SAFE,
     limits: Limits { memory: Some(64 << 20), instructions: Some(10_000_000), ..Limits::default() },
     jit: JitMode::On,
+    gc: Gc { pause: 100, automatic: true },   // the loop collector's schedule
+    hash_seed: None,                          // Some(seed) makes runs repeat exactly
     ..Options::default()
 })?;
 
@@ -45,6 +47,8 @@ assert_eq!(result, "hello, world");
 - Conversions between Rust and Lua values go through `IntoLua` and `FromLua` traits, implemented
   for numbers, strings, booleans, `Option`, `Vec`, `HashMap`, and tuples for multiple values.
 - `UserData` lets a Rust type become userdata with methods, fields, and metamethods.
+- `Lua::collect` runs the loop collector and the finalizers it queues, at a point the host
+  chooses ([`memory.md`](memory.md#schedule)).
 - `Error` covers syntax errors, runtime errors with their Lua value, limit errors, exit requests
   from `os.exit`, and internal errors.
 

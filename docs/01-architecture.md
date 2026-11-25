@@ -34,7 +34,7 @@ describes; the `ferrolua` crate's scope is `ferrolua`.
 | `ferrolua-syntax` | Lexer, parser, syntax trees, spans, and the shared diagnostic type | — | Yes | [syntax](specs/syntax.md) | M1 |
 | `ferrolua-bytecode` | Instruction set, function prototypes, chunk format, and verifier | — | Yes | [bytecode](specs/bytecode.md) | M2.1 |
 | `ferrolua-compiler` | Compact tree to bytecode: scopes, registers, strict mode | syntax, bytecode | Yes | [compiler](specs/compiler.md) | M2.5 |
-| `ferrolua-vm` | Heap, values, tables, interpreter, metamethods, coroutines, limits, debug hooks | bytecode, compiler | Yes | [vm](specs/vm.md) | M2.2 |
+| `ferrolua-vm` | Heap and loop collector, values, tables, interpreter, metamethods, coroutines, limits, debug hooks | bytecode, compiler | Yes | [vm](specs/vm.md) | M2.2 |
 | `ferrolua-jit` | x86-64 encoder, executable memory, baseline and optimizing tiers | vm, bytecode | Yes | [jit](specs/jit.md) | M5 |
 | `ferrolua-stdlib` | Lua 5.5's standard libraries | vm | Yes | [stdlib](specs/stdlib.md) | M2.13 |
 | `ferrolua` | The embedding API that hosts depend on | vm, compiler, stdlib, jit | Yes | [ferrolua](specs/ferrolua.md) | M2.14 |
@@ -158,14 +158,16 @@ docs/                 these documents
    `ferrolua-bytecode`'s format.
 4. `ferrolua-vm` runs the prototype in its interpreter. Each value is reference counted
    ([`specs/memory.md`](specs/memory.md)); when a count reaches zero, the value is freed, and a
-   `__gc` finalizer, if it has one, runs at the next safe point.
+   `__gc` finalizer, if it has one, runs at the next safe point. Values that only reference
+   loops keep alive are freed by the loop collector, which runs at a safe point when the bytes
+   allocated pass the host's threshold, or when the script or host asks (ADR-0018: a
+   deterministic loop collector on top of reference counting).
 5. The interpreter counts calls and loop iterations. When a function gets hot, the JIT compiles it,
    and later calls run the machine code. A failed guard exits to the interpreter at the same
    instruction ([`specs/jit.md`](specs/jit.md)).
 6. A Lua error returns `Err` through each frame until a `pcall` catches it or it reaches the host.
    A limit error passes through `pcall` to the host ([`specs/sandbox.md`](specs/sandbox.md)).
-7. Dropping the state frees every value left, loops included, after running the pending
-   finalizers.
+7. Dropping the state runs the pending finalizers, then frees every value left.
 
 ## Checking a script
 

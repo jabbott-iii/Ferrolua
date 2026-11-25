@@ -21,12 +21,13 @@ Each rule's code is assigned when its task adds it to the registry in
 | Group | Rules |
 | :- | :- |
 | Correctness | Unused local, parameter, or loop variable; assignment that is never read; shadowing a local in the same function; unreachable code; read of an undeclared global in non-strict code; duplicate key in a table constructor; wrong argument count at a call to a known local function; comparison of a value with itself; an unused suppression comment |
-| Memory | `Class.__index = Class` and other tables stored in themselves; parent and child tables that refer to each other; a coroutine stored where its own function can reach it; local functions that call each other, which form a loop (ADR-0003) |
+| Memory | `Class.__index = Class` and other tables stored in themselves; parent and child tables that refer to each other; a coroutine stored where its own function can reach it; local functions that call each other, which form a loop. Only the loop collector frees these, later than counting would (ADR-0018) |
 | Performance | String concatenation in a loop, where `table.concat` is linear; `table.insert(t, #t + 1, v)`; a closure created in a hot loop that captures nothing that changes; a global read in a loop that could be a local |
 | Style | Mixed LuaCATS and inline annotations for one name; an annotation that repeats the inferred type |
 
 The memory rules find only the patterns they can see in one project. A loop built at run time from
-data stays invisible to them, which [`memory.md`](memory.md#loops) explains.
+data stays invisible to them; the loop collector frees those too
+([`memory.md`](memory.md#the-loop-collector)).
 
 ## Configuration
 

@@ -1,8 +1,8 @@
 # Ferrolua
 
 Ferrolua is a Lua 5.5 virtual machine with a just-in-time (JIT) compiler, written in Rust with no
-third-party code, for Rust programs that embed Lua. It frees memory by reference counting instead of
-a garbage collector, and adds optional types, classes, compound assignment, and a strict mode. It
+third-party code, for Rust programs that embed Lua. It frees memory deterministically, by reference
+counting and a loop collector that runs at points the program fixes, and adds optional types, classes, compound assignment, and a strict mode. It
 also ships a type checker, a linter, a formatter, a security scanner, a language server, and a
 debugger. [`docs/00-overview.md`](docs/00-overview.md) gives the goals, and
 [`docs/roadmap.md`](docs/roadmap.md) the plan.
@@ -25,7 +25,7 @@ the Cargo workspace.
 | A new target or platform-specific code | [`docs/03-platforms.md`](docs/03-platforms.md) |
 | Tests, fuzzing, coverage, CI | [`docs/04-quality.md`](docs/04-quality.md) and `.claude/rules/testing.md` |
 | Lua syntax or semantics, extensions | [`docs/specs/language.md`](docs/specs/language.md) and the [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) |
-| Memory, reference counting, `__gc`, weak tables | [`docs/specs/memory.md`](docs/specs/memory.md) |
+| Memory, reference counting, the loop collector, `__gc`, weak tables | [`docs/specs/memory.md`](docs/specs/memory.md) |
 | Libraries a host grants, limits, untrusted input | [`docs/specs/sandbox.md`](docs/specs/sandbox.md) |
 | Diagnostics, codes, `.ferrolua.lua` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
 | `crates/syntax` | [`docs/specs/syntax.md`](docs/specs/syntax.md) |

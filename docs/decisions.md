@@ -72,7 +72,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0003 — Free memory by reference counting, with no garbage collector
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0018
 - **Date:** 2026-11-24
 - **Context:** PUC-Rio Lua frees memory with a tracing garbage collector: it pauses now and then to
   find every value still reachable from the program, and frees the rest. Ferrolua aims for the
@@ -203,9 +203,10 @@ it is `Proposed`, and no code may depend on it.
 - **Status:** Proposed
 - **Date:** 2026-11-24
 - **Context:** Lua has no classes. Programs build them from tables and metatables, usually with
-  `Class.__index = Class`, a table that refers to itself, which ADR-0003's reference counting never
-  frees. Every library builds classes a little differently, so tools can't tell what fields an
-  object has. A class declaration in the language fixes both problems.
+  `Class.__index = Class`, a table that refers to itself, which reference counting alone can't free,
+  so only the loop collector (ADR-0018) frees it. Every library builds classes a little differently,
+  so tools can't tell what fields an object has. A class declaration in the language fixes both
+  problems.
 - **Decision:** Ferrolua adds a `class` declaration with fields, methods, single inheritance with
   `extends`, a constructor named `new`, and `super` calls, as
   [`specs/language.md`](specs/language.md) describes. `class` is a keyword only at the start of a
@@ -217,7 +218,8 @@ it is `Proposed`, and no code may depend on it.
     at a known offset after one check of the instance's class, and the type checker knows every
     field.
 - **Consequences:**
-  - Good: classes make no reference loops, and tools see the full shape of every class.
+  - Good: classes make no reference loops, so an instance is freed as soon as it's dropped, without
+    waiting for the loop collector, and tools see the full shape of every class.
   - Good: field access on an instance can be faster than a table lookup.
   - Bad: instances aren't plain tables, so code that calls `pairs` or `rawget` on an instance needs
     the rules in the spec.
@@ -291,7 +293,7 @@ it is `Proposed`, and no code may depend on it.
 - **Date:** 2026-11-24
 - **Context:** PUC-Rio Lua compiles source to a register-based bytecode and can save it as a
   precompiled chunk with `string.dump`. Its format changes between releases and fits its own VM.
-  Ferrolua's VM, its reference counting (ADR-0003), and its extensions need instructions PUC-Rio's
+  Ferrolua's VM, its reference counting (ADR-0018), and its extensions need instructions PUC-Rio's
   format lacks. A precompiled chunk is untrusted input: a crafted one can point a register or a jump
   anywhere.
 - **Decision:** Ferrolua compiles to a register-based bytecode of its own, defined in
@@ -315,8 +317,8 @@ it is `Proposed`, and no code may depend on it.
 - **Status:** Proposed
 - **Date:** 2026-11-24
 - **Context:** A heap built from raw pointers needs `unsafe` code, and a reference-counting bug in
-  it can read freed memory. ADR-0003 frees values by count, so a bug that frees too early is the
-  worst failure the heap can have.
+  it can read freed memory. ADR-0018 frees values by count and frees loops with a collector, so a
+  bug that frees too early is the worst failure the heap can have.
 - **Decision:** Each Lua state keeps its values in arenas: one growable array of slots for each
   kind of object, such as tables, strings, and closures. A reference to a value is a handle: the
   slot's index plus a generation number that changes each time the slot is reused. A stale handle,
@@ -325,7 +327,9 @@ it is `Proposed`, and no code may depend on it.
   details.
 - **Consequences:**
   - Good: a counting bug can leak memory or raise an internal error, but never read freed memory.
-  - Good: dropping the state drops the arenas, which frees every loop at once (ADR-0003).
+  - Good: dropping the state drops the arenas, which frees everything left at once.
+  - Good: the loop collector walks objects in slot order, which is the same on every run, so it
+    frees and finalizes in a fixed order (ADR-0018).
   - Bad: each access checks an index and a generation, which costs time that raw pointers wouldn't.
     The JIT removes checks it can prove.
 - **Alternatives considered:**
@@ -388,7 +392,8 @@ it is `Proposed`, and no code may depend on it.
      interpreter when a check fails, unless the bytecode verifier (ADR-0010) already proved the
      fact.
   5. Generated code reloads every arena address after any operation that can allocate or free.
-  6. At every exit to the interpreter, reference counts match what the interpreter would hold.
+  6. At every exit to the interpreter, and at every safe point where the loop collector can run,
+     reference counts match what the interpreter would hold (ADR-0018).
 - **Consequences:**
   - Good: one crate, two modules, and six invariants hold all of Ferrolua's `unsafe` code.
   - Bad: generated code itself can't be checked by the Rust compiler. Differential tests, which run
@@ -487,3 +492,65 @@ it is `Proposed`, and no code may depend on it.
 - **Alternatives considered:**
   - The full Lua C API: the whole C ecosystem, at the cost of `unsafe` code at every call.
 - **Revisit when:** a C or C++ host asks to embed Ferrolua.
+
+## ADR-0018 — Free loops with a deterministic collector on top of reference counting
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:** ADR-0003 freed memory by reference counting alone and left reference loops in memory
+  until their state was dropped. Lua code makes loops often: `Class.__index = Class`, trees with
+  parent pointers, doubly linked lists, and coroutines that refer to themselves. A long-running
+  host, such as a game or a server that keeps one state for hours, would grow without bound. On
+  2026-11-24 the owner asked for a deterministic garbage collector instead. Here, deterministic
+  means the collector runs at points the program itself fixes, never on a timer or on another
+  thread, so the same run frees the same values in the same order every time. That matters for
+  tests, for replays, and for games that keep several machines in lockstep.
+- **Decision** (the owner chose reference counting plus a loop collector, run by allocation count
+  and on request, the first of two options for each, on 2026-11-24):
+  - Every value is still reference counted, and is freed as soon as its count reaches zero.
+  - A loop collector frees the values that only loops keep alive. It uses trial deletion, the
+    synchronous cycle collection of Bacon and Rajan's "Concurrent Cycle Collection in Reference
+    Counted Systems" (2001). A value whose count drops to a number above zero may now be part of an
+    unreachable loop, so it becomes a candidate. The collector subtracts the references among the
+    candidates and everything they reach, restores whatever something outside still points to, and
+    frees the rest.
+  - The collector needs no list of roots: registers, the registry, and values the host holds all
+    keep counts, so whatever they reach survives.
+  - It runs only at safe points, at two kinds of time: when the bytes allocated since its last run
+    pass a threshold the host sets, and when a script calls `collectgarbage()` or the host calls
+    `Lua::collect`. `collectgarbage("stop")` turns the automatic runs off.
+  - Given the same script, inputs, host calls, options, and hash seed, every collection runs after
+    the same instruction, and frees and finalizes the same values in the same order. This holds
+    interpreted and with the JIT, because only Lua heap bytes count toward the threshold.
+  - A local function's references to itself still compile to "the running function", and classes
+    (ADR-0007) still need no self-reference, so the commonest loops never reach the collector.
+  - [`specs/memory.md`](specs/memory.md) gives the details.
+- **Consequences:**
+  - Good: loops are freed, so long-running hosts stay within a steady amount of memory.
+  - Good: `collectgarbage()` frees what scripts expect it to free, so fewer scripts differ from
+    PUC-Rio Lua 5.5.1, and weak tables, ephemerons included, behave as §2.5.4 of the manual says.
+  - Good: most values are still freed the moment their last reference goes, and every free happens
+    at a point the program fixes.
+  - Good: the heap stays safe Rust (ADR-0011), and the JIT needs no write barriers, the extra code a
+    tracing collector adds to every store.
+  - Bad: a collection pauses the script for time that grows with the number of candidates and the
+    values they reach. A host that can't accept that turns automatic runs off and collects between
+    frames.
+  - Bad: every decrement that leaves a count above zero records a candidate, on top of the cost of
+    counting (M5.1 measures both).
+  - Bad: values outside loops are still freed earlier than PUC-Rio frees them, so a script that
+    observes `__gc` or weak tables without calling `collectgarbage()` can differ; those scripts go
+    in `tests/extensions/`.
+  - Follow-up: M2.17 builds the collector; M3.1 adds `Lua::collect` and the collector's options;
+    M3.2 runs a collection before a memory limit stops a script; M5.8 checks that the JIT
+    collects at the same points as the interpreter.
+- **Alternatives considered:**
+  - A tracing collector with no reference counting, like PUC-Rio's, scheduled by allocation count:
+    the closest match to PUC-Rio's `__gc` timing, but nothing is freed the moment its last reference
+    goes, and the VM and the JIT need write barriers.
+  - A collector that runs only on request: the host chooses every pause, but loops grow until it
+    asks.
+  - Reference counting alone (ADR-0003): no pauses, but loops stay until the state is dropped.
+- **Revisit when:** a host measures a collection pause above the budget in
+  [`00-overview.md`](00-overview.md#budgets) that scheduling collections can't avoid, or M5.1 shows
+  counting and candidate tracking together cost more than a third of the interpreter's run time.

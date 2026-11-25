@@ -2,7 +2,9 @@
 
 Ferrolua is a Lua 5.5 virtual machine with a just-in-time (JIT) compiler, written in Rust, for Rust
 programs that embed Lua. It is designed to keep memory safe whatever a script does, to use no
-third-party code, and to free memory by reference counting instead of a garbage collector.
+third-party code, and to free memory deterministically: by reference counting, with a loop
+collector that runs at points the program fixes, so every run frees the same values in the same
+order.
 
 **Status:** design only. The design documents in [`docs/`](docs/) are written, and no code exists
 yet. The next task is M0.1 in the [roadmap](docs/roadmap.md), which creates the Cargo workspace.

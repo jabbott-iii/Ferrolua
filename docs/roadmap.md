@@ -320,6 +320,26 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
       output.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
+- [ ] **M2.17 — vm: the deterministic loop collector**
+  - Note: added on 2026-11-24, when the owner chose a deterministic loop collector on top of
+    reference counting (ADR-0018). It is listed where it is to be done, after M2.10.
+  - Depends: M2.10
+  - Do:
+    - Build candidate recording, trial deletion, the schedule by allocation count, the ephemeron
+      rule, and the collection log, as [`specs/memory.md`](specs/memory.md#the-loop-collector)
+      describes, plus the `collectgarbage` options in
+      [`specs/memory.md`](specs/memory.md#collectgarbage).
+    - Add `tests/conformance/gc.lua`, which builds loops, drops them, calls `collectgarbage()`, and
+      prints what weak tables still hold, and the ordering scripts in `tests/extensions/gc/`.
+  - Accept:
+    - 100,000 dropped tables that each refer to themselves are freed by one `collectgarbage()`, and
+      the heap returns to its size before.
+    - No object a register, the registry, or the host can reach is ever freed, in the property test
+      of the memory spec.
+    - Two runs of every conformance script with a fixed hash seed give the same collection log.
+    - `gc.lua` prints its recorded output.
+  - Verify: `cargo test -p ferrolua-vm --locked`; `cargo test -p ferrolua --test conformance --locked`
+
 - [ ] **M2.11 — vm: errors and protected calls**
   - Depends: M2.10
   - Do:
@@ -353,7 +373,7 @@ what PUC-Rio Lua 5.5.1 prints, with memory freed by reference counting.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M2.14 — ferrolua: a minimal embedding API and the conformance runner**
-  - Depends: M2.13
+  - Depends: M2.13, M2.17
   - Do:
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
       [`specs/ferrolua.md`](specs/ferrolua.md) sketches.
@@ -397,8 +417,10 @@ scripts within limits, and gets every Lua 5.5 library it grants.
     describes.
   - Do:
     - Build values tied to their state, `IntoLua` and `FromLua`, Rust functions, `UserData`, the
-      registry, and `Error`, then update the spec with the names the code settled.
+      registry, `Lua::collect`, the collector's options and `hash_seed`, and `Error`, then update
+      the spec with the names the code settled.
   - Accept:
+    - `Lua::collect` frees a loop the host dropped, and never a value the host still holds.
     - Using a value after its state is dropped fails to compile, in a `compile_fail` doc test.
     - Using a value with another state returns an error.
   - Verify: `cargo test -p ferrolua --locked`
@@ -410,7 +432,10 @@ scripts within limits, and gets every Lua 5.5 library it grants.
   - Do:
     - Enforce every limit of [`specs/sandbox.md`](specs/sandbox.md#limits), including work units
       inside library calls, with hostile-input tests in `crates/ferrolua/tests/hostile_sandbox.rs`.
+    - Run the loop collector once before the memory limit stops a script.
   - Accept:
+    - A script whose only garbage is loops runs within a memory limit it would pass without the
+      collector.
     - Each limit stops a script one unit past it, inside `pcall`, `xpcall`, metamethods, and
       coroutines alike.
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
@@ -637,7 +662,8 @@ output with the JIT on or forced, and the agreed budgets are checked.
       [`00-overview.md`](00-overview.md#budgets).
   - Accept:
     - The runner prints the median time and peak memory of each script on Ferrolua and on
-      PUC-Rio, and the share of time spent updating counts, for ADR-0003's threshold.
+      PUC-Rio, the share of time spent updating counts and recording candidates, and the longest
+      loop collection, for ADR-0018's thresholds.
   - Verify: `cargo xtask bench`
 
 - [ ] **M5.2 — jit: the x86-64 encoder**
@@ -691,6 +717,7 @@ output with the JIT on or forced, and the agreed budgets are checked.
   - Do:
     - Count instructions and check memory in compiled code, and run functions with breakpoints or
       hooks interpreted.
+    - Let the loop collector run only at safe points in compiled code, with every count exact.
   - Accept:
     - The limit tests of the sandbox spec pass in `JitMode::Forced`.
   - Verify: `cargo test -p ferrolua --test hostile_sandbox --locked`
@@ -699,10 +726,10 @@ output with the JIT on or forced, and the agreed budgets are checked.
   - Depends: M5.7
   - Do:
     - Add `JitMode` to `Options`, `--jit` to `ferrolua run`, the forced pass to the conformance
-      runner, and the `differential` fuzz target.
+      runner, and the `differential` fuzz target, each comparing output and collection logs.
   - Accept:
-    - One million differential runs from seed 0 find no difference between the interpreter and the
-      JIT.
+    - One million differential runs from seed 0 find no difference in output or collection log
+      between the interpreter and the JIT.
   - Verify: `cargo xtask fuzz differential --seed 0 --runs 1000000`
 
 - [ ] **M5.9 — xtask: budget checks**
@@ -1107,7 +1134,8 @@ hints from annotations, within the optimizing JIT budget.
   - Do:
     - Allocate machine registers by linear scan, spilling to the frame.
   - Accept:
-    - Every exit rebuilds the interpreter's frame exactly, checked by the shadow run.
+    - Every exit rebuilds the interpreter's frame exactly, and every count is exact at each safe
+      point, checked by the shadow run.
   - Verify: `cargo test -p ferrolua-jit --locked`
 
 - [ ] **M11.4 — jit: hints from type annotations**
@@ -1182,9 +1210,9 @@ following the guide.
 | JIT and CI for Linux on AArch64, then macOS on AArch64, then Windows on x86-64 ([`03-platforms.md`](03-platforms.md)) | M12 ships, and the owner widens the platform for the next target |
 | An interactive prompt for `ferrolua` with no arguments, as `lua` has | A user files a feature request for one |
 | The Lua C API and C modules; today hosts must be Rust programs (ADR-0017) | A C or C++ host asks to embed Ferrolua |
-| A loop finder that reports values kept alive only by reference loops, without freeing them | A host reports memory growth from loops it can't locate |
+| Incremental loop collection, which spreads one collection over several safe points to shorten pauses | A host measures a collection pause above the agreed budget that turning off automatic runs and scheduling collections can't avoid |
 | Spreading the freeing of one large structure over several safe points | A benchmark measures a pause over 1 ms from freeing one value |
-| Deferred counting of register references, which changes when `__gc` runs and needs a new record | M5.1 shows count updates above ADR-0003's threshold after M11.2 |
+| Deferred counting of register references, which changes when `__gc` runs and needs a new record | M5.1 shows count updates above ADR-0018's threshold after M11.2 |
 | Running lua.org's official 5.5.1 test suite; it isn't part of the platform today | The owner adds it to the platform in a decision record |
 | Coverage-guided fuzzing; stable Rust can't read coverage counters while running | A stable rustc option exposes coverage counters in process |
 | Branch coverage instead of regions | rustc stabilizes branch coverage |

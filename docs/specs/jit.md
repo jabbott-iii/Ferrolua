@@ -42,7 +42,9 @@ instruction:
 - Each operation first checks the types the interpreter has seen there, such as two integers for
   an `ADD`, and the hints from type annotations. When a guard fails, the code exits to the
   interpreter at that instruction.
-- Reference counts are updated exactly as the interpreter updates them.
+- Reference counts are updated exactly as the interpreter updates them, including recording
+  candidates for the loop collector, and the collector runs only at safe points, where every
+  count is exact.
 - Instruction counting for the instruction limit and debug hooks are kept by decrementing a
   counter at each loop's back edge and at each function's entry.
 - A loop that gets hot while the interpreter runs it enters compiled code at the loop's head,
@@ -59,7 +61,8 @@ value is assigned once. It then optimizes it:
 - it removes pairs of count updates that cancel out;
 - it allocates registers by linear scan.
 
-Its exits rebuild the interpreter's frame exactly, counts included (ADR-0013, invariant 6).
+Its exits rebuild the interpreter's frame exactly, counts included, and so does every safe point
+where the loop collector can run (ADR-0013, invariant 6).
 
 ## Modes
 
@@ -73,9 +76,11 @@ and the differential fuzz target use it.
 2. No mapping is ever writable and executable at once.
 3. Every `#[repr(C)]` layout the generated code reads has the size and field offsets the JIT
    expects.
-4. At every exit, the interpreter's frame and every reference count equal what the interpreter
-   alone would have produced.
-5. Instruction and memory limits stop compiled code at the same point they stop the interpreter,
+4. At every exit and every safe point, the interpreter's frame and every reference count equal
+   what the interpreter alone would have produced.
+5. Compiled code collects after the same instructions as the interpreter, and frees the same
+   values in the same order ([`memory.md`](memory.md#determinism)).
+6. Instruction and memory limits stop compiled code at the same point they stop the interpreter,
    within one loop iteration.
 
 ## Tests
@@ -88,4 +93,6 @@ and the differential fuzz target use it.
   and `ferrolua-jit` alike.
 - Invariant 4: a debug-build check after each exit compares the frame and counts with a shadow run
   in the interpreter.
-- Invariant 5: the limit tests of [`sandbox.md`](sandbox.md), run in `JitMode::Forced`.
+- Invariant 5: the conformance runner compares each script's collection log interpreted and in
+  `JitMode::Forced`, and the `differential` fuzz target does the same.
+- Invariant 6: the limit tests of [`sandbox.md`](sandbox.md), run in `JitMode::Forced`.

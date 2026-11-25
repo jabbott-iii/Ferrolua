@@ -44,6 +44,9 @@ Classes are nominal: only instances of a class or its subclasses have its type.
 - **Calls:** argument counts and types are checked against the function's type; in strict files,
   the arity rule of [`language.md`](language.md#arity-enforcement) applies statically too.
 - **Tables:** a table constructor assigned to a record type must have its required fields.
+- **Collections:** `list<T>`, `tuple<A, B>`, and `set<T>` type lists, tuples, and sets
+  ([`language.md`](language.md#type-annotations-adr-0006)), and the checker infers them from
+  literals, so `[1, 2]` is a `list<integer>`.
 
 ## Declarations
 

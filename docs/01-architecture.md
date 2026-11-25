@@ -157,9 +157,9 @@ docs/                 these documents
 2. `Lua::load` passes the source to `ferrolua-syntax`, whose parser builds the compact tree. A
    syntax error returns a message in PUC-Rio's format, such as
    `input:3: unexpected symbol near 'end'`.
-3. `ferrolua-compiler` resolves names under Lua 5.5's `global` rules, applies strict mode where it
-   is on (ADR-0008), allocates registers, and emits a function prototype in
-   `ferrolua-bytecode`'s format.
+3. `ferrolua-compiler` resolves names under the scoping rules of
+   [`specs/language.md`](specs/language.md#scoping-adr-0025), applies strict mode where it is on
+   (ADR-0008), allocates registers, and emits a function prototype in `ferrolua-bytecode`'s format.
 4. `ferrolua-vm` runs the prototype in its interpreter. Each value is reference counted
    ([`specs/memory.md`](specs/memory.md)); when a count reaches zero, the value is freed, and a
    `__gc` finalizer, if it has one, runs at the next safe point. Values that only reference

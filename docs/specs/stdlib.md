@@ -1,7 +1,9 @@
 # Subsystem: `ferrolua-stdlib`
 
 `ferrolua-stdlib` implements Lua 5.5's standard libraries, §6 of the manual: the base library,
-`coroutine`, `package`, `string`, `utf8`, `table`, `math`, `io`, `os`, and `debug`. Positions count
+`coroutine`, `package`, `string`, `utf8`, `table`, `math`, `io`, `os`, and `debug`, and the `list`,
+`tuple`, and `set` libraries and f-string formatting that Ferrolua adds (ADR-0025: f-strings,
+locals by default, lists, tuples, and sets, and Python's truth). Positions count
 from 0, ranges stop before their end, and no argument converts between strings and numbers
 (ADR-0023: a language of its own, with Python's operators and 0-based indexes). Apart from those
 changes, each function returns what PUC-Rio Lua 5.5.1 returns and raises the errors it raises,
@@ -71,16 +73,66 @@ Pattern capture numbers, stack levels, line numbers, `file:seek` offsets, and th
 
 | Library | Notes |
 | :- | :- |
-| Base | `print` writes through the host's output sink; `load` and `loadfile` accept mode `"t"`, and `"b"` only when the host allows precompiled chunks; `collectgarbage` follows [`memory.md`](memory.md#collectgarbage); `_VERSION` is `"Lua 5.5"` |
+| Base | `print` writes through the host's output sink; `load` and `loadfile` accept mode `"t"`, and `"b"` only when the host allows precompiled chunks; `collectgarbage` follows [`memory.md`](memory.md#collectgarbage); `_VERSION` is `"Lua 5.5"`; `assert` tests truth as [`language.md`](language.md#truth-adr-0025) defines it; `type` also returns `"list"`, `"tuple"`, and `"set"`; and `list`, `tuple`, `set`, and `format` are new |
 | `coroutine` | Every function in §6.2, including `close` and `isyieldable` |
 | `package` | `require`, `package.loaded`, `package.preload`, `package.path`, `package.searchpath`, and a Lua searcher that reads files through the host's loader; `package.loadlib` returns `nil` and an error message, and `package.cpath` has no searcher (ADR-0017) |
-| `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, and `dump` in Ferrolua's chunk format |
+| `string` | Patterns per §6.4.1, `format` with every conversion PUC-Rio supports, `pack`, `packsize`, and `unpack` with every format option, `dump` in Ferrolua's chunk format, and `join` (ADR-0026, proposed) |
 | `utf8` | Every function, with Lua 5.5's `lax` argument and the end position from `utf8.offset` |
 | `table` | `create`, `concat`, `insert`, `move`, `pack`, `remove`, `sort`, and `unpack`; `sort` uses PUC-Rio's algorithm, so equal elements end up in the same order and `invalid order function for sorting` is raised in the same cases |
 | `math` | `math.random` uses xoshiro256**, seeded as PUC-Rio seeds it, so `math.randomseed(42)` gives the same sequence; `math.randomseed()` with no argument takes its seed from `RandomState` |
 | `io` | File handles as userdata with `__close` and `__gc`, shown by their IDs; opened only under the file access policy |
 | `os` | Time functions always; the rest only when granted; `os.exit` returns an exit error to the host |
 | `debug` | Every function in §6.10, working on Ferrolua's frames, locals, and upvalues; `upvalueid` returns an integer ID |
+
+| `list`, `tuple`, and `set` | The methods of [Lists, tuples, and sets](#lists-tuples-and-sets) |
+
+## Lists, tuples, and sets
+
+Each collection's methods live in its library, which its shared metatable's `__index` names, so
+`xs:append(v)` calls `list.append(xs, v)`
+([`language.md`](language.md#lists-tuples-and-sets-adr-0025)). The names and meanings are Python's,
+and an argument Python passes by keyword, such as `reverse`, comes last by position. Positions count
+from 0 and ranges stop before their end, as everywhere else. M3.15 settles each signature and
+records it here.
+
+| Library | Functions |
+| :- | :- |
+| `list` | `append`, `extend`, `insert`, `pop`, `remove`, `clear`, `index`, `count`, `sort`, `reverse`, `copy`, `slice`, `unpack` |
+| `tuple` | `index`, `count`, `slice`, `unpack` |
+| `set` | `add`, `remove`, `discard`, `pop`, `clear`, `copy`, `union`, `intersection`, `difference`, `symmetric_difference`, `issubset`, `issuperset`, `isdisjoint` |
+
+- The base functions `list(c)`, `tuple(c)`, and `set(c)` build a collection from a list, a tuple, a
+  set, or a table's sequence 0 to `#t - 1`, and an empty one with no argument.
+- `pairs` and `ipairs` accept a list or a tuple and give its positions and values; `next`,
+  `rawget`, and `rawset` take tables only. `#` and `rawlen` give a collection's length.
+- `tostring` of a collection writes its elements as an f-string's `!r` does, as in `[1, "a"]`,
+  `(1,)`, and `set([1, 2])`, and writes `...` where a collection holds itself (ADR-0026, proposed).
+- `string.join(sep, c)` joins the strings in a collection, so `(", "):join(xs)` works as Python's
+  `", ".join(xs)` does.
+- The `table` library stays, for tables.
+
+## Formatted strings
+
+An f-string field with a spec, and the base function `format(value, spec)`, format one value with
+Python's format specification mini-language
+([`language.md`](language.md#formatted-string-literals-adr-0025)):
+
+```text
+spec ::= [[fill]align][sign]['z']['#']['0'][width][grouping]['.' precision][type]
+```
+
+- `align` is `<`, `>`, `^`, or `=`; `sign` is `+`, `-`, or a space; `grouping` is `,` or `_`.
+- Integers take the types `b`, `c`, `d`, `o`, `x`, `X`, and `n`; floats take `e`, `E`, `f`, `F`,
+  `g`, `G`, `n`, and `%`; strings take `s`. Without a type, an integer formats as `d`, a string as
+  `s`, and a float with the digits `tostring` prints, unless a precision is given.
+- `n` formats as `d` or `g` does, because Ferrolua has no locale.
+- Floats use the same exact decimal conversion as `string.format`, below.
+- A value whose metatable has `__format` is formatted by `__format(value, spec)`, which must
+  return a string (ADR-0026, proposed). A spec on any other value that isn't a number or a string
+  raises an error, and so does a type that doesn't fit the value, such as `d` with a float. M3.4
+  records each message here.
+- Each byte a field produces counts as one work unit against the instruction limit, as
+  `string.format`'s output does ([`sandbox.md`](sandbox.md#limits)).
 
 ## Number formatting
 
@@ -116,8 +168,10 @@ The `#` keeps an ID from reading as a number or as an address.
 3. A library the host didn't grant has no function in the state.
 4. Formatting any float with `%.17g` and reading it back with `tonumber` gives the same float.
 5. No result of any library function contains a memory address.
-6. No library function, apart from `print`, `tostring`, `tonumber`, and `string.format`'s `%s`,
-   converts an argument between a string and a number.
+6. No library function, apart from `print`, `tostring`, `tonumber`, `format`, and
+   `string.format`'s `%s`, converts an argument between a string and a number.
+7. For every value and spec that Python's `format` accepts for a number or string of the same
+   value, `format` gives the string Python gives.
 
 ## Tests
 
@@ -134,3 +188,5 @@ The `#` keeps an ID from reading as a number or as an address.
   more hexadecimal digits.
 - Invariant 6: a test calls every library function with a numeric string where it takes a number,
   and with a number where it takes a string, and checks that each call raises the wrong-type error.
+- Invariant 7: `tests/extensions/format.lua` formats numbers and strings with each part of the
+  mini-language, against output written from Python's documentation of it.

@@ -18,21 +18,30 @@ the parser's benchmarks measure.
 
 ## Name resolution
 
-The compiler keeps a stack of scopes. Each name resolves, from the innermost scope out, to:
+Names resolve by the rules of [`language.md`](language.md#scoping-adr-0025) (ADR-0025: locals by
+default, for the whole function). Before it emits a function's code, the compiler walks the
+function's body once to collect the names it assigns and its `global` and `nonlocal` declarations,
+so it knows each function-wide local before its first use. Each name then resolves, from the
+innermost scope out, to:
 
-- a local in the current function, which lives in a register;
-- a local in an enclosing function, which becomes an upvalue;
+- a block-scoped local or a function-wide local of the current function, which lives in a register;
+- a local of an enclosing function, which becomes an upvalue;
 - a global, which compiles to an access to the `_ENV` upvalue, as §2.2 of the manual describes.
 
-Lua 5.5's `global` declarations decide which free names are allowed. A chunk starts with an
-implicit `global *`, which any other `global` declaration voids for the rest of its block. In
-strict mode, the chunk starts instead with a declaration of the names the host lists
+A function-wide local starts out unassigned. Where the compiler can't prove that every path to a
+read assigns the local first, it emits a check that raises `local 'x' read before assignment`; a
+local that every path assigns first gets no check. A `global` or `nonlocal` declaration after the
+function's first use of its name is a compile error, and so is a `nonlocal` that names no enclosing
+function's variable. In strict mode, the chunk starts with a declaration of the names the host
+lists, and reading any other undeclared name is a compile error
 ([`language.md`](language.md#undeclared-variable-errors)). Assigning to a `<const>` variable or a
 `for` control variable is a compile error, as is assigning to a `global <const>`.
 
 ## Self-recursion
 
-For each `local function f`, the compiler checks every assignment to `f` in its scope. If the
+For each `local function f`, and each function-wide local whose one assignment is a function, such
+as `function f() ... end` at a chunk's top level (ADR-0026, proposed), the compiler checks every
+assignment to `f` in its scope. If the
 definition is the only one, every use of `f` inside its own body compiles to `SELF`, which loads
 the running closure, and `f` gets no upvalue. Closures nested inside the body that use `f` capture
 it as an ordinary upvalue of the outer closure. [`memory.md`](memory.md#recursion-without-a-loop)
@@ -50,7 +59,12 @@ number ([`language.md`](language.md#meanings)). `<const>` locals with constant v
 too.
 
 A chained comparison such as `a < b < c` evaluates each middle operand once into a register and
-jumps past the rest of the chain at the first comparison that is false. A conditional expression
+jumps past the rest of the chain at the first comparison that is false. A condition, in an `if`, a
+loop, `and`, `or`, `not`, or a conditional expression, compiles to a test of truth as
+[`language.md`](language.md#truth-adr-0025) defines it. An f-string compiles each field's expression
+in order, then one instruction that formats every field and joins the parts, so a long f-string
+makes one string instead of one per part. A list or tuple literal compiles to one instruction that
+builds the collection from its registers, as a table constructor does. A conditional expression
 `x if c else y` compiles to a test of `c` and two branches that each write the same register.
 
 ## Statements

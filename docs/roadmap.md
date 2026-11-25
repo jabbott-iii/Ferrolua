@@ -131,7 +131,10 @@ builds on.
 - [ ] **M1.2 — syntax: the lexer**
   - Note: 2026-11-24, the owner's choice (ADR-0023): the lexer reads Python's operators instead of
     `..` and `~=`.
+  - Note: 2026-11-24, the owner's choice (ADR-0025): the lexer also reads f-strings.
   - Depends: M1.1
+  - Decide first: the owner accepts ADR-0026 (the details of f-strings, locals by default,
+    collections, and truth), which sets the `f` prefix and keeps `[[` a long string.
   - Do:
     - Build the lexer of [`specs/syntax.md`](specs/syntax.md#lexer), with trivia on every token.
     - Add `tests/conformance/lexer.lua`, covering numbers, escapes, and long strings, with its
@@ -140,6 +143,8 @@ builds on.
     - Every token form of §3.1 of the manual lexes, apart from `..` and `~=`, and so do `**`, `!=`,
       and the reserved word `is`. Every malformed form gives PUC-Rio's error, such as
       `malformed number near '0x'`.
+    - `f"a{x}b"`, `f'{x!r:>8}'`, and `f[[{x}]]` lex as f-strings with their fields, `{{` as a brace,
+      and `f "x"` as a name and a string.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
 - [ ] **M1.3 — syntax: parser events and the lossless tree**
@@ -173,10 +178,16 @@ builds on.
     - Report `..`, `~=`, and binary `~` with messages that name their replacements, and record the
       messages in the language spec.
     - Add the precedence property test of [`specs/language.md`](specs/language.md#tests).
+    - Parse list and tuple literals and f-string fields, as
+      [`specs/language.md`](specs/language.md#lists-tuples-and-sets-adr-0025) and
+      [`specs/language.md`](specs/language.md#formatted-string-literals-adr-0025) describe
+      (ADR-0025).
   - Accept:
     - `2 ** -3 ** 2`, `-x ** 2`, `not a == b`, `a < b < c`, `1 + 2 << 3`, and
       `x if a else y if b else z` group as the precedence table says.
     - `x = f if c then g() end` parses as an assignment followed by an `if` statement.
+    - `(x)` parses as a parenthesized expression, `(x,)` and `()` as tuples, `[ [1], [] ]` as a list
+      of lists, and `f"{p:length()}"` as a method call where `f"{x:>8}"` has a spec.
   - Verify: `cargo test -p ferrolua-syntax --locked`
 
 - [ ] **M1.6 — syntax: error recovery and the diagnostic type**
@@ -285,7 +296,8 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Note: 2026-11-24, the owner's choice (ADR-0023): the array part holds keys 0 to n − 1.
   - Depends: M2.3
   - Do:
-    - Build tables with an array part for keys 0 to n − 1 and a hash part, key normalization, `#`
+    - Build tables with an array part for keys 0 to n − 1 and a hash part, a count of entries
+      (ADR-0025), key normalization, `#`
       borders, `next`, reference keys hashed by handle, and each probe step past the first counted
       as a work unit, as [`specs/vm.md`](specs/vm.md#tables) describes.
   - Accept:
@@ -298,12 +310,23 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.5 — compiler: names, upvalues, globals, and self-recursion**
+  - Note: 2026-11-24, the owner's choice (ADR-0025): names are local to the whole function that
+    assigns them, unless `global` or `nonlocal` says otherwise.
   - Depends: M1.7, M2.1
   - Do:
-    - Build name resolution under Lua 5.5's `global` rules, upvalue capture, and the `SELF` rule of
+    - Build name resolution by [`specs/compiler.md`](specs/compiler.md#name-resolution), with
+      function-wide locals, `global` and `nonlocal` declarations, the check for a local read
+      before assignment, upvalue capture, and the `SELF` rule of
       [`specs/compiler.md`](specs/compiler.md#self-recursion).
+    - Add the scoping property test of [`specs/language.md`](specs/language.md#tests).
   - Accept:
-    - A self-recursive local function has no upvalue for its own name; a reassigned one does.
+    - A self-recursive local function has no upvalue for its own name; a reassigned one does, and
+      so does `function f() ... end` at a chunk's top level when nothing else assigns `f`.
+    - `if c then x = 1 else x = 2 end print(x)` reads the function's local; an assignment in a
+      nested function makes its own local unless `nonlocal` names the outer one; only names under
+      a `global` declaration compile to global writes; and `global *` makes them all global.
+    - A `nonlocal` with no enclosing variable, and a `global` after the name's first use, are
+      compile errors.
     - Assigning to a `<const>` local, a `for` variable, or a `global <const>` is a compile error
       with PUC-Rio's message.
   - Verify: `cargo test -p ferrolua-compiler --locked`
@@ -311,8 +334,9 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 - [ ] **M2.6 — compiler: expressions, registers, and constant folding**
   - Depends: M2.5
   - Do:
-    - Compile every expression, including chained comparisons that evaluate each middle operand once
-      and conditional expressions that evaluate one branch, allocate registers as
+    - Compile every expression, including chained comparisons that evaluate each middle operand
+      once, conditional expressions that evaluate one branch, truth tests, f-strings, and list and
+      tuple literals (ADR-0025), allocate registers as
       [`specs/compiler.md`](specs/compiler.md#registers-and-expressions) describes, and fold
       constants.
   - Accept:
@@ -342,6 +366,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 - [ ] **M2.9 — vm: operators and number printing**
   - Note: 2026-11-24, the owner's choice (ADR-0023): operators give Python's results, `+` joins
     strings, and nothing converts between strings and numbers.
+  - Note: 2026-11-24, the owner's choice (ADR-0025): truth follows Python's rule.
   - Depends: M2.8
   - Do:
     - Build the operators of [`specs/language.md`](specs/language.md#meanings) on numbers and
@@ -350,8 +375,11 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       in [`specs/vm.md`](specs/vm.md#the-interpreter).
     - Add `tests/conformance/arithmetic.lua` and `tests/conformance/tostring.lua` for what Lua 5.5
       shares, and `tests/extensions/operators.lua` for the rest.
+    - Build truth, with `__bool`, as [`specs/language.md`](specs/language.md#truth-adr-0025)
+      defines it (ADR-0025), and add `tests/extensions/truth.lua`.
   - Accept:
-    - Both conformance scripts print their recorded output, and `operators.lua` its written output.
+    - Both conformance scripts print their recorded output, and `operators.lua` and `truth.lua`
+      their written output.
     - `"10" + 1`, `1 / 0`, `1 << -1`, and `3.0 | 1` raise their recorded errors, and `2 ** 10` is
       the integer 1024.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
@@ -393,6 +421,27 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
       which matches the log stored for the script.
     - `gc.lua` prints its recorded output.
   - Verify: `cargo test -p ferrolua-vm --locked`; `cargo test -p ferrolua --test conformance --locked`
+
+- [ ] **M2.18 — vm: lists, tuples, and sets**
+  - Note: added on 2026-11-24, when the owner chose lists, tuples, and sets beside tables
+    (ADR-0025). It is listed where it is to be done, after M2.17.
+  - Depends: M2.10, M2.17
+  - Do:
+    - Build lists, tuples, and sets as [`specs/vm.md`](specs/vm.md#lists-tuples-and-sets) and
+      [`specs/language.md`](specs/language.md#lists-tuples-and-sets-adr-0025) describe: their
+      arenas and charges in [`specs/memory.md`](specs/memory.md#memory-accounting), indexing,
+      `#`, `in`, `==`, the orderings, `+`, `*`, the set operators, hashing tuples by value, the
+      shared metatables, `type`'s names, the generic `for` over their values, and their place in
+      the loop collector.
+    - Add the tuple hashing property test of [`specs/language.md`](specs/language.md#tests), and
+      `tests/extensions/collections.lua`.
+  - Accept:
+    - A list that holds itself, dropped, is freed by one `collectgarbage()`.
+    - `[1, nil, 3]` has length 3, `xs[3]` and `xs[-4]` raise the index error, and a list used as a
+      key raises the unhashable error.
+    - Equal tuples built apart are one key in a table and one member in a set.
+    - `collections.lua` prints its written output, once M2.14 can run it.
+  - Verify: `cargo test -p ferrolua-vm --locked`
 
 - [ ] **M2.11 — vm: errors and protected calls**
   - Depends: M2.10
@@ -436,7 +485,7 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M2.14 — ferrolua: a minimal embedding API and the conformance runner**
-  - Depends: M2.13, M2.17
+  - Depends: M2.13, M2.17, M2.18
   - Do:
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
       [`specs/ferrolua.md`](specs/ferrolua.md) sketches.
@@ -485,7 +534,8 @@ scripts within limits, and gets every standard library it grants.
   - Decide first: whether `Lua` implements `Send`, as [`specs/ferrolua.md`](specs/ferrolua.md#open-questions)
     describes.
   - Do:
-    - Build values tied to their state, `IntoLua` and `FromLua`, Rust functions, `UserData`, the
+    - Build values tied to their state, `IntoLua` and `FromLua`, with `Vec` and `HashSet`
+      converting to lists and sets (ADR-0026, proposed), Rust functions, `UserData`, the
       registry, `Lua::collect`, the collector's options and `hash_seed`, a way to change the limits
       between calls (ADR-0021), and `Error`, then update the spec with the names the code settled.
   - Accept:
@@ -539,10 +589,16 @@ scripts within limits, and gets every standard library it grants.
       [`specs/stdlib.md`](specs/stdlib.md#number-formatting) describes.
     - Make `%p` print object IDs (ADR-0019), and record what it prints for values with no
       address.
+    - Build f-string formatting, `format`, and `__format` with Python's mini-language, as
+      [`specs/stdlib.md`](specs/stdlib.md#formatted-strings) describes (ADR-0025), and add
+      `tests/extensions/format.lua` and the f-string property test of
+      [`specs/language.md`](specs/language.md#tests).
     - Add `tests/conformance/string_format.lua`, with subnormal numbers, the largest and smallest
       floats, `inf`, and `nan`.
   - Accept:
     - The script prints its recorded output, and `%.17g` reads back every generated float.
+    - `format.lua` prints its written output, and `f"{x:>{w}.{p}f}"` gives what `format` gives for
+      the same spec.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.5 — stdlib: `string.pack`, `string.packsize`, and `string.unpack`**
@@ -562,6 +618,21 @@ scripts within limits, and gets every standard library it grants.
       algorithm, and add `tests/conformance/table.lua`.
   - Accept:
     - The script prints its recorded output, including the order of equal elements after `sort`.
+  - Verify: `cargo test -p ferrolua --test conformance --locked`
+
+- [ ] **M3.15 — stdlib: the `list`, `tuple`, and `set` libraries**
+  - Note: added on 2026-11-24, when the owner chose lists, tuples, and sets beside tables
+    (ADR-0025). It is listed where it is to be done, after M3.6.
+  - Depends: M2.18, M3.6
+  - Do:
+    - Build the libraries, the base functions `list`, `tuple`, and `set`, `string.join`, and
+      `tostring` of a collection, as [`specs/stdlib.md`](specs/stdlib.md#lists-tuples-and-sets)
+      describes, and record each settled signature there.
+    - Extend `tests/extensions/collections.lua`.
+  - Accept:
+    - Each function has a test for each outcome and error, and `collections.lua` prints its written
+      output.
+    - `tostring` of a list that holds itself writes `...` at the repeat and stops.
   - Verify: `cargo test -p ferrolua --test conformance --locked`
 
 - [ ] **M3.7 — stdlib: `math` and `utf8`**
@@ -898,7 +969,8 @@ annotations, LuaCATS comments, and declarations for the standard library.
 - [ ] **M6.4 — types: representation and subtyping**
   - Depends: M6.1
   - Do:
-    - Build the types of [`specs/types.md`](specs/types.md#types) and the subtype relation.
+    - Build the types of [`specs/types.md`](specs/types.md#types), with `list<T>`, `tuple<A, B>`,
+      and `set<T>` (ADR-0025), and the subtype relation.
   - Accept:
     - Subtyping is reflexive and transitive on generated types, and recursive types terminate.
   - Verify: `cargo test -p ferrolua-types --locked`
@@ -992,7 +1064,8 @@ formats files without changing what they do.
       registering each code.
   - Accept:
     - Each rule has a triggering file and a near miss, `Class.__index = Class` is reported, and so
-      are `x ^ 2` and `for i = 1, #t do`.
+      are `x ^ 2`, `for i = 1, #t do`, and a counter closure that assigns an outer local without
+      `nonlocal`.
   - Verify: `cargo test -p ferrolua-lint --locked`
 
 - [ ] **M7.3 — lint: performance and style rules**
@@ -1009,6 +1082,7 @@ formats files without changing what they do.
     - Build the document layout and the printer of [`specs/fmt.md`](specs/fmt.md#layout).
   - Accept:
     - The meaning, idempotence, and comment property tests pass.
+    - `[[1], [2]]` written as a list comes out as `[ [1], [2] ]`, and f-string text is unchanged.
   - Verify: `cargo test -p ferrolua-fmt --locked`
 
 - [ ] **M7.5 — fmt: options and the check mode**

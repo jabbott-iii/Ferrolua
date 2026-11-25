@@ -6,11 +6,12 @@ Ferrolua is a virtual machine (VM) with a just-in-time (JIT) compiler for a scri
 derived from Lua 5.5, written in Rust, for Rust programs that embed one: games, editors, servers,
 and plugin systems. Its language keeps Lua's statements, values, and libraries (ADR-0001: Ferrolua
 branches from Lua 5.5), with Python's operators, indexes that start at 0, and ranges that stop
-before their end (ADR-0023: a language of its own). It adds what large Lua programs lack: optional
-types, classes, compound assignment, and a strict mode that catches wrong argument counts and
-undeclared variables. It also ships the tools that keep Lua code consistent, fast, and
-secure, in one command: a type checker, a linter, a formatter, a static application security
-testing (SAST) tool, a language server for editor auto complete, and a debugger.
+before their end (ADR-0023: a language of its own), and with Python's f-strings, locals by default,
+lists, tuples, and sets, and rule for which values are false (ADR-0025). It adds what large Lua
+programs lack: optional types, classes, compound assignment, and a strict mode that catches wrong
+argument counts and undeclared variables. It also ships the tools that keep Lua code consistent,
+fast, and secure, in one command: a type checker, a linter, a formatter, a static application
+security testing (SAST) tool, a language server for editor auto complete, and a debugger.
 
 One rule shapes the rest: **a script, however hostile, can't break memory safety or the host.**
 Ferrolua uses no third-party code (ADR-0002), frees memory deterministically, by reference counting
@@ -38,10 +39,10 @@ host allows, within limits the VM enforces (ADR-0014).
    Ferrolua's own crates.
 5. A host picks each state's libraries and limits, and a script can't exceed a memory, instruction,
    or call-depth limit (ADR-0014).
-6. Scripts use Python's operators, 0-based indexes, and half-open ranges, and can use optional
-   types, classes, compound assignment, and strict mode, as
-   [`specs/language.md`](specs/language.md) defines (ADR-0006 through ADR-0008, ADR-0023, and
-   ADR-0024).
+6. Scripts use Python's operators, 0-based indexes, half-open ranges, f-strings, locals by
+   default, lists, tuples, sets, and truth, and can use optional types, classes, compound
+   assignment, and strict mode, as [`specs/language.md`](specs/language.md) defines (ADR-0006
+   through ADR-0008, and ADR-0023 through ADR-0026).
 7. One binary, `ferrolua`, runs scripts and checks them: `run`, `check` (types), `lint`, `fmt`,
    and `sast`, with stable diagnostic codes and SARIF output for code scanning.
 8. Editors get type-aware auto complete, live diagnostics, and a debugger through `ferrolua lsp`
@@ -109,8 +110,8 @@ weeks, L is one to three months, and XL is more than three months.
 | Workspace, coverage, conformance runner, and CI (M0) | M | Coverage through `llvm-tools` and a fuzzer, both of Ferrolua's own |
 | Lexer, parser, and syntax trees (M1) | L | A lossless tree, error recovery, and two outputs from one parser (ADR-0009), with Python's precedence and conditional expressions |
 | Bytecode and compiler (M2) | L | Register allocation, upvalues, Lua 5.5's `global` rules, and constant folding |
-| VM core: heap, values, tables, interpreter, metamethods, coroutines (M2) | XL | Lua 5.5's behavior where the language keeps it, Python's results for operators, reference counting, a deterministic loop collector, and PUC-Rio's error messages |
-| Standard library (M3) | L | `string.format` and number printing that match PUC-Rio byte for byte, patterns, `string.pack`, and every position moved to count from 0 |
+| VM core: heap, values, tables, interpreter, metamethods, coroutines (M2) | XL | Lua 5.5's behavior where the language keeps it, Python's results for operators, lists, tuples, sets, and truth, reference counting, a deterministic loop collector, and PUC-Rio's error messages |
+| Standard library (M3) | L | `string.format` and number printing that match PUC-Rio byte for byte, patterns, `string.pack`, every position moved to count from 0, Python's format mini-language, and the `list`, `tuple`, and `set` libraries |
 | Embedding API and sandbox (M3) | M | Rust types that tie values to their state, plus limits counted inside library calls |
 | Language extensions (M4) | L | Classes with a fixed field layout, and grammar rules that fit around Python's operators |
 | Baseline JIT for x86-64 (M5) | XL | An x86-64 encoder, executable memory, guards, and exits back to the interpreter |
@@ -132,6 +133,6 @@ weeks, L is one to three months, and XL is more than three months.
 | Ferrolua's output differs from PUC-Rio's in details, such as float printing, `string.format`, or error messages | Conformance scripts compare with PUC-Rio's exact output for their Lua 5.5 twins; Ferrolua ports PUC-Rio's behavior, never its code; differences are fixed or recorded in a decision |
 | Counting references makes the interpreter slower than PUC-Rio's | Benchmarks from M5.1 measure the cost; the optimizing JIT removes redundant counts (M11.2); ADR-0018 names the threshold that reopens the decision |
 | The plan is large for its team | Milestones deliver usable parts in order: a parser, then an interpreter, then embedding, then the extensions, the JIT, and the tools |
-| Users won't port Lua code to Ferrolua's operators and 0-based indexes (ADR-0023) | Ferrolua keeps Lua's statements, values, and libraries, so porting changes expressions and index arithmetic only; the linter's porting rules find `x ^ 2` and loops that start at 1 (M7.2); the backlog holds a porting tool |
+| Users won't port Lua code to Ferrolua's operators, 0-based indexes, scoping, and truth (ADR-0023, ADR-0025) | Ferrolua keeps Lua's statements, tables, and libraries, so porting changes expressions, index arithmetic, and some assignments; `global *` keeps a ported chunk's globals while it moves to local scoping; the linter's porting rules find `x ^ 2`, loops that start at 1, and assignments that hide an outer local (M7.2); the backlog holds a porting tool |
 | A conformance script and its Lua 5.5 twin drift apart, so a pair passes while testing different things | Twins keep each statement on the same line and make the same calls in the same order; reviews read them side by side; the runner fails on a script without a twin |
 | Without a coverage-guided fuzzer, deep bugs go unfound | Grammar-based generation of valid Lua, mutation of saved inputs, and differential testing between the interpreter and the JIT (see [`04-quality.md`](04-quality.md)) |

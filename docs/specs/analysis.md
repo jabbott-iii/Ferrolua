@@ -17,7 +17,8 @@ changed and the files that `require` them.
 ## Names and scopes
 
 Names resolve under the same rules as the compiler ([`compiler.md`](compiler.md#name-resolution)):
-locals, upvalues, and globals, with Lua 5.5's `global` declarations and strict mode. Each name has
+block-scoped and function-wide locals, upvalues, and globals, with `global` and `nonlocal`
+declarations and strict mode (ADR-0025: locals by default, for the whole function). Each name has
 a symbol with its definition, its uses, and its assignments, which the linter's unused-variable
 rules and the language server's rename use.
 

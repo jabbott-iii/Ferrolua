@@ -25,7 +25,7 @@ a state unless the host registers it.
 | :- | :- | :- |
 | Base | On | `load` reads text only; `dofile` and `loadfile` exist only when file access is granted; `print` writes to the host's output, which defaults to discarding it |
 | `string` | On | `string.dump` exists only when precompiled chunks are allowed |
-| `table`, `math`, `utf8`, `coroutine` | On | Pure computation |
+| `table`, `list`, `tuple`, `set`, `math`, `utf8`, `coroutine` | On | Pure computation |
 | `os` time functions | On | `os.time`, `os.clock`, `os.date`, and `os.difftime` |
 | Rest of `os` | Off | `os.execute`, `os.remove`, `os.rename`, `os.tmpname`, `os.getenv`, `os.setlocale`, and `os.exit` |
 | `io` | Off | Granted with a file access policy, below |
@@ -62,8 +62,10 @@ status to the host, which the command-line tool turns into the process's exit st
 | Nesting depth | Nested blocks and expressions in the parser | PUC-Rio Lua 5.5.1's limit, which M1.8 records |
 
 Library functions that can run long count their work against the instruction limit: one unit per
-byte that `string.rep`, `table.concat`, and `string.format` produce, and one per step of the
-pattern matcher in `string.find`, `string.match`, `string.gmatch`, and `string.gsub`. A pattern
+byte that `string.rep`, `table.concat`, `string.format`, `string.join`, `format`, and f-string
+fields produce, one per element that joining, repeating, comparing, or combining lists, tuples,
+and sets visits or produces (ADR-0025: lists, tuples, and sets), and one per step of the pattern
+matcher in `string.find`, `string.match`, `string.gmatch`, and `string.gsub`. A pattern
 built to make the matcher backtrack is stopped like a loop. Table operations count too
 (ADR-0020): each probe step past the first is one unit, so keys crafted to collide are stopped the
 same way.

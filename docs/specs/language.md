@@ -1,15 +1,17 @@
 # Subsystem: `language`
 
 Ferrolua's language derives from Lua 5.5. It keeps Lua's statements, values, tables, metatables,
-closures, coroutines, and standard library, and changes three things: its operators follow
-Python's, its indexes start at 0, and its ranges stop before their end (ADR-0023: a language of its
-own, with Python's operators and 0-based indexes). It adds four features: compound assignment,
-optional type annotations, classes, and a strict mode with arity enforcement and undeclared-variable
-errors. This spec defines what differs from Lua 5.5; the
+closures, coroutines, and standard library, and takes these from Python instead: its operators, its
+indexes that start at 0, and its ranges that stop before their end (ADR-0023: a language of its
+own, with Python's operators and 0-based indexes); and f-strings, locals by default, lists, tuples,
+and sets, and Python's rule for which values are false (ADR-0025: four more of Python's features).
+It also adds compound assignment, optional type annotations, classes, and a strict mode with arity
+enforcement and undeclared-variable errors. This spec defines what differs from Lua 5.5; the
 [Lua 5.5 Reference Manual](https://www.lua.org/manual/5.5/) defines everything else. The parser
-lands in M1, and the four features in M4. ADR-0006 (types), ADR-0007 (classes, proposed), ADR-0008
-(strict mode, proposed), and ADR-0024 (the details Python's operators and 0-based indexes leave
-open) shaped it.
+lands in M1, and compound assignment, types, classes, and strict mode in M4. ADR-0006 (types),
+ADR-0007 (classes, proposed), ADR-0008 (strict mode, proposed), ADR-0024 (the details Python's
+operators and 0-based indexes leave open), and ADR-0026 (the details of ADR-0025's features,
+proposed) shaped it.
 
 ## Why a language of its own
 
@@ -30,7 +32,8 @@ Lua tools, such as lua-language-server and StyLua, don't work on Ferrolua files 
 Ferrolua implements all of Lua 5.5 that this spec doesn't change, including what is new since 5.4:
 
 - `global` declarations, in every form: `global x`, `global x <const> = 1`, `global function f`,
-  `global *`, and `global <const> *`, with the scoping rules in §2.2 and §3.3.7 of the manual;
+  `global *`, and `global <const> *`, with the scoping rules that [Scoping](#scoping-adr-0025)
+  gives in place of §2.2 and §3.3.7 of the manual;
 - read-only control variables in numeric and generic `for` loops;
 - named varargs, such as `function f(...args)`, where `args` is a read-only local holding the
   vararg table;
@@ -40,9 +43,6 @@ Ferrolua implements all of Lua 5.5 that this spec doesn't change, including what
 - `table.create`, the `lax` argument to `utf8.codes`, `utf8.codepoint`, and `utf8.len`, and the end
   position that `utf8.offset` also returns.
 
-Truth stays Lua's (ADR-0024): only `nil` and `false` are false, and `0`, `""`, and an
-empty table are true, unlike in Python.
-
 ## Tokens and keywords
 
 | Token | Meaning |
@@ -51,6 +51,8 @@ empty table are true, unlike in Python.
 | `!=` | Not equal |
 | `^` | Bitwise XOR, which is power in Lua |
 | `+=` `-=` `*=` `/=` `//=` `%=` `**=` `&=` `\|=` `^=` `<<=` `>>=` | Compound assignment |
+| `f"..."` `f'...'` `f[[...]]` | Formatted string literal (f-string) |
+| `[` ... `]` | List literal, where an expression starts |
 | `?` | Optional parameter or type |
 | `->` | Return type in a function type |
 
@@ -62,6 +64,8 @@ empty table are true, unlike in Python.
 - A comment wins over every new token: `--` always starts a comment, so `x -=- 1` is `x` followed
   by `-=`, then `-` and `1`, while `x--=1` is `x` followed by a comment.
 - The lexer takes the longest token it can: `**=` before `**`, and `**` before `*`.
+- `nonlocal` stays an ordinary name too, a keyword only at the start of a statement and followed
+  by a name (ADR-0026, proposed).
 - `class`, `extends`, `type`, and `super` stay ordinary names. `class` is a keyword only at the
   start of a statement, or right after `local` or `global`, and followed by a name; `type` only at
   the start of a statement and followed by a name; and `extends` only after the name in a class
@@ -128,12 +132,16 @@ sum        ::= term {('+' | '-') term}
 term       ::= unary {('*' | '/' | '//' | '%') unary}
 unary      ::= ('-' | '+' | '~' | '#') unary | power
 power      ::= simpleexp ['**' unary]
-simpleexp  ::= 'nil' | 'false' | 'true' | Numeral | LiteralString | '...' | functiondef
-             | prefixexp | tableconstructor
+simpleexp  ::= 'nil' | 'false' | 'true' | Numeral | LiteralString | FString | '...' | functiondef
+             | prefixexp | tableconstructor | listcons | tuplecons
+listcons   ::= '[' [exp {',' exp} [',']] ']'
+tuplecons  ::= '(' ')' | '(' exp ',' [exp {',' exp} [',']] ')'
 ```
 
 These rules replace the `exp` rule of §9 of the manual. `prefixexp`, `functiondef`, and
-`tableconstructor` keep their Lua 5.5 definitions.
+`tableconstructor` keep their Lua 5.5 definitions, so `(x)` stays a parenthesized expression, and
+only a comma makes a tuple. [Formatted string literals](#formatted-string-literals-adr-0025)
+defines `FString`.
 
 ### Meanings
 
@@ -163,18 +171,22 @@ These rules replace the `exp` rule of §9 of the manual. `prefixexp`, `functiond
 - **`k in v`** calls `v`'s `__contains` metamethod when it has one (ADR-0024), and
   converts the result to a boolean. Otherwise, for a table `v`, it is true when `rawget(v, k)` isn't
   `nil`; for strings `k` and `v`, when `k` occurs in `v` as plain text, not as a pattern. Any other
-  pair raises an error. It tests keys, as Python's `in` does for a dictionary, so
-  `3 in {1, 2, 3}` is false: that table's keys are 0, 1, and 2. `k not in v` is `not (k in v)`.
+  pair raises an error. On a table it tests keys, as Python's `in` does for a dictionary, so
+  `3 in {1, 2, 3}` is false: that table's keys are 0, 1, and 2. On a list or a tuple it tests
+  values, so `3 in [1, 2, 3]` is true, and on a set its members. `k not in v` is `not (k in v)`.
 - **`a is b`** is `rawequal(a, b)`: true for the same table, function, thread, or userdata, and for
   equal strings, numbers, booleans, or `nil`, without calling `__eq`. `a is not b` is
   `not (a is b)`.
-- **`x if c else y`** evaluates `c`, then exactly one of `x` and `y`: `x` when `c` is neither `nil`
-  nor `false`, and `y` otherwise.
+- **`x if c else y`** evaluates `c`, then exactly one of `x` and `y`: `x` when `c` is true, as
+  [Truth](#truth-adr-0025) defines it, and `y` otherwise.
 - **Unary `+`** returns a number unchanged and raises an error for any other value. It has no
   metamethod (ADR-0024).
-- **`#`** gives a string's length in bytes, calls `__len`, or gives a table's border, as
-  [Indexes and ranges](#indexes-and-ranges-adr-0023) defines it.
-- **`__concat`** is no longer a metamethod, because `..` is gone. `__contains` is new.
+- **`#`** gives a string's length in bytes or a collection's length, calls `__len`, or gives a
+  table's border, as [Indexes and ranges](#indexes-and-ranges-adr-0023) defines it.
+- **Lists, tuples, and sets** take `==`, the orderings, `+`, `*`, and the set operators, as
+  [Lists, tuples, and sets](#lists-tuples-and-sets-adr-0025) says.
+- **`__concat`** is no longer a metamethod, because `..` is gone. `__contains`, `__bool`, and
+  `__format` are new.
 
 M2.9 records each operator's edge cases and error messages in [`vm.md`](vm.md#the-interpreter).
 
@@ -220,7 +232,7 @@ local x = f if c then g() end     -- an assignment, then an if statement
   numbers, and the fields of `os.date`. `arg[0]` is the script, and `arg[1]` its first argument.
 
 ```lua
-local primes = {2, 3, 5, 7}
+local primes = [2, 3, 5, 7]
 print(primes[0])               --> 2
 print(#primes)                 --> 4
 for i = 0, #primes do
@@ -229,6 +241,162 @@ end
 print(("Ferrolua"):sub(0, 5))  --> Ferro
 print(("Ferrolua"):sub(-3))    --> lua
 ```
+
+## Formatted string literals (ADR-0025)
+
+An f-string is a string literal with an `f` touching its opening quote or long bracket: `f"..."`,
+`f'...'`, or `f[[...]]`. Each field in braces holds an expression. Ferrolua evaluates the fields
+from left to right, formats each one, and joins the parts into one string.
+
+```text
+FString ::= 'f' LiteralString     -- the f touches the quote or the long bracket
+field   ::= '{' exp ['='] ['!' ('s' | 'r')] [':' spec] '}'
+spec    ::= {a character other than '{' or '}' | field}
+```
+
+```lua
+local name, n, price = "Ada", 3, 2.5
+print(f"{name} has {n} items")      --> Ada has 3 items
+print(f"total: {n * price:.2f}")   --> total: 7.50
+print(f"[{n:>4}]")                  --> [   3]
+print(f"{n=}, {name!r}")            --> n=3, "Ada"
+print(f"{name:upper()}")            --> ADA, a method call, not a spec
+print(f"{{n}} is {n}")              --> {n} is 3
+```
+
+- `{{` and `}}` stand for `{` and `}`. The text between fields keeps the escapes of its string
+  form, so a long-bracket f-string has none.
+- A field's expression is any expression, and may hold strings and braces of its own. At its top
+  level, `!s` or `!r` before `:` or `}` is a conversion, and `:` starts the format spec unless a
+  name and `(` follow it, which make a method call (ADR-0026, proposed).
+- `=` after the expression writes the expression's text, then `=`, then the value.
+- Without a spec, a field writes `tostring` of its value. `!r` writes a string quoted, as
+  `string.format("%q")` writes it, and any other value as `tostring` does. `=` uses `!r` unless the
+  field gives a conversion or a spec.
+- After `:` comes Python's format specification mini-language,
+  `[[fill]align][sign][z][#][0][width][grouping][.precision][type]`, for numbers and strings. A
+  value whose metatable has `__format` is formatted by `__format(value, spec)` (ADR-0026,
+  proposed). A spec may hold fields of its own, as in `{x:>{width}}`.
+  [`stdlib.md`](stdlib.md#formatted-strings) gives the details.
+- Formatting a field is a conversion the code asks for, so f-strings keep ADR-0023's rule that
+  nothing converts between strings and numbers on its own.
+- `f"x"` is no longer a call of a function named `f`; that call is written `f("x")` or `f "x"`.
+
+## Scoping (ADR-0025)
+
+Every function, the main chunk included, owns the names its body assigns. A name resolves, from
+the innermost scope out, to:
+
+1. a parameter, a `for` loop's variable, or a `local` whose block is still open;
+2. a local of the current function, which it has because the function assigns the name;
+3. the same, in each enclosing function in turn, which a closure captures as an upvalue;
+4. a global, read and written through `_ENV`, as §2.2 of the manual describes.
+
+- An assignment, plain or compound, or a `function name` statement makes the name a local of the
+  whole function it is in, unless something on the list above, or a `global` or `nonlocal`
+  declaration, already names it. The local exists from the function's start, even when the
+  assignment comes later or inside a block, so `if c then x = 1 else x = 2 end print(x)` prints
+  the local.
+- Reading such a local before the function assigns it raises an error,
+  `local 'x' read before assignment` (ADR-0026, proposed). Assigning `nil` counts as assigning it.
+- `global x` declares that `x` names a global, so assignments to it write the global. Lua 5.5's
+  forms `global x <const> = 1`, `global function f`, `global *`, and `global <const> *` stay.
+- `nonlocal x` declares that `x` names the variable `x` of the nearest enclosing function that has
+  one, so assignments write that variable instead of making a local.
+- A `global` or `nonlocal` declaration covers the whole function it is in and the functions nested
+  in it, and comes before the function's first use of the name. `global *` makes every name that
+  the function assigns, and nothing else declares, a global, which restores Lua's rule for code
+  being ported (ADR-0026, proposed).
+- `local` keeps Lua's meaning: a local that lasts to the end of its block, with `<const>` or
+  `<close>` if wanted. Each pass of a loop gets a new `local`, while a function-wide local is one
+  variable for the whole call, so closures made in a loop share it, as in Python.
+- Reading a name that no scope declares reads a global, as in Lua and Python. Lua 5.5's implicit
+  `global *` at the start of every chunk is gone (ADR-0026, proposed), and strict mode's
+  [undeclared-variable errors](#undeclared-variable-errors) are the way to forbid such reads.
+
+```lua
+count = 0                   -- a local of the chunk
+function bump()             -- bump is a local of the chunk too
+  nonlocal count            -- without it, count += 1 would read bump's own unassigned count
+  count += 1
+end
+global function report()    -- a global, which other chunks can call
+  print(f"count = {count}")
+end
+```
+
+## Lists, tuples, and sets (ADR-0025)
+
+| Type | Built by | Changes | Holds | As a key |
+| :- | :- | :- | :- | :- |
+| `list` | `[1, 2]`, `[]` | Yes | Any values, `nil` included, in order | Not allowed |
+| `tuple` | `(1, 2)`, `(1,)`, `()` | No | Any values, `nil` included, in order | By value, when its elements can be keys |
+| `set` | `set([1, 2])`, `set()` | Yes | Distinct values that can be keys, in no order | Not allowed |
+
+Tables stay, as dictionaries, records, modules, and metatables. Most of what follows is ADR-0026's
+proposal.
+
+- `#` gives a collection's exact length. A list or a tuple is indexed by an integer from `-#c` to
+  `#c - 1`, a negative index counting from the end; any other index raises an error, as Python's
+  `IndexError` does. `xs[i] = v` replaces an element, and `xs:append(v)` adds one. A tuple and a
+  set can't be assigned into.
+- `in` tests a list's or a tuple's values with `==`, and a set's members.
+- `==` compares lists, tuples, and sets by value. `<`, `<=`, `>`, and `>=` compare lists and tuples
+  element by element, and sets as subsets, as in Python. `is` still tests identity.
+- `+` joins two lists or two tuples into a new one, and `*` with an integer repeats one. `|`, `&`,
+  `-`, and `^` give the union, intersection, difference, and symmetric difference of two sets.
+- A tuple whose elements can all be keys hashes by value, so `t[(1, 2)]` finds any equal tuple. A
+  list or a set used as a table key or a set element raises an error. Tables, functions, threads,
+  and userdata still hash by handle (ADR-0020).
+- Each type has one metatable, shared the way strings share theirs, whose `__index` is the type's
+  library, so `xs:append(v)` calls `list.append`. `setmetatable` on a collection raises an error.
+  [`stdlib.md`](stdlib.md#lists-tuples-and-sets) lists the functions.
+- A generic `for` over a list, tuple, or set visits its values: `for v in xs do`. `ipairs(xs)` gives
+  positions too. A set visits its members in an order the hash seed fixes, as a table's keys are.
+- `list(c)`, `tuple(c)`, and `set(c)` build a collection from another one or from a table's
+  sequence, and an empty one with no argument.
+- The last expression in a list or tuple literal expands to all its results, as in a table
+  constructor, so `[...]` collects the varargs.
+- Multiple results stay Lua's: `return a, b` returns two values, not a tuple, and `a, b = t`
+  assigns the tuple to `a`. `t:unpack()` gives a tuple's elements as results.
+- `type` returns `"list"`, `"tuple"`, or `"set"`.
+- `[[` always starts a long string, so a list whose first element is a list is written with a
+  space: `[ [1, 2], [3] ]`. A `(` or `[` at the start of a line continues the expression before it,
+  as `(` does in Lua, so `f()` followed by a line that starts with `[1]` indexes `f()`'s result.
+
+```lua
+local xs = [3, 1, 2]
+xs:append(nil)
+print(#xs, xs[-2])                  --> 4  2
+local seen = set([(0, 0), (1, 2)])
+print((1, 2) in seen, [1] == [1])   --> true  true
+for v in (10, 20) do print(v) end   --> 10, then 20
+```
+
+## Truth (ADR-0025)
+
+Python's rule decides which values are false; ADR-0024 had kept Lua's, where only `nil` and
+`false` are. These values are false:
+
+- `nil` and `false`;
+- `0`, `0.0`, and `-0.0`;
+- `""`;
+- an empty list, tuple, or set;
+- a table with no entries and no metatable, as an empty Python dictionary is (ADR-0026, proposed);
+- a table or userdata whose metatable's `__bool` returns `false` (ADR-0026, proposed).
+
+Every other value is true, including `nan`, every function and thread, a class instance, and a
+table that has a metatable but no `__bool`, which acts as an object. `__bool` must return a
+boolean, or the test raises an error.
+
+- `if`, `while`, `repeat ... until`, `not`, `and`, `or`, a conditional expression, and `assert`
+  test truth this way, and so do the results of `__eq`, `__lt`, `__le`, and `__contains`, and of
+  `table.sort`'s comparator.
+- `and` and `or` still return one of their operands: `0 or 5` is 5, and `"" and f()` is `""`. So
+  `x = x or default` now replaces a 0 or an empty string too.
+- Library functions that take `nil` or `false` to mean "no value", such as `string.gsub` with a
+  replacement function and `load` with a reader, keep testing for exactly those two (ADR-0026,
+  proposed).
 
 ## Compound assignment (ADR-0023)
 
@@ -289,7 +457,9 @@ end
 - `local x <const>: number = 1` puts the attribute before the type, because `<` after a type would
   read as the start of type arguments.
 - The built-in type names are `any`, `unknown`, `never`, `nil`, `boolean`, `number`, `integer`,
-  `string`, `function`, `table`, `thread`, and `userdata`.
+  `string`, `function`, `table`, `thread`, `userdata`, `list`, `tuple`, and `set`. `list<T>`,
+  `set<T>`, and `tuple<A, B>` give the element types, and `{T}` stays the type of a table used as a
+  sequence.
 - `type` declares an alias with the scope of a local. An alias is visible to the type checker
   only, and the compiler emits nothing for it.
 
@@ -364,15 +534,17 @@ Strict mode is two checks, each off unless turned on:
 ### Undeclared-variable errors
 
 A strict chunk compiles as if it started with a `global` declaration that lists the names the
-state's libraries and its host define. Every other free name must be declared with `global` before
-it is used, under Lua 5.5's rules, and an undeclared name is a compile-time error. PUC-Rio Lua
+state's libraries and its host define. An assignment always declares its name, as a local or
+through `global` ([Scoping](#scoping-adr-0025)), so the check is on reads: reading a name that is
+neither a local, declared with `global`, nor one of those names is a compile-time error. PUC-Rio Lua
 5.5.1's message for an undeclared name is recorded in M4.6, and Ferrolua uses the same wording.
 
 ```lua
 --!strict
 print("hello")      -- print is defined by the base library
-count = 1           -- compile error: count is not declared
-global total = 0    -- declares total
+count = 1           -- fine: a local of the chunk
+print(cuont)        -- compile error: cuont is not declared
+global total = 0    -- declares the global total
 total += 1          -- fine
 ```
 
@@ -407,8 +579,8 @@ area(2, 3, 4)  -- error: bad argument count to 'area' (expected 1 to 2, got 3)
    bytecode, apart from the JIT hints.
 3. **Single evaluation:** in a compound assignment, the target's prefix, its key, and the
    right-hand side are each evaluated exactly once, in that order; in a chained comparison, each
-   middle operand is evaluated exactly once; and a conditional expression evaluates its condition
-   once and exactly one branch.
+   middle operand is evaluated exactly once; a conditional expression evaluates its condition
+   once and exactly one branch; and an f-string evaluates each field once, from left to right.
 4. **Half-open ranges:** for every string `s` and integers `i` and `j`, `string.sub(s, i, j)`
    returns the bytes Python's `s[i:j]` returns, and for integers `a`, `b`, and a nonzero `c`,
    `for v = a, b, c do` runs once for each value of Python's `range(a, b, c)`, in the same order.
@@ -416,6 +588,14 @@ area(2, 3, 4)  -- error: bad argument count to 'area' (expected 1 to 2, got 3)
    output with strict mode off.
 6. **Classes make no loops:** creating and dropping any number of instances returns the heap to its
    size before, with no collection.
+7. **f-strings:** an f-string gives the string that joining its text with `format(v, spec)` of each
+   field's value gives.
+8. **No accidental globals:** an assignment writes a global only where a `global` declaration
+   covers it.
+9. **Truth:** a value is false exactly when [Truth](#truth-adr-0025) lists it, in every place that
+   tests truth.
+10. **Equal tuples hash alike:** two tuples that compare equal are one key in a table and one member
+    in a set.
 
 ## Tests
 
@@ -434,5 +614,13 @@ area(2, 3, 4)  -- error: bad argument count to 'area' (expected 1 to 2, got 3)
   and compare the output of those that finish (M4.6, M4.7).
 - Invariant 6: a test in `ferrolua-vm` records the heap's size, creates and drops 100,000 instances
   of a class with a parent, and checks the size again (M4.5).
+- Invariant 7: a property test in `ferrolua` generates f-strings and compares each with the same
+  fields formatted by `format` and joined (M3.4).
+- Invariant 8: a property test in `ferrolua-compiler` generates functions that assign names and
+  checks that only names under a `global` declaration compile to global writes (M2.5).
+- Invariant 9: `tests/extensions/truth.lua` tests every kind of value in each place that tests
+  truth (M2.9).
+- Invariant 10: a property test in `ferrolua-vm` builds equal tuples separately and checks that a
+  table and a set each hold one entry for them (M2.18).
 - Each grammar rule has a parser test for the accepted form and for each nearby error, with the
   exact message.

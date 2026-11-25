@@ -32,7 +32,9 @@ Each kind of heap object has an arena: a growable array of slots plus a list of 
 | :- | :- | :- |
 | Strings | Immutable byte strings, short ones interned (see [`vm.md`](vm.md)) | No |
 | Prototypes | The compiled code of a function, shared by its closures | No |
-| Tables | Array part, hash part, metatable, and weak mode | Yes |
+| Tables | Array part, hash part, count of entries, metatable, and weak mode | Yes |
+| Lists and tuples | A list's growable array, or a tuple's fixed one, of values (ADR-0025: lists, tuples, and sets beside tables) | Yes |
+| Sets | A hash set of values | Yes |
 | Closures | A Lua function: its prototype and upvalue cells | Yes |
 | Native functions | A Rust function the host or the standard library registered, with its captured values | Yes |
 | Upvalue cells | A captured local after its frame returns | Yes |
@@ -70,6 +72,9 @@ enum Value {
     Float(f64),
     String(Handle),
     Table(Handle),
+    List(Handle),
+    Tuple(Handle),
+    Set(Handle),
     Function(Handle),
     Userdata(Handle),
     Thread(Handle),
@@ -160,10 +165,12 @@ end
 ```
 
 would hold a counted reference to itself through its upvalue, a loop the collector would have to
-find. The compiler sees that `fact` is assigned only once, by its own definition, so every use of
-`fact` inside the body is the function that is running. It compiles those uses to "the running
-function" and creates no upvalue, so no loop forms and the closure is freed by counting alone. A
-local function that is assigned anywhere else keeps an ordinary upvalue.
+find. The same holds for a function-wide local assigned a function once, such as
+`function fact(n) ... end` at a chunk's top level, which is a local of the chunk (ADR-0025: locals
+by default; ADR-0026, proposed). The compiler sees that `fact` is assigned only once, by its own
+definition, so every use of `fact` inside the body is the function that is running. It compiles
+those uses to "the running function" and creates no upvalue, so no loop forms and the closure is
+freed by counting alone. A local function that is assigned anywhere else keeps an ordinary upvalue.
 
 ## The loop collector
 

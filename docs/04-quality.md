@@ -14,7 +14,7 @@ forbids weakening a test to make it pass and sets coverage at 100% of lines and 
 | Unit tests | `#[cfg(test)] mod tests` beside the code | Each function's outcomes and edges |
 | Integration tests | Each crate's `tests/` | The crate through its public API only |
 | Conformance scripts | `tests/conformance/` | Behavior Ferrolua keeps from Lua 5.5, against the output PUC-Rio Lua 5.5.1 printed for each script's Lua 5.5 twin, interpreted and with the JIT forced on |
-| Extension scripts | `tests/extensions/` | Behavior with no Lua 5.5 counterpart: Python's operators, 0-based indexes and ranges, the language extensions, and the intended differences, against output written from the spec |
+| Extension scripts | `tests/extensions/` | Behavior with no Lua 5.5 counterpart: Python's operators, indexes, ranges, f-strings, scoping, collections, and truth, the language extensions, and the intended differences, against output written from the spec |
 | Differential tests | `crates/ferrolua/tests/` and a fuzz target | The interpreter and the JIT print the same output, raise the same errors, and give the same collection log |
 | Determinism tests | `crates/ferrolua/tests/` | Two runs with a fixed hash seed give the same collection log, which matches the log stored for the script, on every target ([`specs/memory.md`](specs/memory.md#determinism)) |
 | Property tests | Beside the code, using `ferrolua-testkit` | Laws that hold for every input, such as "formatting doesn't change the bytecode" |

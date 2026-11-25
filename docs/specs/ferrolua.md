@@ -47,10 +47,11 @@ assert_eq!(result, "hello, world");
 - `Value<'lua>` and typed handles such as `Table<'lua>` and `Function<'lua>` count their
   references, and release them when dropped.
 - Conversions between Rust and Lua values go through `IntoLua` and `FromLua` traits, implemented
-  for numbers, strings, booleans, `Option`, `Vec`, `HashMap`, and tuples for multiple values. A
-  `Vec`'s element `v[i]` becomes the table's `t[i]`, since both count from 0 (ADR-0023: a language
-  of its own, with Python's operators and 0-based indexes), and `FromLua` reads a `Vec` from keys 0
-  to `#t - 1`. Neither converts between strings and numbers.
+  for numbers, strings, booleans, `Option`, `Vec`, `HashSet`, `HashMap`, and tuples for multiple
+  values. A `Vec` converts to and from a list and a `HashSet` to and from a set, with `v[i]` as the
+  list's `xs[i]`, since both count from 0, and a `HashMap` to and from a table (ADR-0025: lists,
+  tuples, and sets beside tables; ADR-0026, proposed). `FromLua` also reads a `Vec` from a table's
+  keys 0 to `#t - 1`. None converts between strings and numbers.
 - `UserData` lets a Rust type become userdata with methods, fields, and metamethods.
 - `Lua::collect` runs the loop collector and the finalizers it queues, at a point the host
   chooses ([`memory.md`](memory.md#schedule)). It is a call like any other: its finalizers count

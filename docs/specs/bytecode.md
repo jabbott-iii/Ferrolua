@@ -28,10 +28,11 @@ these forms:
 
 An instruction that needs a wider operand is followed by an `EXTRA` word. The instruction set covers
 moves and loads, upvalues, globals through `_ENV`, table access with constant-key forms, arithmetic,
-bitwise, and comparison with constant operands, membership and identity tests, jumps, calls and tail
-calls, returns, varargs, numeric and generic `for`, closures, `<close>` variables, and the
-extensions: `ARITY` checks, class construction, and field access by slot. M2.1 records the full
-list, with each opcode's operands and effect, in this section.
+bitwise, and comparison with constant operands, membership and identity tests, truth tests, the
+check for a local read before assignment, list and tuple construction, f-string formatting, jumps,
+calls and tail calls, returns, varargs, numeric and generic `for`, closures, `<close>` variables,
+and the extensions: `ARITY` checks, class construction, and field access by slot. M2.1 records the
+full list, with each opcode's operands and effect, in this section.
 
 ## Prototypes
 

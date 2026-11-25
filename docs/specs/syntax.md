@@ -45,6 +45,10 @@ of [`language.md`](language.md#tokens-and-keywords), such as `**`, `!=`, and `**
   with the same overflow rules as PUC-Rio: a decimal integer that doesn't fit becomes a float;
 - short strings with every escape, `\z`, `\xXX`, `\ddd`, and `\u{XXX}` up to `2^31`, and long
   strings and comments with any level of `=` signs;
+- f-strings: an `f` touching a short or long string starts one (ADR-0025: f-strings, locals by
+  default, lists, tuples, and sets, and Python's truth). The lexer splits it into text parts and
+  fields, and lexes each field's expression into ordinary tokens, counting brackets and skipping
+  strings to find the field's end, so the parser reads a field as an expression;
 - a first line starting with `#`, which is skipped, as `lua` does for scripts that start with `#!`.
 
 Each token keeps its leading and trailing trivia, the spaces, newlines, and comments around it, so
@@ -64,6 +68,12 @@ pub enum Event {
     Error(Diagnostic),
 }
 ```
+
+List and tuple literals, and the fields of f-strings, parse as
+[`language.md`](language.md#lists-tuples-and-sets-adr-0025) and
+[`language.md`](language.md#formatted-string-literals-adr-0025) define them. After `(` and an
+expression, a comma makes a tuple and `)` makes a parenthesized expression, and `()` is the empty
+tuple. The parser decides after that expression, as the next paragraph describes.
 
 A node can start before a part the parser has already read, so the parser can wrap a left
 operand in a binary, chained, or conditional node once it sees the operator. That is how it reads

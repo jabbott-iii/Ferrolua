@@ -822,7 +822,8 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0023 — Make Ferrolua a language of its own, with Python's operators and 0-based indexes
 
-- **Status:** Accepted
+- **Status:** Accepted; ADR-0025 adds f-strings, locals by default, lists, tuples, sets, and
+  Python's truth
 - **Date:** 2026-11-24
 - **Context:**
   - ADR-0004 made Ferrolua's language a superset of Lua 5.5, so every valid Lua 5.5 script runs
@@ -914,7 +915,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0024 — Settle what Python's operators and 0-based indexes leave open
 
-- **Status:** Accepted
+- **Status:** Accepted; ADR-0025 replaces its rule for truth with Python's
 - **Date:** 2026-11-24
 - **Context:** ADR-0023 records the owner's choices: Python's operators, indexes from 0, ranges
   without their end, and no implicit conversion. Writing them into the language spec raised
@@ -982,3 +983,192 @@ it is `Proposed`, and no code may depend on it.
   - Reading `LUA_INIT`, as `lua` does: a user's Lua 5.5 startup code would fail to parse.
 - **Revisit when:** users report bugs from expecting `0` or `""` to be false, as in Python, or a
   host needs `in` to see fields that `__index` provides.
+
+## ADR-0025 — Add f-strings, function-wide locals, lists, tuples, and sets, and Python's truth
+
+- **Status:** Accepted
+- **Date:** 2026-11-24
+- **Context:**
+  - ADR-0023 made Ferrolua a language of its own, with Python's operators and 0-based indexes, and
+    ADR-0024 kept Lua's rule for truth, where only `nil` and `false` are false. On 2026-11-24 the
+    owner asked for four more of Python's features: formatted string literals (f-strings),
+    local-by-default scoping, dedicated collection types, and Python's truth.
+  - Lua makes a name global when code assigns it without declaring it, so a typo in an assignment
+    creates a global that every chunk sees. Lua 5.5's `global` declarations can turn that off, but
+    only by declaring every global name a chunk uses.
+  - Lua has one structured type, the table, which serves as list, dictionary, record, object,
+    module, and metatable. A table can't hold `nil` as a list element, its length is unclear when
+    it has holes, it can't be a key by value, and nothing marks one as a set.
+  - Asked the same day, the owner chose lists, tuples, and sets beside tables over two other
+    options: Python's four types in place of tables, and lists and sets only. For scoping, the
+    owner chose locals that reach the whole function, as in Python, over locals that reach the
+    rest of their block, as Lua's `local` does.
+- **Decision** (the owner chose the four features, the first of three options for collections, and
+  the first of two for scoping, on 2026-11-24):
+  - **f-strings.** `f"..."` is a formatted string literal, as in Python:
+    `f"{name} has {n:>3} items"` evaluates each field in braces, formats it, and joins the parts
+    into one string. A field takes Python's conversions `!s` and `!r`, the `=` that writes the
+    expression's text before its value, and Python's format specification mini-language after `:`.
+  - **Locals by default, for the whole function.** Assigning a name anywhere in a function makes it
+    a local of that whole function, unless the function declares it `global` or `nonlocal`, as in
+    Python. Reading such a local before any assignment raises an error, and no assignment creates
+    a global unless a `global` declaration says so. `local` stays, for a local that lasts to the
+    end of its block and can take `<const>` or `<close>`. Reading a name that no scope declares
+    reads a global, as in Lua and Python.
+  - **Lists, tuples, and sets beside tables.** `[1, 2]` makes a list, `(1, 2)` a tuple, and
+    `set(...)` a set, each a type of its own. A list is a sequence that can change, a tuple one
+    that can't, and a set holds distinct values in no order. `in` tests a list's or a tuple's
+    values, so `3 in [1, 2, 3]` is true. Tables stay, as dictionaries, records, modules, and
+    metatables.
+  - **Python's truth.** `nil`, `false`, `0`, `0.0`, `""`, and empty collections are false, and other
+    values are true, as in Python. This replaces ADR-0024's rule.
+  - [`specs/language.md`](specs/language.md) gives the syntax and the meanings. ADR-0026 (proposed)
+    settles the details these choices leave open.
+- **Consequences:**
+  - Good: `f"{x} of {n}"` replaces `string.format("%s of %d", x, n)`, and the `tostring` calls that
+    `+` needs, since `+` converts nothing (ADR-0023).
+  - Good: a typo in an assignment makes a local, not a global that other chunks see, and a function
+    changes a global only where it declares one.
+  - Good: a list holds `nil` and has an exact length, `in` finds a value in it, and a tuple can be a
+    key by value, as in Python.
+  - Good: Python programmers read `if items then` and `x or default` as they expect.
+  - Bad: Lua code that assigns a global, or an outer function's local, from inside a function now
+    makes a local there. A counter closure needs `nonlocal n`, and a function that sets a global
+    needs `global name`. A porting rule of the linter reports an assignment that hides an outer
+    local (M7.2).
+  - Bad: a function-wide local is one variable for the whole call, so closures made in a loop share
+    it, as in Python. An explicit `local` inside the loop gives each pass its own.
+  - Bad: `x = x or default` now replaces a 0 or an empty string too, and `if count then` skips its
+    block when `count` is 0. Ported Lua code that relied on 0 and `""` being true changes meaning
+    without an error.
+  - Bad: `f"..."` used to call a function named `f` with a string; that call is now written
+    `f("...")` or `f "..."`.
+  - Bad: `[[` still starts a long string, so a list whose first element is a list is written
+    `[ [1, 2] ]`, with a space, which the formatter writes for it (M7.4).
+  - Bad: the heap has three new kinds of object, each with a fixed charge (ADR-0021), and every
+    truth test checks a value's type and, for a table, its count of entries.
+  - Follow-up: M1.2 lexes f-strings; M1.5 parses list and tuple literals and f-string fields; M2.4
+    counts each table's entries; M2.5 resolves names by the new scoping; M2.18 builds lists,
+    tuples, and sets; M2.9 builds Python's truth and the collections' operators; M3.4 formats
+    f-string fields; M3.15 adds the `list`, `tuple`, and `set` libraries; M7.2 adds the porting
+    rules; M7.4 spaces nested lists.
+- **Alternatives considered:**
+  - Python's four types, with tables gone: closest to Python, but metatables, modules, and `_ENV`
+    would need new designs, and so would every Lua idiom built on tables.
+  - Lists and sets only: smaller, but a pair of values couldn't be a key by value.
+  - Locals that reach the rest of their block, as Lua's `local` does: simpler to compile, but
+    `if c then x = 1 else x = 2 end print(x)` would read a global `x`.
+  - Lua's truth, which ADR-0024 kept: ported Lua code keeps its meaning, but Python programmers'
+    expectations don't hold.
+- **Revisit when:** a host reports porting bugs from the scoping or truth rules that no linter rule
+  could catch, or needs tables to compare by value.
+
+## ADR-0026 — Settle what f-strings, function-wide locals, collections, and truth leave open
+
+- **Status:** Proposed
+- **Date:** 2026-11-24
+- **Context:** ADR-0025 records the owner's choices. Writing them into the language spec raised
+  questions they don't answer. Python's f-strings use `:` for a format spec, where Ferrolua also
+  uses `:` to call a method. Python's `global` statement covers one function, while Lua 5.5's
+  `global` declarations also cover the functions nested in them. Python's lists, tuples, and sets
+  live in a language without Lua's multiple results, metatables, or long strings. Python's truth
+  rule has no case for a table, which is both a dictionary and an object. The agent proposed these
+  answers on 2026-11-24.
+- **Decision:**
+  - **f-strings:**
+    - The prefix is a lowercase `f` touching the opening `"`, `'`, or long bracket, as in
+      `f[[...]]`; `f "x"`, with a space, is still a call.
+    - `{{` and `}}` stand for `{` and `}`, and the text between fields keeps its string form's
+      escapes.
+    - At the top level of a field's expression, `!s` or `!r` before `:` or `}` is a conversion, and
+      `:` starts the format spec unless a name and `(` follow it, which make a method call:
+      `{p:length()}` calls `length`, and `{x:>8}` formats `x`. A spec may hold fields of its own,
+      as in `{x:>{width}}`.
+    - Without a spec, a field writes `tostring` of its value. `!r` writes a string as
+      `string.format("%q")` does and any other value as `tostring` does, and `=` uses `!r` unless
+      the field gives a conversion or a spec.
+    - A table, userdata, or class instance with a `__format` metamethod is formatted by
+      `__format(value, spec)`, which must return a string. A spec on any other value that isn't a
+      number or a string raises an error.
+    - The base function `format(value, spec)` formats one value as a field does, as Python's
+      `format` does.
+  - **Scoping:**
+    - A `global` or `nonlocal` declaration covers the whole function it is in and every function
+      nested in it, and must come before the function's first use of the name. A use before it is a
+      compile error.
+    - `nonlocal x` names the `x` of the nearest enclosing function that has one, the main chunk
+      included; naming none is a compile error. `nonlocal` is a keyword only at the start of a
+      statement and followed by a name.
+    - `global *` makes every name that the function and its nested functions assign, and don't
+      otherwise declare, a global, which restores Lua's rule for porting. `global <const> *` makes
+      them read-only globals, so assigning one is a compile error.
+    - Lua 5.5's implicit `global *` at the start of every chunk is gone, and so is its rule that a
+      `global` declaration ends it. Reading an undeclared name is always a global read, and strict
+      mode is the way to forbid it.
+    - Reading a local before its function assigns it raises `local 'x' read before assignment`.
+    - The rule that a self-recursive local function holds no reference to itself (ADR-0018) also
+      covers a function-wide local assigned a function once, such as `function f() ... end` at a
+      chunk's top level.
+  - **Collections:**
+    - A list or a tuple holds any value, `nil` included. Its index is an integer from `-#c` to
+      `#c - 1`, and any other index raises an error, as Python's `IndexError` does. A list grows
+      through its methods, such as `xs:append(v)`, never by assigning past its end.
+    - `==` compares lists, tuples, and sets by value. `<`, `<=`, `>`, and `>=` compare lists and
+      tuples element by element, and sets as subsets. `+` joins two lists or two tuples, `*` with an
+      integer repeats one, and `|`, `&`, `-`, and `^` give the union, intersection, difference, and
+      symmetric difference of two sets.
+    - A tuple whose elements can all be keys hashes by value. A list or a set used as a table key or
+      a set element raises an error, as Python's `unhashable type` does. Tables, functions,
+      threads, and userdata still hash by handle (ADR-0020).
+    - Each type has one metatable, as strings share theirs, whose `__index` is its library, so
+      `xs:append(v)` calls `list.append`. `setmetatable` on a collection raises an error.
+    - A generic `for` over a list, tuple, or set visits its values: `for v in xs do`. A set visits
+      its members in an order the hash seed fixes, as a table's keys are.
+    - The base functions `list(c)`, `tuple(c)`, and `set(c)` build a collection from another one or
+      from a table's sequence, and an empty one with no argument.
+    - The last expression in a list or tuple literal expands to all its results, as in a table
+      constructor, so `[...]` collects the varargs.
+    - Multiple results stay Lua's: `return a, b` returns two values, not a tuple, and `a, b = t`
+      assigns the tuple to `a`; `t:unpack()` gives its elements as results.
+    - `(x)` stays a parenthesized expression; `(x,)` is a tuple of one, and `()` the empty tuple.
+    - `[[` always starts a long string.
+    - A host's `Vec` converts to and from a list, and a `HashSet` to and from a set.
+    - `tostring` of a collection writes its elements as `!r` does, as in `[1, "a"]`, `(1,)`, and
+      `set([1, 2])`, so the text reads back as an equal value when its elements do. A collection
+      that holds itself writes `...` where it repeats.
+    - `string.join(sep, c)` joins the strings in a collection, so `(", "):join(xs)` works as
+      Python's `", ".join(xs)` does.
+  - **Truth:**
+    - A table with no entries and no metatable is false, as an empty Python dictionary is. A table
+      or userdata whose metatable has `__bool` is false when `__bool` returns `false`, and `__bool`
+      must return a boolean. Every other table, userdata, and class instance is true.
+    - `-0.0` is false and `nan` is true, as in Python.
+    - The results of `__eq`, `__lt`, `__le`, and `__contains`, `table.sort`'s comparator, and
+      `assert` use the new truth. Library functions that take `nil` or `false` to mean "no value",
+      such as `string.gsub` with a replacement function and `load` with a reader, keep testing for
+      exactly those two.
+- **Consequences:**
+  - Good: `{obj:name()}` works in an f-string, and so do the method calls Lua code already writes.
+  - Good: `global *` at the top of a ported chunk keeps its assignments global, so a port can move
+    to local scoping one function at a time.
+  - Good: an object built as an empty table with a metatable stays true, as Python objects are.
+  - Bad: an f-string format spec can't start with a name followed by `(`; none of Python's does.
+  - Bad: `[ [1, 2] ]` needs its space, and `a, b = (1, 2)` doesn't unpack, unlike Python.
+  - Bad: a truth test on a table reads its metatable as well as its count of entries.
+  - Follow-up: M1.2 lexes the `f` prefix; M1.5 parses fields and collection literals; M2.5 builds
+    the declarations and the error for a read before assignment; M2.9 builds truth with `__bool`;
+    M2.18 builds the collections' operators, hashing, and metatables; M3.4 builds `__format` and
+    `format`; M3.15 builds the `list`, `tuple`, and `set` libraries; M3.1 converts `Vec` and
+    `HashSet`.
+- **Alternatives considered:**
+  - `:` always starting the format spec, as in Python: simpler, but `{p:length()}` would fail.
+  - `global` covering one function, as Python's does: a ported chunk would need a declaration in
+    every function that sets a global.
+  - Lists that grow when code assigns `xs[#xs]`, as tables do: familiar from Lua, but Python raises
+    an error there, and `append` says what it does.
+  - Every empty table false, metatable or not: closer to Python's dictionaries, but an object built
+    as an empty table with a metatable would be false.
+  - `__bool` falling back to `__len`, as Python's `__bool__` falls back to `__len__`: one more
+    lookup on every truth test of a table with a metatable.
+  - A set literal `{1, 2}`, as Python writes it: `{1, 2}` already builds a table.
+- **Revisit when:** the owner accepts or changes this record, which M1.2 needs first.

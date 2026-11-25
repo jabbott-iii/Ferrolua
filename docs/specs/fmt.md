@@ -21,7 +21,10 @@ optional line break in it when it doesn't.
 
 - Comments stay attached to the token they follow or precede, on the same line or their own.
 - Blank lines between statements are kept, up to one.
-- Long strings and long comments are copied exactly, because their contents are data.
+- Long strings and long comments are copied exactly, because their contents are data, and so is
+  the text between an f-string's fields.
+- A list literal whose first element is a list gets a space after its `[`, as `[ [1, 2] ]`,
+  because `[[` would start a long string (ADR-0025: lists, tuples, and sets).
 - Parentheses that Lua needs are kept, and ones it doesn't need are kept too, because
   `(f())` truncates `f`'s results to one value.
 

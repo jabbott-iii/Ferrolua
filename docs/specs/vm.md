@@ -47,6 +47,26 @@ hash part uses open addressing with the seeded hash. Float keys with integer val
   PUC-Rio gives for its own `{1, nil, 3}`.
 - `next` visits the array part in order, then the hash part, and continues correctly while the
   loop assigns `nil` to visited fields, as §6.1 of the manual allows.
+- Each table keeps a count of its entries, so a truth test knows in one step whether a table is
+  empty (ADR-0025: Python's truth).
+
+## Lists, tuples, and sets
+
+Lists, tuples, and sets are values of their own, with an arena each
+([`memory.md`](memory.md#objects-and-arenas)), as
+[`language.md`](language.md#lists-tuples-and-sets-adr-0025) defines them (ADR-0025: lists, tuples,
+and sets beside tables).
+
+- A list is a growable array of values, `nil` included, with its length; a tuple is a fixed array
+  that never changes, with its hash computed on first use. Indexing either checks the index
+  against the length, so it never reads past the end.
+- A set is a hash set over the same seeded hash as tables, with reference values hashed by handle
+  (ADR-0020) and tuples by value, and the same probe-step counting against the instruction limit.
+- Each type has one metatable per state, which scripts can read with `getmetatable` but not
+  replace.
+- Joining, repeating, and comparing collections, and the set operators, count one work unit per
+  element they visit or produce, as library calls count their work
+  ([`sandbox.md`](sandbox.md#limits)).
 
 ## The interpreter
 
@@ -55,19 +75,23 @@ A call pushes a frame with a base register and a return address; a tail call reu
 proper tail calls use no stack. Native functions, the ones written in Rust, are called with a view
 of their argument registers and return values the same way.
 
-Operators follow [`language.md`](language.md#meanings): integer operations wrap around on
-overflow, `//` and `%` round toward minus infinity, `**` of two integers gives an integer when the
-exponent isn't negative, `>>` keeps the sign, division by zero raises an error, and nothing
-converts between strings and numbers. M2.9 records each operator's edge cases and error messages
-here. Number-to-string conversion prints floats with enough digits to read back the same value, as
-Lua 5.5 does, using PUC-Rio's exact rules, which M2.9 records here.
+Operators follow [`language.md`](language.md#meanings): integer operations wrap around on overflow,
+`//` and `%` round toward minus infinity, `**` of two integers gives an integer when the exponent
+isn't negative, `>>` keeps the sign, division by zero raises an error, and nothing converts between
+strings and numbers. A truth test follows [`language.md`](language.md#truth-adr-0025): it checks the
+value's type, then for a table its count of entries and its metatable's `__bool`. M2.9 records each
+operator's edge cases and error messages here. Number-to-string conversion prints floats with enough
+digits to read back the same value, as Lua 5.5 does, using PUC-Rio's exact rules, which M2.9 records
+here.
 
 ## Metamethods
 
 Every event in §2.4 of the manual is supported: arithmetic, bitwise, `__len`, `__eq`, `__lt`,
 `__le`, `__index`, `__newindex`, `__call`, `__close`, `__gc`, `__mode`, `__name`, `__tostring`,
-`__metatable`, and `__pairs`, apart from `__concat`, which went with `..`. `__contains` is new, for
-`in` (ADR-0024: the details Python's operators and 0-based indexes leave open). A chain of
+`__metatable`, and `__pairs`, apart from `__concat`, which went with `..`. Three are new:
+`__contains`, for `in` (ADR-0024: the details Python's operators and 0-based indexes leave open),
+and `__bool`, for truth, and `__format`, for an f-string field with a spec (ADR-0026, proposed:
+the details of f-strings, locals, collections, and truth). A chain of
 `__index` or `__newindex` tables stops at PUC-Rio Lua 5.5.1's limit, with its message, which M2.10
 records here. A chain of `__call` stops after 15 objects, as §8.1 of the manual says.
 

@@ -27,14 +27,15 @@ each value by its bold name. If a value still reads `[FILL IN: …]`, the rule i
 yet. Work out that value from the repository itself, and tell the user which values are missing
 so they can fill them in.
 
-- **Lua version:** two languages. Most `.lua` files here are Ferrolua scripts: Lua 5.5 with
-  Python's operators, indexes that start at 0, and ranges that stop before their end (architecture
-  decision records ADR-0001 and ADR-0023 in `docs/decisions.md`). Write them by this rule, with the
-  changes `docs/specs/language.md` makes, which win where the two disagree: `**` for powers, `^`
-  for XOR, `!=`, `+` to join strings, no conversion between strings and numbers, and positions
-  from 0. The files in each `reference/` folder are plain Lua 5.5, for PUC-Rio Lua 5.5.1, the
-  reference interpreter: the twin of each conformance script and benchmark, which must make the
-  same calls and print the same output
+- **Lua version:** two languages. Most `.lua` files here are Ferrolua scripts: Lua 5.5 with Python's
+  operators, indexes that start at 0, and ranges that stop before their end (architecture decision
+  records ADR-0001 and ADR-0023 in `docs/decisions.md`). Write them by this rule, with the changes
+  `docs/specs/language.md` makes, which win where the two disagree: `**` for powers, `^` for XOR,
+  `!=`, `+` to join strings, no conversion between strings and numbers, positions from 0, f-strings,
+  locals by default with `global` and `nonlocal` for outer names, lists, tuples, and sets, and
+  Python's truth (ADR-0025). The files in each `reference/` folder are plain Lua 5.5, for PUC-Rio
+  Lua 5.5.1, the reference interpreter: the twin of each conformance script and benchmark, which
+  must make the same calls and print the same output
 - **Host:** Ferrolua itself, which provides the standard libraries and whatever an embedding host
   registers. The Lua 5.5 twins run on PUC-Rio's standalone `lua` 5.5.1 interpreter, to record the
   output Ferrolua must match

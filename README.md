@@ -11,8 +11,9 @@ yet. The next task is M0.1 in the [roadmap](docs/roadmap.md), which creates the 
 
 ## What is planned
 
-- **A language derived from Lua 5.5:** Lua's statements, values, and libraries, with Python's
-  operators, indexes that start at 0, and ranges that stop before their end, as the
+- **A language derived from Lua 5.5:** Lua's statements, tables, and libraries, with Python's
+  operators, indexes that start at 0, ranges that stop before their end, f-strings, locals by
+  default, lists, tuples, and sets, and rule for which values are false, as the
   [language spec](docs/specs/language.md) defines them. Where the language keeps Lua 5.5's
   behavior, a script will print what PUC-Rio Lua 5.5.1, the reference interpreter, prints for the
   same code written in Lua, apart from the differences the [decision log](docs/decisions.md)

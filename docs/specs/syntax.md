@@ -19,20 +19,34 @@ that a parser written only for the compiler wouldn't have.
 
 ## Source and spans
 
-Lua source is bytes, not necessarily UTF-8, so every position is a byte offset.
+Lua source is bytes, not necessarily UTF-8, so every position is a byte offset, and every column
+counts bytes. Built in M1.1 as described here:
 
 ```rust
-pub struct SourceId(u32);
-pub struct Span { pub source: SourceId, pub start: u32, pub end: u32 }
+pub const MAX_SOURCE_LEN: u32 = u32::MAX - 1;
+
+pub struct SourceId(u32);   // SourceId::new(index) makes one, and id.index() reads it back
+pub struct Span { pub source: SourceId, pub start: u32, pub end: u32 }   // end excluded
 pub struct LineMap { /* byte offsets of line starts */ }
 
 impl LineMap {
-    pub fn line_col(&self, offset: u32) -> (u32, u32);   // 1-based, columns in bytes
+    pub fn new(source: &[u8]) -> Result<LineMap, Error>;   // Error::SourceTooLong
+    pub fn line_col(&self, offset: u32) -> (u32, u32);    // 1-based, columns in bytes
 }
 ```
 
-Lines end at `\n`, `\r`, `\r\n`, or `\n\r`, as PUC-Rio's lexer counts them. A source longer than
-`u32::MAX` bytes is rejected before lexing.
+Lines end at `\n`, `\r`, `\r\n`, or `\n\r`, as `inclinenumber` in PUC-Rio Lua 5.5.1's `llex.c`
+counts them: it takes the other byte of a pair along when it comes next, so `\n\n` and `\r\r` end
+two lines. A line break belongs to the line it ends, so the end of a source that ends with one is
+on an empty last line. `line_col` gives an offset past the end of the source the position of the
+end, so an offset from damaged input can't make it panic.
+
+A source longer than `MAX_SOURCE_LEN` bytes is rejected before lexing: `LineMap::new` returns
+`Error::SourceTooLong`. The limit is one byte below `u32::MAX`, so that every offset, the end of
+the source included, and every 1-based line and column fit in a `u32`. In a source of `u32::MAX`
+bytes with no line break, the column just past the last byte would be `2^32`. The source size
+limit of [`sandbox.md`](sandbox.md#limits), 16 MB by default, is far lower; M1.8, the task that
+adds the parser's size and nesting limits, will enforce it.
 
 ## Lexer
 
@@ -120,6 +134,8 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
 5. Nesting one level past PUC-Rio Lua 5.5.1's limit stops with PUC-Rio's message.
 6. Every expression groups as the precedence table says ([`language.md`](language.md#invariants),
    invariant 1).
+7. The line map gives every byte offset the line that PUC-Rio Lua 5.5.1's lexer counts for it, for
+   any bytes, valid UTF-8 or not, and a source longer than `MAX_SOURCE_LEN` bytes is rejected.
 
 ## Tests
 
@@ -132,3 +148,8 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
 - Invariant 5: hostile-input tests at the limit and one level past it, for blocks, parentheses,
   tables, and function bodies.
 - Invariant 6: the precedence property test (M1.5).
+- Invariant 7: `crates/syntax/tests/source.rs` checks the line and column of every offset of every
+  source of up to seven bytes made from `a`, `\n`, `\r`, and 0xFF, a byte that never appears in
+  valid UTF-8, against a model of `inclinenumber`. It also checks each line ending and a source of
+  `u32::MAX` bytes, and unit tests in `crates/syntax/src/source.rs` check the length limit at
+  `MAX_SOURCE_LEN` and one byte past it.

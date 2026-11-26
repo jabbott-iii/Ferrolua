@@ -252,7 +252,21 @@ on every pull request; the owner has made the jobs required.
 Lua 5.5.1 uses wherever the syntax is Lua's, and prints a lossless tree, which every later tool
 builds on.
 
-- [ ] **M1.1 — syntax: source text, spans, and line maps**
+- [x] **M1.1 — syntax: source text, spans, and line maps**
+  - Note: Built on 2026-11-25. `crates/syntax/src/source.rs` holds `SourceId`, with `new` and
+    `index`; `Span`, with public fields and its end excluded; `LineMap`, with `new` and `line_col`;
+    and `MAX_SOURCE_LEN`. `crates/syntax/src/error.rs` holds the crate's error enum, `Error`, whose
+    one variant so far is `SourceTooLong`.
+  - Note: `MAX_SOURCE_LEN` is `u32::MAX - 1` bytes, one byte less than the spec first said. In a
+    source of `u32::MAX` bytes with no line break, the column just past the end would be `2^32`,
+    which a `u32` can't hold. `line_col` gives an offset past the end the position of the end, so
+    it never panics.
+  - Note: The line counting follows `inclinenumber` in Lua 5.5.1's `llex.c`, read on lua.org on
+    2026-11-25. `crates/syntax/tests/source.rs` checks the line map against a model of it on all
+    21,845 sources of up to seven bytes made from `a`, `\n`, `\r`, and 0xFF. The project has no
+    mutation tool, so the change was checked by hand: each of nine edits to `source.rs`, such as
+    pairing `\n\n`, dropping the clamp at the end, or moving the length limit, failed at least one
+    test.
   - Depends: M0.1
   - Do:
     - Build `Span`, `SourceId`, and `LineMap`, as [`specs/syntax.md`](specs/syntax.md#source-and-spans)
@@ -268,6 +282,13 @@ builds on.
   - Note: 2026-11-24, the owner's choice (ADR-0025): the lexer also reads f-strings.
   - Note: 2026-11-24, the owner accepted ADR-0026 (the details of f-strings, locals by default,
     collections, and truth), which sets the `f` prefix and keeps `[[` a long string.
+  - Note (from M1.1): `LineMap::new` already rejects a source longer than `MAX_SOURCE_LEN` with
+    `Error::SourceTooLong`, so a lexer that builds the line map first needn't check the length
+    again. In Lua 5.5.1, `inclinenumber` stops with `chunk has too many lines` when the line
+    number reaches `INT_MAX`. `luaL_loadfilex`, in `lauxlib.c`, skips a UTF-8 byte order mark, then
+    a first line that starts with `#` up to the first `\n` only, and puts a `\n` in its place. So a
+    lone `\r` in that line doesn't end a line for PUC-Rio, though `LineMap` counts it, and how the
+    lexer skips the line decides which count Lunaferra keeps.
   - Depends: M1.1
   - Do:
     - Build the lexer of [`specs/syntax.md`](specs/syntax.md#lexer), with trivia on every token.

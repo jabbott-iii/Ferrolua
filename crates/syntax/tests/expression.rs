@@ -9,8 +9,8 @@
 
 use lunaferra_syntax::ast::{AstNode, Chunk, CompareOp, Expr, FStringPart, Stat, TableField};
 use lunaferra_syntax::{
-    Event, Lexed, NodeKind, Origin, ParseError, ParseErrorKind, SourceId, Span, SyntaxElement,
-    SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse, source_errors,
+    Event, Lexed, Limits, NodeKind, Origin, ParseError, ParseErrorKind, SourceId, Span,
+    SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse, source_errors,
 };
 use lunaferra_testkit::{Config, Source};
 
@@ -19,7 +19,8 @@ use TokenKind as T;
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Parses `source` and builds its tree, which the parser's events must always make.

@@ -3,8 +3,8 @@
 //! the round trip from tokens and trivia back to the source on generated input.
 
 use lunaferra_syntax::{
-    Error, LexError, LexErrorKind, Lexed, Near, Number, Origin, SourceId, Span, TokenKind,
-    TriviaKind, lex, numeral_value,
+    Error, LexError, LexErrorKind, Lexed, Limits, MAX_SOURCE_LEN, Near, Number, Origin, SourceId,
+    Span, TokenKind, TriviaKind, lex, numeral_value,
 };
 use lunaferra_testkit::Config;
 
@@ -12,12 +12,14 @@ use TokenKind as T;
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Lexes `source` as a file.
 fn lexed_file(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::File).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::File, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Returns the bytes of `span` in `source`.
@@ -735,7 +737,7 @@ fn gives_back_a_program_from_its_tokens_and_trivia() {
     let source = b"#!x\n\xEF\xBB\xBF local t = { [1] = \"a\\z\n b\", f\"{x!r:>8} {{\" }\r\n\
                    -- done\n--[[ end ]]  ";
     for origin in [Origin::String, Origin::File] {
-        let lexed = lex(source, SourceId::new(3), origin).unwrap();
+        let lexed = lex(source, SourceId::new(3), origin, &Limits::default()).unwrap();
         assert_eq!(round_trip(&lexed, source), source);
         let last = lexed.tokens().last().unwrap();
         let len = u32::try_from(source.len()).unwrap();
@@ -824,12 +826,18 @@ fn reads_a_strings_first_bytes_as_code() {
 #[test]
 fn rejects_a_source_one_byte_longer_than_the_limit() {
     // As in `tests/source.rs`, the zeroed memory is mapped lazily, and the lexer checks the
-    // length before it reads a byte.
+    // length before it reads a byte. Only the trusted limits reach this length. The source is a
+    // file whose first line, which starts with `#`, is all of it, so a lexer that failed to refuse
+    // it would read it as one skipped line, not as 4 GB of tokens that exhaust memory.
     let len = usize::try_from(u32::MAX).unwrap();
-    let source = vec![0_u8; len];
+    let mut source = vec![0_u8; len];
+    source[0] = b'#';
     assert_eq!(
-        lex(&source, SourceId::new(0), Origin::String),
-        Err(Error::SourceTooLong { len })
+        lex(&source, SourceId::new(0), Origin::File, &Limits::trusted()),
+        Err(Error::SourceTooLong {
+            len,
+            limit: MAX_SOURCE_LEN
+        })
     );
 }
 
@@ -1384,7 +1392,7 @@ fn gives_back_every_generated_source_from_its_tokens_and_trivia() {
         },
         |bytes| {
             for origin in [Origin::String, Origin::File] {
-                let lexed = lex(bytes, SourceId::new(0), origin).unwrap();
+                let lexed = lex(bytes, SourceId::new(0), origin, &Limits::default()).unwrap();
                 if round_trip(&lexed, bytes) != *bytes {
                     return Err(format!("{origin:?} round trip"));
                 }

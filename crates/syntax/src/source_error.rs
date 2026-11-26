@@ -88,11 +88,11 @@ impl fmt::Display for SourceError<'_> {
 /// # Examples
 ///
 /// ```
-/// use lunaferra_syntax::{Origin, SourceId, lex, parse, source_errors};
+/// use lunaferra_syntax::{Limits, Origin, SourceId, lex, parse, source_errors};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let source = b"x = = 1\ny = 0x\nz = = 3\n";
-/// let lexed = lex(source, SourceId::new(0), Origin::String)?;
+/// let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 /// let events = parse(source, &lexed);
 /// let errors: Vec<String> = source_errors(&lexed, &events)
 ///     .iter()
@@ -149,11 +149,11 @@ pub fn source_errors<'a>(lexed: &'a Lexed, events: &'a [Event]) -> Vec<SourceErr
 /// # Examples
 ///
 /// ```
-/// use lunaferra_syntax::{Origin, SourceId, diagnostics, lex, parse};
+/// use lunaferra_syntax::{Limits, Origin, SourceId, diagnostics, lex, parse};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let source = b"if x ~= 1 then\n  y = 1\n";
-/// let lexed = lex(source, SourceId::new(0), Origin::String)?;
+/// let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 /// let found = diagnostics(&lexed, &parse(source, &lexed));
 /// let codes: Vec<String> = found.iter().map(|found| found.code.to_string()).collect();
 /// assert_eq!(codes, ["P0026", "P0014"]);
@@ -259,7 +259,7 @@ impl LexErrorKind {
 }
 
 impl ParseErrorKind {
-    /// Returns the `P` code of this kind of error, from `P0013` to `P0027`, as the registry of
+    /// Returns the `P` code of this kind of error, from `P0013` to `P0028`, as the registry of
     /// the diagnostics spec lists them.
     pub(crate) const fn code(&self) -> Code {
         match self {
@@ -278,6 +278,7 @@ impl ParseErrorKind {
             Self::LuaConcatenation => p(25),
             Self::LuaNotEqual => p(26),
             Self::LuaBitwiseXor => p(27),
+            Self::NestingTooDeep => p(28),
         }
     }
 }
@@ -304,7 +305,7 @@ mod tests {
     ];
 
     /// One error of each syntax kind, in the order of their codes.
-    fn syntax() -> [ParseErrorKind; 15] {
+    fn syntax() -> [ParseErrorKind; 16] {
         [
             ParseErrorKind::Expected(TokenKind::End),
             ParseErrorKind::Unclosed {
@@ -327,6 +328,7 @@ mod tests {
             ParseErrorKind::LuaConcatenation,
             ParseErrorKind::LuaNotEqual,
             ParseErrorKind::LuaBitwiseXor,
+            ParseErrorKind::NestingTooDeep,
         ]
     }
 
@@ -339,7 +341,7 @@ mod tests {
 
     #[test]
     fn numbers_the_kinds_from_p0001_in_order() {
-        let expected: Vec<String> = (1..=27).map(|number| format!("P{number:04}")).collect();
+        let expected: Vec<String> = (1..=28).map(|number| format!("P{number:04}")).collect();
         assert_eq!(codes(), expected);
     }
 

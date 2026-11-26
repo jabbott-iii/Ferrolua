@@ -28,11 +28,11 @@ use crate::{Error, Event, Lexed, NodeKind, Span, Token, TokenKind, Trivia};
 ///
 /// ```
 /// use lunaferra_syntax::ast::{AstNode, Chunk};
-/// use lunaferra_syntax::{Event, NodeKind, Origin, SourceId, SyntaxTree, lex};
+/// use lunaferra_syntax::{Limits, Event, NodeKind, Origin, SourceId, SyntaxTree, lex};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let source = b"-- a comment\nx\n";
-/// let lexed = lex(source, SourceId::new(0), Origin::String)?;
+/// let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 /// let [name, eof] = lexed.tokens() else {
 ///     return Err("`x` is one token, then the end".into());
 /// };

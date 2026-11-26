@@ -56,7 +56,7 @@ pub use error::{ParseError, ParseErrorKind};
 
 use crate::lexer::string_as_read;
 use crate::source_error::token_of;
-use crate::{Event, LexErrorKind, Lexed, Near, NodeKind, Span, Token, TokenKind};
+use crate::{Event, LexErrorKind, Lexed, MAX_DEPTH, Near, NodeKind, Span, Token, TokenKind};
 
 /// Reads the tokens of `source`, which `lexed` holds, and returns the events of its tree.
 ///
@@ -79,17 +79,17 @@ use crate::{Event, LexErrorKind, Lexed, Near, NodeKind, Span, Token, TokenKind};
 /// # Examples
 ///
 /// ```
-/// use lunaferra_syntax::{Event, Origin, SourceId, SyntaxTree, lex, parse};
+/// use lunaferra_syntax::{Limits, Event, Origin, SourceId, SyntaxTree, lex, parse};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let source = b"local x = 1\nif x then print(x) end\n";
-/// let lexed = lex(source, SourceId::new(0), Origin::String)?;
+/// let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 /// let events = parse(source, &lexed);
 /// let tree = SyntaxTree::build(source, &lexed, &events)?;
 /// assert_eq!(tree.root().text(), source);
 ///
 /// let broken = b"if x then\nprint(x\nend\ny = = 1\n";
-/// let lexed = lex(broken, SourceId::new(1), Origin::String)?;
+/// let lexed = lex(broken, SourceId::new(1), Origin::String, &Limits::default())?;
 /// let errors: Vec<String> = parse(broken, &lexed)
 ///     .iter()
 ///     .filter_map(|event| match event {
@@ -148,6 +148,12 @@ struct Parser<'s> {
     /// The `if` statement that starts with the `if` and the condition read last after an
     /// expression, until the statement that holds the expression is finished.
     pending_if: Option<PendingIf>,
+    /// How many levels of nesting the parser is inside, counted as [`MAX_DEPTH`] says.
+    depth: u32,
+    /// Whether the parser reported `C stack overflow` and hasn't started a statement below the
+    /// limit since, so that one nesting too deep gets one error, not one for each statement or
+    /// operand past the limit.
+    too_deep: bool,
 }
 
 /// The start of an `if` statement that the parser read after an expression, as the start of a
@@ -315,6 +321,8 @@ impl<'s> Parser<'s> {
                 loops: 0,
             }],
             pending_if: None,
+            depth: 0,
+            too_deep: false,
         }
     }
 
@@ -549,14 +557,15 @@ impl<'s> Parser<'s> {
     }
 
     /// Reports `kind` at the current token, on the line where it ends, with `near` after the
-    /// message, then recovers, skipping as `skip` says.
+    /// message, then recovers, skipping as `skip` says, and returns whether it reported the
+    /// error.
     ///
     /// Nothing is reported while the parser is unwinding, where the last recovery stopped, or at
     /// a token that holds a lexical error. The parser still recovers from the last two, because
     /// the token it found there is still wrong.
-    fn error_with(&mut self, kind: ParseErrorKind, near: Option<Near>, skip: Skip) {
+    fn error_with(&mut self, kind: ParseErrorKind, near: Option<Near>, skip: Skip) -> bool {
         if self.unwinding {
-            return;
+            return false;
         }
         let quiet = self.recovered_at == Some(self.pos) || self.holds_lexical_error(self.pos);
         if !quiet {
@@ -569,6 +578,7 @@ impl<'s> Parser<'s> {
             }));
         }
         self.recover(skip, !quiet);
+        !quiet
     }
 
     /// Reports `kind` near the current token, on the line where it ends, without recovering:
@@ -628,6 +638,35 @@ impl<'s> Parser<'s> {
             // Every other token, Lunaferra's own among them, is written as its bytes.
             _ => Some(Near::Text(text.to_vec())),
         }
+    }
+
+    // Nesting.
+
+    /// Counts one more level of nesting, as PUC-Rio's `enterlevel` does, and returns whether the
+    /// parser may read it.
+    ///
+    /// One level past [`MAX_DEPTH`] is `C stack overflow` at the current token, which isn't
+    /// counted: the recovery skips that token at least, so the parser always moves on, and
+    /// unwinds to a shallower level. The caller reads nothing more there. Until the parser starts
+    /// a statement below the limit, each later try is refused the same way without another error,
+    /// so the statements of a 198th block, or the elements of a list that recovery goes on in,
+    /// add none.
+    fn enter(&mut self) -> bool {
+        if self.depth < MAX_DEPTH {
+            self.depth += 1;
+            return true;
+        }
+        if !self.too_deep {
+            self.too_deep = self.error_with(ParseErrorKind::NestingTooDeep, None, Skip::AtLeastOne);
+        } else if !self.unwinding {
+            self.recover(Skip::AtLeastOne, false);
+        }
+        false
+    }
+
+    /// Leaves `levels` levels of nesting that [`Parser::enter`] counted.
+    fn leave(&mut self, levels: u32) {
+        self.depth = self.depth.saturating_sub(levels);
     }
 
     // Recovery.

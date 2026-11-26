@@ -45,8 +45,8 @@ A source longer than `MAX_SOURCE_LEN` bytes is rejected before lexing: `LineMap:
 `Error::SourceTooLong`. The limit is one byte below `u32::MAX`, so that every offset, the end of
 the source included, and every 1-based line and column fit in a `u32`. In a source of `u32::MAX`
 bytes with no line break, the column just past the last byte would be `2^32`. The source size
-limit of [`sandbox.md`](sandbox.md#limits), 16 MB by default, is far lower; M1.8, the task that
-adds the parser's size and nesting limits, will enforce it.
+limit of [`sandbox.md`](sandbox.md#limits), 16 MB by default, is far lower, and `lex` enforces it,
+as [Limits](#limits) describes.
 
 ## Lexer
 
@@ -75,7 +75,8 @@ Built in M1.2 as described here:
 
 ```rust
 pub enum Origin { File, String }   // a file skips its byte order mark and `#` line
-pub fn lex(source: &[u8], id: SourceId, origin: Origin) -> Result<Lexed, Error>;   // SourceTooLong
+pub fn lex(source: &[u8], id: SourceId, origin: Origin, limits: &Limits)
+    -> Result<Lexed, Error>;   // Error::SourceTooLong { len, limit }
 
 pub struct Lexed { /* tokens, trivia, errors, and the line map */ }
 impl Lexed {
@@ -158,8 +159,10 @@ Two of `llex.c`'s errors aren't reproduced, because each needs a source of gigab
 can build. `chunk has too many lines` needs 2^31 − 1 lines, so a source of at least 2 GB.
 `lexical element too long` needs a token of two thirds of PUC-Rio's `MAX_SIZE`: about 2.9 GB on a
 32-bit target such as the web, and more than any source on a 64-bit one. Both are far past the
-16 MB source limit of [`sandbox.md`](sandbox.md#limits), but within `Options::trusted()`, which
-sets none; M1.8, the task that enforces the source limit, decides how to handle them.
+16 MB source limit of [`sandbox.md`](sandbox.md#limits), and within `Limits::trusted()` the lexer
+gives neither, an intended difference (the owner's choice, 2026-11-26): its lines are `u32` values,
+and it keeps no buffer for a token, so it reads every source up to `MAX_SOURCE_LEN` bytes
+correctly. Writing the errors would add code that no test can run.
 
 ## Parser and events
 
@@ -328,9 +331,54 @@ ends after the error starts, and a lexical error before a syntax error at the sa
 error it gives is the one PUC-Rio reports, so `x = 1 0x` gives `malformed number near '0x'`, while
 `@ 0x` gives `unexpected symbol near '@'`.
 
-From M1.8, a depth counter will stop nesting at PUC-Rio Lua 5.5.1's limit, with its message,
-and M1.8 records both here. Until then, the parser calls itself once for each level of a nested
-block or expression, with no limit.
+### Limits
+
+Reading a source is bounded twice, as [`sandbox.md`](sandbox.md#limits) asks (ADR-0041: 197 levels
+of nesting everywhere, and a host's limit on a source's length). Built in M1.8 as described here:
+
+```rust
+pub const MAX_DEPTH: u32 = 197;   // levels of nesting, which no host can raise
+
+#[non_exhaustive]
+pub struct Limits { pub source_len: u32 }   // the longest source, in bytes
+impl Default for Limits { /* source_len: 16 MB, 16,777,216 bytes */ }
+impl Limits { pub const fn trusted() -> Limits; /* source_len: MAX_SOURCE_LEN */ }
+```
+
+`lex` refuses a source longer than `limits.source_len` bytes, or than `MAX_SOURCE_LEN` when the
+limit is higher, with `Error::SourceTooLong { len, limit }`, before it reads a byte (the owner's
+choice, 2026-11-26, of a `Limits` argument over a second function). Reading a long source of dense
+code takes memory of its own: 16 MB of `x = f(a, "s") + t.k[1] * 2` makes 10.5 million tokens and
+31.7 million events of 64 bytes each, and a debug build peaks at 4.6 GB parsing it, which M1.11
+reduces.
+
+The parser counts levels of nesting where PUC-Rio Lua 5.5.1's `lparser.c` calls `enterlevel`, so
+each construct of Lua's syntax nests as deeply as it does there: one level for each statement,
+`return` included, and each call of the operand-reading function that mirrors `subexpr`; one for
+each target of an assignment after the first, as `restassign` counts; and one for each name of a
+`global` declaration with values, as `initglobal` counts. Lunaferra's own syntax adds one: the
+value after a conditional expression's `else`, which a call of its own reads. Lists, tuples,
+f-strings' fields, and a conditional's condition are read by that operand function, so they
+count through it.
+
+PUC-Rio stops at 200 nested C calls with `C stack overflow`. Two are in use when a script's `load`
+reads a chunk, so 197 levels parse there, and one level more stops (the owner's choice,
+2026-11-26, of that count everywhere, with no setting). PUC-Rio allows 198 for a file that `lua`
+runs, and one fewer for each C call, such as `pcall`, around `load`, which Lunaferra doesn't
+reproduce. No host can raise the limit, because the parser calls itself for each level, and a
+call stack that overflows ends the process. At 197 levels, a debug build on x86-64 Linux needs at
+most 208 KB of stack, for tuples, and 192 KB for parentheses and calls, as measured on 2026-11-26,
+and the tests also run each construct at its limit on a thread with a 256 KB stack, as ADR-0028
+(the targets, host services, math, and tests of the six platforms) asks.
+
+One level past the limit is a `ParseErrorKind::NestingTooDeep` at the token the parser would have
+read next, with PUC-Rio's message and no `near`. The level isn't counted, and recovery skips that
+token at least, so the parser always moves on, then unwinds as after any other error. Until the
+parser starts a statement below the limit, each later try at a level too deep is refused the same
+way without another error, so the statements of a 198th block, or the elements of a tuple that
+recovery goes on in, add none. Only a nesting that starts anew after recovery reports again:
+25,000 nested function expressions give one error for each 100, because after each the recovery
+goes on at the main chunk.
 
 ## Lossless tree
 
@@ -644,6 +692,10 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   `luaX_token2str` does, such as `<name>` and `<eof>`. With `(to close Y at line N)`, it names the
   construct a missing `end`, `until`, or `)` closes, when that construct opened on an earlier
   line.
+- `C stack overflow`, for nesting too deep, is a runtime error of `load` in PUC-Rio, from
+  `lstate.c`, so it has no `near`, and `load` writes it with no chunk name or line before it.
+  PUC-Rio's `lua` adds a traceback to it through its message handler. Its `ParseError` still has
+  the line where its token ends, for the tools.
 
 ## Invariants
 
@@ -668,13 +720,18 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
     holds a lexical error.
 11. The first error that `source_errors` gives is the one PUC-Rio Lua 5.5.1 reports for the same
     source, wherever the syntax is Lua's.
+12. `lex` refuses a source one byte longer than its limit, before it reads a byte, and accepts one
+    at the limit.
 
 ## Tests
 
 - Invariants 1 and 2: the `lexer` and `parser` fuzz targets check the round trip and the absence of
-  panics on generated and mutated input, and a hostile-input test checks time on inputs from 1 KB to
-  16 MB, including 100,000 nested parentheses. Until those land (M1.8, M1.9),
-  `crates/syntax/tests/lexer.rs` checks the lexer's half of invariant 1: a property test writes
+  panics on generated and mutated input. `crates/syntax/tests/hostile_syntax.rs` checks that the
+  time to lex and parse grows in proportion to the size, from 64 KB to 1 MB, for seven kinds of
+  input: ordinary code, a broken line repeated, nesting at the limit, parentheses and blocks far
+  past it, f-strings, and long strings and comments. It also parses a 16 MB source of few tokens,
+  and each construct nested 25,000 levels deep, and checks each tree's round trip. Until the fuzz
+  targets land (M1.9), `crates/syntax/tests/lexer.rs` checks the lexer's half of invariant 1: a property test writes
   out the tokens and trivia of 5,000 generated sources, lexed both as a string and as a file, and
   compares them with the source, and other tests do the same for every conformance script and for
   100,000 nested f-strings. `crates/syntax/tests/tree.rs` checks the tree's half: a property test
@@ -709,8 +766,15 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   [`language.md`](language.md) records. A property test parses 2,000 generated programs of every
   statement and every expression, and checks that none has an error, and other tests check that
   each form PUC-Rio accepts parses, and to which nodes.
-- Invariant 5: hostile-input tests at the limit and one level past it, for blocks, parentheses,
-  tables, and function bodies.
+- Invariant 5: `crates/syntax/tests/hostile_syntax.rs` nests each of 19 constructs of Lua's syntax
+  to the deepest that `load` accepted on PUC-Rio Lua 5.5.1 on 2026-11-26, called from a script's
+  main chunk, and one level more: parentheses, `do`, `while`, `if`, and `repeat` blocks, a `return`
+  in blocks, tables, table fields, function expressions and statements, local functions, unary
+  `-`, `not`, `**`, calls, indexes, call statements, assignment targets, and `global` names. It does
+  the same for lists, tuples, f-strings, and conditional expressions, at the depth the rule gives
+  them, on the test's own thread and on one with a 256 KB stack, and checks the error's kind,
+  message, span, and line, its code `P0028`, that the parser goes on after it, and that a nesting
+  far past the limit gives one error.
 - Invariant 6: a property test in `crates/syntax/tests/expression.rs` generates 3,000 expressions
   from the grammar of [`language.md`](language.md#precedence), with every operator, `not`, chained
   comparisons, conditional expressions, and parentheses, and writes beside each the grouping that
@@ -724,6 +788,11 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   `u32::MAX` bytes, and unit tests in `crates/syntax/src/source.rs` check the length limit at
   `MAX_SOURCE_LEN` and one byte past it. `crates/syntax/tests/lexer.rs` checks the count after a
   file's skipped first line that holds a `\r`, as PUC-Rio gave it for such a file.
+- Invariant 12: `crates/syntax/tests/hostile_syntax.rs` lexes a source of 16 MB under the default
+  limits and refuses one byte more, which `Limits::trusted()` accepts, checks a host's limit of 0,
+  and refuses a source longer than `MAX_SOURCE_LEN` under a higher limit. Each source of 4 GB in the
+  tests is a file whose `#` line is all of it, so a lexer that failed to refuse it would read one
+  skipped line, not exhaust memory.
 - Invariant 8: unit tests in `crates/syntax/src/lexer/numeral.rs` compare 19 hexadecimal floats
   near the limits and ties of rounding with the bits PUC-Rio Lua 5.5.1 gave them, read back 2,000
   floats written exactly in hexadecimal, and compare 2,000 more of 65 to 128 bits, half of them

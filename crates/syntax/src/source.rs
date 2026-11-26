@@ -92,21 +92,22 @@ impl LineMap {
     ///
     /// Returns [`Error::SourceTooLong`] if `source` is longer than [`MAX_SOURCE_LEN`] bytes.
     pub fn new(source: &[u8]) -> Result<Self, Error> {
-        Self::counting_from(source, 0)
+        let len = checked_len(source.len(), MAX_SOURCE_LEN)?;
+        Ok(Self::counting_from(source, 0, len))
     }
 
-    /// Builds the line map of `source` as [`LineMap::new`] does, except that the bytes before
-    /// offset `from` are all on line 1, whatever they hold.
+    /// Builds the line map of `source`, whose length `len` [`checked_len`] gave, as
+    /// [`LineMap::new`] does, except that the bytes before offset `from` are all on line 1,
+    /// whatever they hold.
     ///
     /// PUC-Rio Lua 5.5.1 reads a file whose first line starts with `#` as if that line, up to
     /// its first `\n`, were empty, so a lone `\r` in it ends no line. The lexer builds the line
     /// map of such a file with `from` at that `\n`. `from` past the end counts no line breaks.
-    pub(crate) fn counting_from(source: &[u8], from: usize) -> Result<Self, Error> {
-        let len = checked_len(source.len())?;
-        Ok(Self {
+    pub(crate) fn counting_from(source: &[u8], from: usize, len: u32) -> Self {
+        Self {
             starts: line_starts(source, from, len),
             len,
-        })
+        }
     }
 
     /// Returns the line and the column of the byte at `offset`, both counted from 1, with the
@@ -131,11 +132,12 @@ impl LineMap {
     }
 }
 
-/// Returns `len` as a `u32`, or the error for a source longer than [`MAX_SOURCE_LEN`] bytes.
-fn checked_len(len: usize) -> Result<u32, Error> {
+/// Returns `len`, a source's length, as a `u32`, or the error for a source longer than `limit`
+/// bytes, which must be at most [`MAX_SOURCE_LEN`].
+pub(crate) fn checked_len(len: usize, limit: u32) -> Result<u32, Error> {
     match u32::try_from(len) {
-        Ok(fits) if fits <= MAX_SOURCE_LEN => Ok(fits),
-        _ => Err(Error::SourceTooLong { len }),
+        Ok(fits) if fits <= limit => Ok(fits),
+        _ => Err(Error::SourceTooLong { len, limit }),
     }
 }
 
@@ -179,32 +181,56 @@ mod tests {
     #[test]
     fn accepts_a_source_of_max_source_len_bytes() {
         let len = usize::try_from(MAX_SOURCE_LEN).unwrap();
-        assert_eq!(checked_len(len), Ok(MAX_SOURCE_LEN));
+        assert_eq!(checked_len(len, MAX_SOURCE_LEN), Ok(MAX_SOURCE_LEN));
     }
 
     #[test]
     fn accepts_an_empty_source() {
-        assert_eq!(checked_len(0), Ok(0));
+        assert_eq!(checked_len(0, MAX_SOURCE_LEN), Ok(0));
     }
 
     #[test]
     fn rejects_a_source_one_byte_longer_than_max_source_len() {
         let len = usize::try_from(u32::MAX).unwrap();
-        assert_eq!(checked_len(len), Err(Error::SourceTooLong { len }));
+        assert_eq!(
+            checked_len(len, MAX_SOURCE_LEN),
+            Err(Error::SourceTooLong {
+                len,
+                limit: MAX_SOURCE_LEN
+            })
+        );
+    }
+
+    #[test]
+    fn accepts_a_source_at_a_lower_limit_and_rejects_one_byte_more() {
+        assert_eq!(checked_len(16, 16), Ok(16));
+        assert_eq!(
+            checked_len(17, 16),
+            Err(Error::SourceTooLong { len: 17, limit: 16 })
+        );
     }
 
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn rejects_a_source_too_long_for_a_u32() {
         let len = usize::try_from(u64::from(u32::MAX) + 1).unwrap();
-        assert_eq!(checked_len(len), Err(Error::SourceTooLong { len }));
+        assert_eq!(
+            checked_len(len, MAX_SOURCE_LEN),
+            Err(Error::SourceTooLong {
+                len,
+                limit: MAX_SOURCE_LEN
+            })
+        );
     }
 
     #[test]
     fn rejects_a_source_of_usize_max_bytes() {
         assert_eq!(
-            checked_len(usize::MAX),
-            Err(Error::SourceTooLong { len: usize::MAX })
+            checked_len(usize::MAX, MAX_SOURCE_LEN),
+            Err(Error::SourceTooLong {
+                len: usize::MAX,
+                limit: MAX_SOURCE_LEN
+            })
         );
     }
 }

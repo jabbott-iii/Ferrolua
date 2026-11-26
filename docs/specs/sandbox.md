@@ -60,13 +60,21 @@ status to the host, which the command-line tool turns into the process's exit st
 | Instructions | Bytecode instructions one call from the host runs, plus work units inside library calls and table operations | 1,000,000,000 |
 | Call depth | Nested calls, Lua and native | PUC-Rio Lua 5.5.1's limits on nested native calls and stack slots, which M3.2 records |
 | String size | Bytes in one string | `2^63 - 1`, limited by memory in practice |
-| Source size | Bytes of one chunk passed to `load` | 16 MB |
-| Nesting depth | Nested blocks and expressions in the parser | PUC-Rio Lua 5.5.1's limit, which M1.8 records |
+| Source size | Bytes of one chunk passed to `load` | 16 MB, 16,777,216 bytes |
+| Nesting depth | Nested blocks and expressions in the parser | 197 levels, PUC-Rio Lua 5.5.1's limit for `load` called from a script, which no host can raise |
 
 These defaults come from ADR-0030 (finite limits by default), so a host that sets no limits still
 bounds every script. `Options::trusted()` sets no memory, instruction, or source-size limit and
 grants every library, for a host that runs only its own scripts, and each limit error names the
-setting that raises it (M3.20).
+setting that raises it (M3.20). With no source-size limit, a chunk may still be at most
+4,294,967,294 bytes, the most `lunaferra-syntax` reads. The nesting depth has no setting, because
+the parser calls itself for each level, and a call stack that overflows would end the host's
+process (ADR-0041: 197 levels of nesting everywhere, and a host's limit on a source's length;
+[`syntax.md`](syntax.md#limits)).
+
+Reading a source takes memory that the memory limit doesn't count yet: about 290 bytes for each
+byte of dense code, so reading a 16 MB chunk of it allocates gigabytes. M1.11 cuts that cost and
+decides how the limit counts it.
 
 Library functions that can run long count their work against the instruction limit: one unit per
 byte that `string.rep`, `table.concat`, `string.format`, `string.join`, `format`, and f-string

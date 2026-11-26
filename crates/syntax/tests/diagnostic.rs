@@ -3,13 +3,14 @@
 //! Lua's operators, the order of [`source_errors`], and what a [`SourceError`] gives.
 
 use lunaferra_syntax::{
-    Code, Diagnostic, Edit, Fix, Lexed, Origin, Severity, SourceError, SourceId, Span, Tool,
-    diagnostics, lex, parse, source_errors,
+    Code, Diagnostic, Edit, Fix, Lexed, Limits, Origin, Severity, SourceError, SourceId, Span,
+    Tool, diagnostics, lex, parse, source_errors,
 };
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Returns the diagnostics of `source`.
@@ -101,7 +102,9 @@ fn gives_each_kind_of_lexical_error_its_code_message_and_span() {
 
 #[test]
 fn gives_each_kind_of_syntax_error_its_code_message_and_span() {
-    let cases: [(&[u8], Diagnostic); 13] = [
+    // The 196th `(` would start the 198th level of nesting, at the `1`.
+    let too_deep = format!("return {}1{}", "(".repeat(196), ")".repeat(196));
+    let cases: [(&[u8], Diagnostic); 14] = [
         (b"if x", error(13, "'then' expected near <eof>", 4, 4)),
         (
             b"if x then\n",
@@ -153,6 +156,7 @@ fn gives_each_kind_of_syntax_error_its_code_message_and_span() {
             b"x = a .. b",
             error(25, "'..' is not an operator: use '+' to join strings", 6, 8),
         ),
+        (too_deep.as_bytes(), error(28, "C stack overflow", 203, 204)),
     ];
     for (source, expected) in cases {
         assert_eq!(

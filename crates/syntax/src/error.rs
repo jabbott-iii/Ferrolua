@@ -3,16 +3,18 @@
 
 use std::fmt;
 
-use crate::MAX_SOURCE_LEN;
-
 /// An error from one of this crate's functions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// The source is longer than [`MAX_SOURCE_LEN`] bytes, the longest that this crate accepts.
+    /// The source is longer than the limit it was read under:
+    /// [`MAX_SOURCE_LEN`](crate::MAX_SOURCE_LEN) bytes, the longest that this crate accepts, or the [`Limits`](crate::Limits) given to
+    /// [`lex`](crate::lex).
     SourceTooLong {
         /// The length of the source, in bytes.
         len: usize,
+        /// The limit, in bytes.
+        limit: u32,
     },
     /// An event falls outside the root node: a [`Start`](crate::Event::Start) after the root
     /// is finished, or a [`Token`](crate::Event::Token), a [`Finish`](crate::Event::Finish), or
@@ -50,9 +52,9 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::SourceTooLong { len } => write!(
+            Self::SourceTooLong { len, limit } => write!(
                 f,
-                "source of {len} bytes is longer than the limit of {MAX_SOURCE_LEN} bytes"
+                "source of {len} bytes is longer than the limit of {limit} bytes"
             ),
             Self::EventOutsideRoot { event } => {
                 write!(f, "event {event} falls outside the root node")

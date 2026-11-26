@@ -6,13 +6,14 @@
 
 use lunaferra_syntax::ast::{AstNode, Chunk, Stat};
 use lunaferra_syntax::{
-    Code, Lexed, NodeKind, Origin, SourceId, SyntaxElement, SyntaxNode, SyntaxTree, TokenKind,
-    Tool, diagnostics, lex, parse, source_errors,
+    Code, Lexed, Limits, NodeKind, Origin, SourceId, SyntaxElement, SyntaxNode, SyntaxTree,
+    TokenKind, Tool, diagnostics, lex, parse, source_errors,
 };
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Parses `source`, and returns its tree, which the parser's events must always make, and each
@@ -491,7 +492,8 @@ fn recovers_from_100_000_errors_one_by_one() {
 /// Returns the text of each chunk that `tests/conformance/syntax_errors.lua` loads: the long
 /// string after each name `check`.
 fn conformance_chunks(script: &[u8]) -> Vec<Vec<u8>> {
-    let lexed = lex(script, SourceId::new(0), Origin::File).expect("the script is short");
+    let lexed = lex(script, SourceId::new(0), Origin::File, &Limits::default())
+        .expect("the script is short");
     let text = |index: usize| {
         let span = lexed.tokens()[index].span;
         let start = usize::try_from(span.start).expect("small");

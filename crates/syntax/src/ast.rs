@@ -13,11 +13,11 @@
 //!
 //! ```
 //! use lunaferra_syntax::ast::{AstNode, Block, Chunk, Expr, Stat};
-//! use lunaferra_syntax::{Origin, SourceId, SyntaxTree, TokenKind, lex, parse};
+//! use lunaferra_syntax::{Limits, Origin, SourceId, SyntaxTree, TokenKind, lex, parse};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let source = b"if ready then start(1) end";
-//! let lexed = lex(source, SourceId::new(0), Origin::String)?;
+//! let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 //! let tree = SyntaxTree::build(source, &lexed, &parse(source, &lexed))?;
 //!
 //! let chunk = Chunk::cast(tree.root()).ok_or("the root is a chunk")?;

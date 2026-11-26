@@ -4,7 +4,7 @@
 
 use super::expression::IfAfter;
 use super::{Done, Function, Lacking, Marker, ParseErrorKind, Parser, PendingIf, Skip};
-use crate::{NodeKind, Span, TokenKind};
+use crate::{MAX_DEPTH, NodeKind, Span, TokenKind};
 
 use NodeKind as N;
 use TokenKind as T;
@@ -56,18 +56,32 @@ impl Parser<'_> {
     pub(super) fn statements(&mut self) {
         loop {
             self.unwinding = false;
+            // A statement below the limit is a new place, where nesting too deep is an error again.
+            if self.depth < MAX_DEPTH {
+                self.too_deep = false;
+            }
             if let Some(pending) = self.pending_if.take() {
+                // The statement that left the `if` pending is in this block too, and its level
+                // fit, so this one does: its events are already read, and must stay in the tree.
+                self.depth = self.depth.saturating_add(1);
                 self.pending_if_stat(pending);
+                self.leave(1);
                 continue;
             }
             if self.block_ends() {
                 return;
             }
             if self.at(T::Return) {
-                self.return_stat();
+                if self.enter() {
+                    self.return_stat();
+                    self.leave(1);
+                }
                 return;
             }
-            self.statement();
+            if self.enter() {
+                self.statement();
+                self.leave(1);
+            }
         }
     }
 
@@ -80,7 +94,9 @@ impl Parser<'_> {
         )
     }
 
-    /// Reads one statement other than `return`.
+    /// Reads one statement other than `return`. Each statement, `return` and an `if` statement
+    /// that an expression left pending included, is one level of nesting, as each call of
+    /// PUC-Rio's `statement` is, which [`Parser::statements`] counts.
     fn statement(&mut self) {
         let line = self.line();
         match self.current() {
@@ -356,18 +372,27 @@ impl Parser<'_> {
             Some(attrib) => self.precede(attrib),
             None => self.start(),
         };
+        let mut names = 0;
         loop {
             let name = self.start();
             self.expect(T::Name);
             self.global_attrib();
             self.complete(name, N::AttName);
+            names += 1;
             if !self.eat(T::Comma) {
                 break;
             }
         }
         self.complete(list, N::AttNameList);
         if self.eat(T::Equal) {
+            // PUC-Rio's `initglobal` counts a level for each name before it reads the values.
+            let mut entered = 0;
+            while entered < names && self.enter() {
+                entered += 1;
+            }
+            // After a level too deep, the parser is unwinding, so the values add nothing.
             self.expr_list_before(IfAfter::ConditionalOrStatement);
+            self.leave(entered);
         }
         self.complete(stat, N::GlobalStat);
     }
@@ -466,15 +491,22 @@ impl Parser<'_> {
         }
         let list = self.precede(first);
         self.check_target(first);
+        // PUC-Rio's `restassign` counts a level after each target but the first.
+        let mut entered = 0;
         while self.eat(T::Comma) {
             if let Some(target) = self.suffixed_expr() {
                 self.check_target(target);
             }
+            if !self.enter() {
+                break;
+            }
+            entered += 1;
         }
         let targets = self.complete(list, N::ExprList);
         let stat = self.precede(targets);
         self.expect(T::Equal);
         self.expr_list_before(IfAfter::ConditionalOrStatement);
+        self.leave(entered);
         self.complete(stat, N::AssignStat);
     }
 

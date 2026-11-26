@@ -14,8 +14,8 @@ use lunaferra_syntax::compact::{
     FunctionId, List, Name, StatId, StatKind, TableField, TargetKind, UnaryOp, Vararg,
 };
 use lunaferra_syntax::{
-    CompactTree, Error, Event, Lexed, NodeKind, Number, Origin, SourceId, Span, SyntaxElement,
-    SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, numeral_value, parse,
+    CompactTree, Error, Event, Lexed, Limits, NodeKind, Number, Origin, SourceId, Span,
+    SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, numeral_value, parse,
 };
 use lunaferra_testkit::Config;
 
@@ -27,12 +27,14 @@ use NodeKind as N;
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Parses `source`, lexed with `origin`, and builds both of its trees from the same events.
 fn trees(source: &[u8], origin: Origin) -> (SyntaxTree, Result<CompactTree, Error>) {
-    let lexed = lex(source, SourceId::new(0), origin).expect("each test's source is short");
+    let lexed = lex(source, SourceId::new(0), origin, &Limits::default())
+        .expect("each test's source is short");
     let events = parse(source, &lexed);
     let lossless =
         SyntaxTree::build(source, &lexed, &events).expect("the parser's events make a tree");

@@ -599,7 +599,36 @@ builds on.
     - For generated valid programs, the compact tree matches the lossless tree's structure.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.8 — syntax: size and nesting limits**
+- [x] **M1.8 — syntax: size and nesting limits**
+  - Note: Built on 2026-11-26. `crates/syntax/src/limits.rs` holds `Limits`, whose `source_len` is
+    16 MB by default and `MAX_SOURCE_LEN` under `Limits::trusted()`, and `MAX_DEPTH`, 197.
+    `lex(source, id, origin, &limits)` refuses a longer source before it reads a byte, with
+    `Error::SourceTooLong { len, limit }`, and the parser counts levels where `lparser.c` calls
+    `enterlevel`, plus one for each conditional's `else` value, and stops one level past the limit
+    with `ParseErrorKind::NestingTooDeep`, `C stack overflow`, code `P0028`, as
+    [`specs/syntax.md`](specs/syntax.md#limits) describes.
+  - Note: 2026-11-26, the owner's choices, which ADR-0041 records: the limit is 197 levels
+    everywhere, the count for `load` from a script's main chunk, with no host setting, though
+    PUC-Rio allows 198 for a file `lua` runs and one fewer for each C call around `load`; the
+    source limit reaches the lexer as a `Limits` argument of `lex`; the lexer gives neither `chunk
+    has too many lines` nor `lexical element too long`, an intended difference for sources of
+    gigabytes; and the 16 MB criterion is checked on inputs of few tokens, with M1.11 added for the
+    memory that dense code takes.
+  - Note: `load` on PUC-Rio Lua 5.5.1, from a script's main chunk, accepted 197 levels in all for
+    each of 19 constructs, which `crates/syntax/tests/hostile_syntax.rs` lists with their counts,
+    such as 195 parentheses after `return` and 97 nested function expressions. 16 MB of dense code
+    lexes and parses in 10 s in a debug build, in proportion to its size (0.55 s per MB), and peaks
+    at 4.6 GB, which M1.11 addresses. At the limit, a debug build needs at most 208 KB of stack,
+    for tuples, after `sub_expr` was kept to one stack frame for each level.
+  - Note: Every test that calls `lex` now passes `&Limits::default()`, and each test of
+    `Error::SourceTooLong` expects its `limit` too. The two tests that build a source of 4 GB read
+    it as a file whose `#` line is all of it: when a mutation removed the lexer's cap on the limit,
+    the old form lexed 4 GB of zero bytes and the system killed the tests for lack of memory. The
+    project has no mutation tool, so the tests were checked by hand: each of 11 edits to the limits,
+    such as allowing level 198, not counting assignment targets, reporting each try past the
+    limit, or making recovery look back over every token, failed a test, apart from one that made a
+    redundant check always pass, which was then removed. The last, a quadratic step, made the
+    timing test run for hours, so the test now gives the large input a deadline and fails at it.
   - Note (from M1.7): `CompactTree::build` reads the events with a stack of the nodes that are
     open, so it needs no limit of its own, and builds and drops 100,000 nested parentheses in
     `crates/syntax/tests/compact.rs`. The hostile-input tests can build each valid input's compact
@@ -636,6 +665,9 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
+  - Note (from M1.8): `lex` takes `&Limits`, and `Limits::default()` refuses inputs past 16 MB.
+    The parser stops at 197 levels of nesting, so no input can overflow its stack, and the targets
+    can grow inputs from the deeply nested constructs of `crates/syntax/tests/hostile_syntax.rs`.
   - Note (from M1.7): `generate_program` moved to `crates/syntax/tests/program/mod.rs`, which the
     tests in `tests/parser.rs` and `tests/compact.rs` share. The `parser` target can also build the
     compact tree of each input that `source_errors` finds no error in, which must succeed.
@@ -680,6 +712,9 @@ builds on.
   - Verify: `cargo xtask fuzz parser --seed 0 --runs 1000000` (expect no new saved input)
 
 - [ ] **M1.10 — cli: `lunaferra parse`**
+  - Note (from M1.8): `lex` takes the `Limits` to read a file under: `Limits::default()` refuses a
+    file over 16 MB with `Error::SourceTooLong`, and `Limits::trusted()` reads any file up to
+    `MAX_SOURCE_LEN`. A file nested too deep gets `P0028`, `C stack overflow`.
   - Note (from M1.6): `diagnostics(&lexed, &events)` gives every lexical and syntax error of a file
     as a `Diagnostic`, in the order PUC-Rio meets them, with a `Code` that displays as `P0013`, the
     message, and the span, which `LineMap::line_col` turns into a line and a column.
@@ -696,6 +731,27 @@ builds on.
     - A valid file exits with 0, a broken one prints its diagnostics and exits with 1, and a missing
       file exits with 2.
   - Verify: `cargo test -p lunaferra-cli --locked`
+
+- [ ] **M1.11 — syntax: the memory of reading a large source**
+  - Note: added on 2026-11-26, the owner's choice, when M1.8 measured that lexing and parsing
+    16 MB of `x = f(a, "s") + t.k[1] * 2` lines peaks at 4.6 GB in a debug build: 10.5 million
+    tokens of 32 bytes, 31.7 million events of 64 bytes each, because an `Event` holds a whole
+    `ParseError`, and the lossless tree. Its time grows in proportion to its size, so only its
+    memory is at fault. A `load` of 16 MB, the default source limit, can so allocate far more than
+    the default memory limit of 256 MB, which doesn't count it.
+  - Depends: M1.8
+  - Decide first: how much memory reading a source may take for each of its bytes, and how a
+    state's memory limit counts that memory ([`specs/sandbox.md`](specs/sandbox.md#limits)).
+  - Do:
+    - Measure the memory that lexing, parsing, and building each tree take for 16 MB of dense code,
+      and cut it to the budget, for example by keeping a parse error out of line in `Event::Error`
+      and in the parser's own events, and by building the compact tree without keeping every event.
+    - Record the measurements and the budget in [`specs/syntax.md`](specs/syntax.md#limits).
+  - Accept:
+    - Reading 16 MB of dense code into a compact tree peaks within the budget, measured on the
+      x86-64 Linux development machine.
+    - `crates/syntax/tests/hostile_syntax.rs` parses 16 MB of each kind of input it times.
+  - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 **Exit criteria (M1):** `lunaferra parse` handles every Lunaferra script in `tests/conformance/`,
 reports errors in PUC-Rio's words wherever the syntax is Lua's, and the fuzz targets run clean.
@@ -992,6 +1048,9 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Verify: `cargo test -p lunaferra --test conformance --locked`
 
 - [ ] **M2.14 — lunaferra: a minimal embedding API and the conformance runner**
+  - Note (from M1.8): `Lua::load` passes its source limit to `lex` as a `lunaferra_syntax::Limits`.
+    For `ParseErrorKind::NestingTooDeep`, `load` returns `C stack overflow` with no chunk name or
+    line before it, as PUC-Rio's `load` does for this error, which `lstate.c` raises.
   - Depends: M2.13, M2.17, M2.18
   - Note: 2026-11-24, the owner accepted ADR-0034 (handles with no lifetime, checked against their
     state), which sets the shape of every handle.
@@ -1293,6 +1352,9 @@ scripts within limits, and gets every standard library it grants.
 - [ ] **M3.20 — lunaferra: finite limits by default**
   - Note: added on 2026-11-24, when the owner asked for five improvements to draft (ADR-0030). It
     is listed where it is to be done, after M3.13.
+  - Note (from M1.8): `lunaferra_syntax::Limits` holds only `source_len`: its default is 16 MB, and
+    its `trusted()` allows `MAX_SOURCE_LEN`, the most the lexer reads, so `Options::trusted()` maps
+    to it. The nesting depth has no setting, so no limit error names one for it.
   - Note: 2026-11-24, the owner accepted ADR-0030 (finite limits by default).
   - Depends: M3.2, M3.13
   - Do:
@@ -1355,6 +1417,11 @@ scripts within limits, and gets every standard library it grants.
 - [ ] **M3.18 — ci: the interpreter on every target**
   - Note: added on 2026-11-24, when the owner chose all six platforms by the first release
     (ADR-0027).
+  - Note (from M1.8): At 197 levels of nesting, a debug build of the parser needs at most 208 KB of
+    stack on x86-64 Linux, for tuples, and 192 KB for parentheses and calls, and
+    `crates/syntax/tests/hostile_syntax.rs` parses each construct at the limit on a thread with a
+    256 KB stack, as ADR-0028 asks. Each target's frames differ in size, so the test shows whether
+    the margin holds there.
   - Note (from M0.3): `cargo xtask coverage` and its tests have run only on x86-64 Linux so far. It
     adds `EXE_SUFFIX` to the names of the LLVM tools, and `xtask/tests/coverage.rs` expects Windows to
     print Cargo's failure status as `exit code: 101`.

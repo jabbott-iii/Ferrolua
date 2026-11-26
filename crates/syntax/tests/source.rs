@@ -191,12 +191,21 @@ fn has_a_limit_one_byte_short_of_u32_max() {
 fn rejects_a_source_one_byte_longer_than_the_limit() {
     let len = usize::try_from(u32::MAX).unwrap();
     let source = vec![0_u8; len];
-    assert_eq!(LineMap::new(&source), Err(Error::SourceTooLong { len }));
+    assert_eq!(
+        LineMap::new(&source),
+        Err(Error::SourceTooLong {
+            len,
+            limit: MAX_SOURCE_LEN
+        })
+    );
 }
 
 #[test]
 fn describes_a_source_that_is_too_long() {
-    let error = Error::SourceTooLong { len: 4_294_967_295 };
+    let error = Error::SourceTooLong {
+        len: 4_294_967_295,
+        limit: MAX_SOURCE_LEN,
+    };
     assert_eq!(
         error.to_string(),
         "source of 4294967295 bytes is longer than the limit of 4294967294 bytes"

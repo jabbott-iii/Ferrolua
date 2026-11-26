@@ -27,11 +27,11 @@
 //!
 //! ```
 //! use lunaferra_syntax::compact::{BinaryOp, ExprKind, StatKind, TargetKind};
-//! use lunaferra_syntax::{CompactTree, Number, Origin, SourceId, lex, parse};
+//! use lunaferra_syntax::{Limits, CompactTree, Number, Origin, SourceId, lex, parse};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let source = b"x = 1 + 2\n";
-//! let lexed = lex(source, SourceId::new(0), Origin::String)?;
+//! let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 //! let tree = CompactTree::build(source, &lexed, &parse(source, &lexed))?;
 //!
 //! let [statement] = tree[tree.block()] else {

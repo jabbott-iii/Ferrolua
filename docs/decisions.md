@@ -1978,3 +1978,52 @@ it is `Proposed`, and no code may depend on it.
     crates.io, and `Cargo.toml` would still call those crates.
 - **Revisit when:** M14.1 settles which names in the manifest, the commands, and the messages
   change, or a user's issue shows the name confused with Rust's crates.
+
+## ADR-0041 — Bound the parser at 197 levels of nesting everywhere, and the lexer by a host's limit
+
+- **Status:** Accepted
+- **Date:** 2026-11-26
+- **Context:**
+  - `docs/specs/sandbox.md` asks for a source-size limit, 16 MB by default and none under
+    `Options::trusted()`, and a nesting limit at PUC-Rio Lua 5.5.1's, both enforced by
+    `lunaferra-syntax` (M1.8). The crate had no type for a host's options.
+  - PUC-Rio counts a level of nesting each time `lparser.c` calls `enterlevel`, and stops at 200
+    nested C calls with `C stack overflow`. The levels a parse gets depend on the calls around it:
+    measured on 2026-11-26, a file that `lua` runs nests 198 levels, a chunk that `load` reads from
+    a script 197, and one that `load` reads inside `pcall` 196.
+  - Lunaferra's parser calls itself for each level, in Rust, so a deeper limit risks a call stack
+    that overflows, which ends the process. At 197 levels, a debug build needs at most 208 KB of
+    stack.
+  - PUC-Rio's `llex.c` gives `chunk has too many lines` at line 2^31 − 1 and `lexical element too
+    long` about 2.9 GB into one token on a 32-bit target. Both need a source of gigabytes, which no
+    test can build.
+- **Decision** (the owner chose each of these on 2026-11-26, from the options M1.8 put):
+  - The parser reads at most 197 levels of nesting everywhere, counted where `lparser.c` calls
+    `enterlevel`, plus one for each conditional expression's `else` value. No host can raise it.
+  - `lex` takes a `Limits`, whose `source_len` is 16 MB by default and `MAX_SOURCE_LEN` under
+    `Limits::trusted()`, and refuses a longer source before it reads a byte.
+  - The lexer gives neither `chunk has too many lines` nor `lexical element too long`: its lines
+    are `u32` values and it keeps no buffer for a token, so it reads every source up to
+    `MAX_SOURCE_LEN` bytes correctly.
+- **Consequences:**
+  - Good: no source can overflow the parser's call stack, and `load` from a script stops at the
+    same depth, with the same message, as on PUC-Rio.
+  - Good: one argument carries the source limit to the lexer, which the embedding API and the
+    tools each fill from their own options.
+  - Bad: a file nested 198 levels deep, which `lua` runs, doesn't load in Lunaferra, and a chunk
+    that `load` reads inside `pcall` may nest one level deeper than on PUC-Rio.
+  - Bad: a source of more than 2^31 − 2 lines, possible only under `Limits::trusted()`, loads,
+    where PUC-Rio refuses it.
+  - Follow-up: M1.11 cuts the memory that reading a source takes, which can reach gigabytes for
+    16 MB of dense code, and decides how a state's memory limit counts it.
+- **Alternatives considered:**
+  - A host setting for the depth, capped at 197: more to the API for a limit that a host rarely
+    needs to lower.
+  - Counting the calls around the parse, as PUC-Rio does: Lunaferra's calls differ from PUC-Rio's,
+    so the counts would still differ, and a fixed count is simpler to test.
+  - A second lexing function for limited sources, `lex` unchanged: two entry points, and the
+    default one would have no sandbox limit.
+  - Lowering `MAX_SOURCE_LEN` below 2 GB, so neither lexer error can arise: it would refuse a
+    single-line source of 3 GB, which 64-bit PUC-Rio loads.
+- **Revisit when:** a target's tests overflow a 256 KB stack at the limit, or a script that runs
+  on PUC-Rio fails in Lunaferra because of the nesting limit.

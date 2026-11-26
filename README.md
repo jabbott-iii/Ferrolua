@@ -8,7 +8,7 @@ the same values in the same order.
 
 **Status:** design and the first test tools. The design documents in [`docs/`](docs/) are
 written, and the Cargo workspace has a crate for each part, apart from the two that packages need,
-which wait for their decision records. The parser's crate has its first six pieces: byte spans
+which wait for their decision records. The parser's crate has its first seven pieces: byte spans
 that mark places in source text, with line maps that turn a byte offset into a line and column,
 counting lines as PUC-Rio Lua 5.5.1 does; the lexer, which splits source text into tokens, keeps
 the spaces and comments around each one, and reports a malformed token with the message PUC-Rio
@@ -18,8 +18,9 @@ which reads every statement and every expression, with Python's operators and th
 goes on after each syntax error, and gives the first error with the message and line PUC-Rio
 Lua 5.5.1 gives where the syntax is Lua's; the compact tree that the compiler will read, built
 from the same events for a source with no error, which holds each name and literal as its value
-and the span of each part; and the diagnostic type that every tool reports, with a stable code for
-each kind of syntax error. The other
+and the span of each part; the limits on reading a source, 16 MB by default and 197 levels of
+nesting, PUC-Rio Lua 5.5.1's limit for `load`; and the diagnostic type that every tool reports,
+with a stable code for each kind of syntax error. The other
 crates hold only their documentation, except the test tools: the test kit, which has a seeded random generator and a property-test runner; the fuzzer,
 which runs its targets on mutated inputs and saves each input that makes one fail; and `xtask`,
 whose `cargo xtask coverage` measures which lines and regions of code the tests run, whose
@@ -29,8 +30,8 @@ targets that test it so far. The three conformance scripts, `hello.lua`, `lexer.
 `syntax_errors.lua`, have their twins' output recorded, and wait for the conformance runner that
 M2.14 builds. The continuous
 integration (CI) workflow runs every check on each pull request, and each of its jobs must pass
-before a merge. The next task is M1.8 in the [roadmap](docs/roadmap.md), which limits the size
-of a source and how deeply its code may nest.
+before a merge. The next task is M1.9 in the [roadmap](docs/roadmap.md), which adds fuzz targets
+for the lexer and the parser.
 
 ## What is planned
 

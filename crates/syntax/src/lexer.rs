@@ -15,7 +15,10 @@ mod numeral;
 pub use error::{LexError, LexErrorKind, Near};
 pub use numeral::{Number, numeral_value};
 
-use crate::{Error, LineMap, SourceId, Span, Token, TokenKind, Trivia, TriviaKind};
+use crate::source::checked_len;
+use crate::{
+    Error, Limits, LineMap, MAX_SOURCE_LEN, SourceId, Span, Token, TokenKind, Trivia, TriviaKind,
+};
 use escape::{
     Bracket, closes, find_close, line_break_end, long_body_start, open_bracket, read_escape,
 };
@@ -103,31 +106,34 @@ impl Lexed {
 ///
 /// # Errors
 ///
-/// Returns [`Error::SourceTooLong`] if `source` is longer than
-/// [`MAX_SOURCE_LEN`](crate::MAX_SOURCE_LEN) bytes.
+/// Returns [`Error::SourceTooLong`] if `source` is longer than `limits.source_len` bytes, or
+/// than [`MAX_SOURCE_LEN`] when the limit is higher. The lexer checks the length before it reads
+/// a byte.
 ///
 /// # Examples
 ///
 /// ```
-/// use lunaferra_syntax::{Origin, SourceId, TokenKind, lex};
+/// use lunaferra_syntax::{Limits, Origin, SourceId, TokenKind, lex};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let lexed = lex(b"x = 2 ** 10 -- a comment\n", SourceId::new(0), Origin::String)?;
+/// let limits = Limits::default();
+/// let lexed = lex(b"x = 2 ** 10 -- a comment\n", SourceId::new(0), Origin::String, &limits)?;
 /// let kinds: Vec<TokenKind> = lexed.tokens().iter().map(|token| token.kind).collect();
 /// use TokenKind::*;
 /// assert_eq!(kinds, [Name, Equal, Integer, StarStar, Integer, Eof]);
 ///
-/// let broken = lex(b"x = 0x", SourceId::new(1), Origin::String)?;
+/// let broken = lex(b"x = 0x", SourceId::new(1), Origin::String, &limits)?;
 /// assert_eq!(broken.errors()[0].to_string(), "malformed number near '0x'");
 /// # Ok(())
 /// # }
 /// ```
-pub fn lex(source: &[u8], id: SourceId, origin: Origin) -> Result<Lexed, Error> {
+pub fn lex(source: &[u8], id: SourceId, origin: Origin, limits: &Limits) -> Result<Lexed, Error> {
+    let len = checked_len(source.len(), limits.source_len.min(MAX_SOURCE_LEN))?;
     let (mark, first_line) = match origin {
         Origin::File => file_prefix(source),
         Origin::String => (0, 0),
     };
-    let lines = LineMap::counting_from(source, first_line)?;
+    let lines = LineMap::counting_from(source, first_line, len);
     let mut lexer = Lexer {
         source,
         id,

@@ -38,15 +38,17 @@
 //!   letter.
 //! - [`Error`] is the error the crate's functions return, and [`MAX_SOURCE_LEN`] is the length of
 //!   the longest source they accept.
+//! - The limits on reading a source: [`Limits`], which [`lex`] takes, sets the longest source a
+//!   host reads, and [`MAX_DEPTH`] is the deepest nesting the parser reads.
 //!
 //! # Example
 //!
 //! ```
-//! use lunaferra_syntax::{Origin, SourceId, TokenKind, lex};
+//! use lunaferra_syntax::{Limits, Origin, SourceId, TokenKind, lex};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let source = b"local x = 1\nprint(f\"x is {x}\")\n";
-//! let lexed = lex(source, SourceId::new(0), Origin::String)?;
+//! let lexed = lex(source, SourceId::new(0), Origin::String, &Limits::default())?;
 //! let print = lexed.tokens()[4];
 //! assert_eq!(print.kind, TokenKind::Name);
 //! // `print` starts at byte 12, on line 2, in column 1.
@@ -63,6 +65,13 @@
 //! Lua source is bytes, and need not be valid UTF-8, so every position is a byte offset held in
 //! a `u32`, and every column counts bytes. [`LineMap::new`] and [`lex`] refuse a source longer
 //! than [`MAX_SOURCE_LEN`] bytes, which keeps every offset, line, and column within a `u32`.
+//!
+//! # Limits
+//!
+//! [`lex`] refuses a source longer than its [`Limits`] allow, 16 MB by default, before it reads a
+//! byte. The parser reads at most [`MAX_DEPTH`] levels of nesting, PUC-Rio Lua 5.5.1's limit for
+//! `load`, and one level more is the error `C stack overflow`, after which it goes on, so no
+//! source can make it overflow the call stack. No setting raises that limit.
 //!
 //! # Errors in the source
 //!
@@ -105,6 +114,7 @@ mod diagnostic;
 mod error;
 mod event;
 mod lexer;
+mod limits;
 mod parser;
 mod source;
 mod source_error;
@@ -116,6 +126,7 @@ pub use diagnostic::{Code, Diagnostic, Edit, Fix, Label, Severity, Tool};
 pub use error::Error;
 pub use event::{Event, NodeKind};
 pub use lexer::{LexError, LexErrorKind, Lexed, Near, Number, Origin, lex, numeral_value};
+pub use limits::{Limits, MAX_DEPTH};
 pub use parser::{ParseError, ParseErrorKind, parse};
 pub use source::{LineMap, MAX_SOURCE_LEN, SourceId, Span};
 pub use source_error::{SourceError, diagnostics, source_errors};

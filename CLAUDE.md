@@ -21,16 +21,16 @@ docs, except `lunaferra-syntax`, which holds source IDs, spans, and line maps (M
 (M1.2), the parser's events, the lossless tree built from them, and typed views of its nodes (M1.3),
 the parser, which reads every statement (M1.4) and every expression, with Python's operators and
 their precedence (M1.5), the parser's recovery after each syntax error, with the diagnostic
-type that every tool reports and a `P` code for each kind of syntax error (M1.6), and the compact
-tree for the compiler, built from the same events as the lossless tree (M1.7);
+type that every tool reports and a `P` code for each kind of syntax error (M1.6), the compact
+tree for the compiler, built from the same events as the lossless tree (M1.7), and the limits on a
+source's size and nesting depth (M1.8);
 `lunaferra-testkit`, which holds the seeded random generator and the property-test runner (M0.2);
 `lunaferra-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which holds
 `cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and `cargo xtask record` (M0.5).
 `tests/conformance/` holds three scripts, `hello.lua`, `lexer.lua`, and `syntax_errors.lua`, and
 their Lua 5.5 twins with the twins' recorded `.out` files. `.github/workflows/ci.yml` runs a CI job
 for each automated check and a fuzz job on every pull request, and each job must pass before a
-merge to `main` (M0.6). The next task is M1.8, which adds the parser's limits on source size and
-nesting depth.
+merge to `main` (M0.6). The next task is M1.9, which adds the lexer and parser fuzz targets.
 
 ## Read before working
 

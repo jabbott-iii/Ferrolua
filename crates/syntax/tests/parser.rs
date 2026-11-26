@@ -12,7 +12,7 @@ use lunaferra_syntax::ast::{
     AstNode, Chunk, Expr, FuncBody, GenericForStat, IfStat, LocalStat, NumericForStat, Stat,
 };
 use lunaferra_syntax::{
-    Error, Event, Lexed, NodeKind, Origin, ParseError, ParseErrorKind, SourceId, Span,
+    Error, Event, Lexed, Limits, NodeKind, Origin, ParseError, ParseErrorKind, SourceId, Span,
     SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse, source_errors,
 };
 use lunaferra_testkit::{Config, Source};
@@ -26,7 +26,8 @@ use TokenKind as T;
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Parses `source` and builds its tree, which the parser's events must always make.
@@ -390,7 +391,8 @@ fn accepts_what_puc_rio_accepts() {
     ];
     for source in sources {
         let source = if source.starts_with(b"\xEF") {
-            let lexed = lex(source, SourceId::new(0), Origin::File).expect("short");
+            let lexed =
+                lex(source, SourceId::new(0), Origin::File, &Limits::default()).expect("short");
             let events = parse(source, &lexed);
             assert!(!events.iter().any(|event| matches!(event, Event::Error(_))));
             continue;
@@ -956,7 +958,7 @@ fn gives_each_syntax_error_its_kind_span_line_and_near_text() {
 #[test]
 fn counts_lines_after_a_files_skipped_first_line() {
     let source = b"#!/usr/bin/env lunaferra\nif x";
-    let lexed = lex(source, SourceId::new(0), Origin::File).expect("short");
+    let lexed = lex(source, SourceId::new(0), Origin::File, &Limits::default()).expect("short");
     let errors: Vec<String> = parse(source, &lexed)
         .iter()
         .filter_map(|event| match event {
@@ -1425,7 +1427,8 @@ fn gives_back_every_conformance_script_and_its_twin_from_its_parsed_tree() {
         entries.sort();
         for path in entries {
             let source = std::fs::read(&path).expect("readable");
-            let lexed = lex(&source, SourceId::new(0), Origin::File).expect("short");
+            let lexed =
+                lex(&source, SourceId::new(0), Origin::File, &Limits::default()).expect("short");
             let events = parse(&source, &lexed);
             let tree = SyntaxTree::build(&source, &lexed, &events).expect("a tree");
             assert_eq!(tree.root().text(), source, "{}", path.display());

@@ -4,8 +4,8 @@
 
 use lunaferra_syntax::ast::{AstNode, Block, Chunk, ErrorNode};
 use lunaferra_syntax::{
-    Error, Event, Lexed, NodeKind, Origin, SourceId, Span, SyntaxElement, SyntaxNode, SyntaxTree,
-    Token, TokenKind, TriviaKind, lex,
+    Error, Event, Lexed, Limits, NodeKind, Origin, SourceId, Span, SyntaxElement, SyntaxNode,
+    SyntaxTree, Token, TokenKind, TriviaKind, lex,
 };
 use lunaferra_testkit::{Config, Source};
 
@@ -14,7 +14,8 @@ use TokenKind as T;
 
 /// Lexes `source` as a string, as `load` reads one.
 fn lexed(source: &[u8]) -> Lexed {
-    lex(source, SourceId::new(0), Origin::String).expect("each test's source is short")
+    lex(source, SourceId::new(0), Origin::String, &Limits::default())
+        .expect("each test's source is short")
 }
 
 /// Returns the event that names `token`.
@@ -552,7 +553,8 @@ fn gives_back_every_conformance_script_and_its_twin_from_its_tree() {
             let path = entry.unwrap().path();
             if path.extension().is_some_and(|extension| extension == "lua") {
                 let source = std::fs::read(&path).unwrap();
-                let lexed = lex(&source, SourceId::new(0), Origin::File).unwrap();
+                let lexed =
+                    lex(&source, SourceId::new(0), Origin::File, &Limits::default()).unwrap();
                 let tree = SyntaxTree::build(&source, &lexed, &flat_events(&lexed)).unwrap();
                 assert_eq!(tree.root().text(), source, "{}", path.display());
                 scripts += 1;
@@ -619,12 +621,12 @@ fn gives_back_every_generated_source_and_its_events_from_its_tree() {
         |source| {
             let bytes = generate_source(source);
             let origin = [Origin::String, Origin::File][below(source, 2)];
-            let lexed = lex(&bytes, SourceId::new(0), origin).unwrap();
+            let lexed = lex(&bytes, SourceId::new(0), origin, &Limits::default()).unwrap();
             let events = generate_events(source, lexed.tokens());
             (bytes, origin, events)
         },
         |(bytes, origin, events)| {
-            let lexed = lex(bytes, SourceId::new(0), *origin).unwrap();
+            let lexed = lex(bytes, SourceId::new(0), *origin, &Limits::default()).unwrap();
             let tree = SyntaxTree::build(bytes, &lexed, events).map_err(|e| e.to_string())?;
             if tree.root().text() != *bytes {
                 return Err(String::from("the root's text isn't the source"));

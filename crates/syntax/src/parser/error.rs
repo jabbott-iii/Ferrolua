@@ -57,9 +57,10 @@ impl std::error::Error for ParseError {}
 
 /// The kinds of [`ParseError`], each with the words of its message.
 ///
-/// Every kind but three comes from PUC-Rio Lua 5.5.1's parser, `lparser.c`, with the same words.
-/// The three that Lunaferra adds report Lua's operators that it replaced with Python's, after an
-/// expression, and name the replacement.
+/// Every kind but three comes from PUC-Rio Lua 5.5.1's parser, `lparser.c`, with the same words,
+/// and [`NestingTooDeep`](ParseErrorKind::NestingTooDeep) from its `lstate.c`. The three that
+/// Lunaferra adds report Lua's operators that it replaced with Python's, after an expression, and
+/// name the replacement.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ParseErrorKind {
@@ -118,6 +119,13 @@ pub enum ParseErrorKind {
     /// `'~' is not a binary operator: use '^' for bitwise XOR`: Lua's XOR operator, after an
     /// expression. Before an operand, `~` is still bitwise NOT.
     LuaBitwiseXor,
+    /// `C stack overflow`: one level of nesting past [`MAX_DEPTH`](crate::MAX_DEPTH), at the
+    /// token the parser would have read next.
+    ///
+    /// PUC-Rio raises it as a runtime error of `load`, not as a syntax error, so its message has
+    /// no `near`, and `load` writes it with no chunk name or line before it. The error's
+    /// [`line`](ParseError::line) is still where the token ends, for the tools.
+    NestingTooDeep,
 }
 
 impl fmt::Display for ParseErrorKind {
@@ -160,6 +168,7 @@ impl fmt::Display for ParseErrorKind {
             Self::LuaBitwiseXor => {
                 f.write_str("'~' is not a binary operator: use '^' for bitwise XOR")
             }
+            Self::NestingTooDeep => f.write_str("C stack overflow"),
         }
     }
 }
@@ -260,7 +269,7 @@ const fn token_name(kind: TokenKind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Origin, SourceId, lex};
+    use crate::{Limits, Origin, SourceId, lex};
     use TokenKind as T;
 
     /// Every token kind, with its name in messages.
@@ -370,7 +379,13 @@ mod tests {
             else {
                 continue;
             };
-            let lexed = lex(text.as_bytes(), SourceId::new(0), Origin::String).unwrap();
+            let lexed = lex(
+                text.as_bytes(),
+                SourceId::new(0),
+                Origin::String,
+                &Limits::default(),
+            )
+            .unwrap();
             let first = lexed.tokens()[0];
             let fstring_part = matches!(
                 kind,

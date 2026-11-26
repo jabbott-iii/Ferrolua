@@ -113,29 +113,52 @@ impl Parser<'_> {
         }
         let node = self.precede(value);
         self.expect(T::Else);
+        // The value after `else` may be another conditional expression, read by a call of its
+        // own, so it is a level of nesting that no `sub_expr` counts. The value before `if` was
+        // read one level deeper than this, so this level fits, and the value's own `sub_expr`
+        // stops a chain that goes too deep.
+        self.depth = self.depth.saturating_add(1);
         self.expr_before(if_after);
+        self.leave(1);
         self.complete(node, N::ConditionalExpr)
     }
 
     /// Reads an operand and the binary operators after it that bind more tightly than `limit`,
     /// as PUC-Rio's `subexpr` does: a unary operator and its operand, or a simple expression,
     /// then each binary operator above `limit` and its right operand.
+    ///
+    /// Each call is one level of nesting, as each call of PUC-Rio's `subexpr` is.
+    ///
+    /// It is one function, not a counting one around a reading one, because the parser calls it
+    /// once for each level of most nesting, and each frame it saves is stack that a deep source
+    /// doesn't use.
     fn sub_expr(&mut self, limit: u8) -> Option<Done> {
-        let operand_limit = match self.current() {
+        if !self.enter() {
+            return None;
+        }
+        let operand = match self.current() {
             // `not` binds more loosely than a comparison, so it may start only an operand of
             // `and`, `or`, or `not`, not one of a comparison or of a tighter operator.
-            T::Not if limit <= level::NOT => level::NOT,
-            T::Minus | T::Plus | T::Tilde | T::Hash => level::UNARY,
-            _ => {
-                let operand = self.simple_expr()?;
-                return Some(self.binary_rest(operand, limit));
-            }
+            T::Not if limit <= level::NOT => Some(self.unary(level::NOT)),
+            T::Minus | T::Plus | T::Tilde | T::Hash => Some(self.unary(level::UNARY)),
+            _ => self.simple_expr(),
         };
+        let Some(operand) = operand else {
+            self.leave(1);
+            return None;
+        };
+        let done = self.binary_rest(operand, limit);
+        self.leave(1);
+        Some(done)
+    }
+
+    /// Reads a unary operator and its operand, whose operators must bind more tightly than
+    /// `operand_limit`, and returns the node of both.
+    fn unary(&mut self, operand_limit: u8) -> Done {
         let unary = self.start();
         self.bump();
         self.sub_expr(operand_limit);
-        let operand = self.complete(unary, N::UnaryExpr);
-        Some(self.binary_rest(operand, limit))
+        self.complete(unary, N::UnaryExpr)
     }
 
     /// Reads each binary operator that binds more tightly than `limit` after `left`, an operand

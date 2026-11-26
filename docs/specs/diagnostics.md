@@ -109,6 +109,7 @@ are made from the errors.
 | `P0025` | `lua-concatenation` | `'..' is not an operator: use '+' to join strings`: Lua's `..` after an expression | M1.6 |
 | `P0026` | `lua-not-equal` | `'~=' is not an operator: use '!=' to test inequality`: Lua's `~=`, with a fix that writes `!=` | M1.6 |
 | `P0027` | `lua-bitwise-xor` | `'~' is not a binary operator: use '^' for bitwise XOR`: Lua's binary `~`, with a fix that writes `^` | M1.6 |
+| `P0028` | `nesting-too-deep` | `C stack overflow`: blocks and expressions nested one level past the parser's limit of 197 levels | M1.8 |
 
 ## Output formats
 

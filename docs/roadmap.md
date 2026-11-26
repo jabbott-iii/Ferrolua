@@ -276,7 +276,42 @@ builds on.
       valid UTF-8.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.2 — syntax: the lexer**
+- [x] **M1.2 — syntax: the lexer**
+  - Note: Built on 2026-11-25. `crates/syntax/src/token.rs` holds `TokenKind`, `Token`, `Trivia`,
+    and `TriviaKind`. `crates/syntax/src/lexer.rs` holds `lex`, `Lexed`, and `Origin`, with
+    `lexer/error.rs` for `LexError`, `LexErrorKind`, and `Near`, `lexer/escape.rs` for escapes and
+    long brackets, and `lexer/numeral.rs` for `Number` and `numeral_value`. Each token keeps its
+    leading and trailing trivia, and the lexer goes on after an error, as
+    [`specs/syntax.md`](specs/syntax.md#lexer) describes.
+  - Note: PUC-Rio Lua 5.5.1 was already built on this machine, in
+    `~/.local/share/lua/src/lua-5.5.1`, from a `lua-5.5.1.tar.gz` whose SHA-256 matches the one
+    M0.5 records, and its sources matched the tarball's. Its `llex.c`, `lobject.c`, and
+    `lauxlib.c` decided each rule and message. `cargo xtask record` with `LUNAFERRA_PUC_LUA` set to
+    its `lua` saved `lexer.out`, 17 lines, and a second run reported it `unchanged`. The 54 broken
+    chunks in `crates/syntax/tests/lexer.rs` hold the messages its `load` gave them.
+  - Note: With `Origin::File`, the lexer skips a byte order mark and a first line that starts with
+    `#`, up to its first `\n`, as `luaL_loadfilex` does, and builds the line map so that a lone
+    `\r` in that line ends no line: for a file `cr.lua` holding `#!x\ry\nx = 0x`, PUC-Rio gave
+    `cr.lua:2: malformed number near '0x'`. `load` skips neither, so `Origin::String` doesn't.
+  - Note: `Number` and `numeral_value` are public because rustc's `dead_code` lint, an error
+    under the check commands, reports an enum's payload that no code reads, and because `tonumber`
+    and the compiler will need the same conversion. Hexadecimal floats are converted by Lunaferra's own code, which rounds as
+    glibc's `strtod` does; 19 values near the limits of rounding match the bits PUC-Rio gave.
+  - Note: The f-string details that ADR-0026 left open are in
+    [`specs/language.md`](specs/language.md#formatted-string-literals-adr-0025), with the
+    messages for f-string errors: a field may span lines, a method call after `:` needs a name and
+    `(` touching it, and so on.
+  - Note: PUC-Rio Lua 5.5.1's default build sets `LUA_COMPAT_GLOBAL`, which keeps `global` a name
+    outside declarations, so `load("global = 1")` compiles there. The lexer reserves `global`, as
+    the manual and `specs/language.md` do.
+  - Note: In a release build on this machine (x86-64 Linux, an Intel Core i7-11800H), the lexer
+    read inputs of 1, 4, and 16 MB, each one unit repeated: ordinary code, strings of bad escapes,
+    f-strings of braces and nested fields, 16 MB of `f"{` opening 5.3 million nested f-strings,
+    runs of `]=]`, and f-string colons. Its time grew in proportion to the size, and 16 MB took
+    160–440 ms. M1.8's hostile-input test makes such a check part of the tests.
+  - Note: The project has no mutation tool, so the tests were checked by hand: with recovery after
+    a failed escape going on past the failing byte instead of from it, one test of strings failed,
+    and a test of f-strings was added for the same change.
   - Note: 2026-11-24, the owner's choice (ADR-0023): the lexer reads Python's operators instead of
     `..` and `~=`.
   - Note: 2026-11-24, the owner's choice (ADR-0025): the lexer also reads f-strings.
@@ -303,6 +338,9 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.3 — syntax: parser events and the lossless tree**
+  - Note (from M1.2): ADR-0009 (one parser for the compiler and the tools), which this task builds,
+    is still `Proposed`. `Lexed::leading` and `Lexed::trailing` give each token's trivia, and
+    `round_trip` in `crates/syntax/tests/lexer.rs` writes a source back out from them.
   - Depends: M1.2
   - Do:
     - Build the event stream and the lossless tree builder, with typed views for each node kind.
@@ -311,6 +349,9 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.4 — syntax: statements**
+  - Note (from M1.2): A byte that starts no token is a `TokenKind::Unknown` token, which PUC-Rio's
+    parser reports as `unexpected symbol near '@'`, writing a byte that isn't printable as
+    `'<\N>'` with `N` in decimal, as `luaX_token2str` does.
   - Depends: M1.3
   - Do:
     - Parse every statement of §3.3 and §9 of the manual, including `global` declarations in every
@@ -324,6 +365,10 @@ builds on.
     precedence, with chained comparisons, conditional expressions, `in`, and `is`.
   - Note: 2026-11-24, the owner accepted ADR-0024 (the details Python's operators and 0-based
     indexes leave open), which makes `is` a reserved word.
+  - Note (from M1.2): The lexer reads `..` as `TokenKind::DotDot` and `~=` as
+    `TokenKind::TildeEqual`, so the parser can name their replacements. A field's `=` is an
+    ordinary `Equal` token at the field's top level, before a conversion, a spec, or its end. A
+    spec comes as `FStringSpec` and `FStringText` tokens, and the fields inside it as fields.
   - Depends: M1.3
   - Do:
     - Parse expressions with the precedence, grouping, and grammar of
@@ -346,6 +391,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.6 — syntax: error recovery and the diagnostic type**
+  - Note (from M1.2): Each `LexError` has the line PUC-Rio's message names and `message()`, the
+    bytes after the chunk name and the line. Only a source's first error is the one PUC-Rio
+    reports. `Lexed::lines` is the line map to use, because a file's skipped first line changes
+    the count.
   - Depends: M1.4, M1.5
   - Do:
     - Build the `Diagnostic` type of [`specs/diagnostics.md`](specs/diagnostics.md#the-diagnostic),
@@ -359,6 +408,11 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.7 — syntax: compact tree for the compiler**
+  - Note (from M1.2): `numeral_value` gives a numeral's value. The lexer checks strings but keeps
+    no value: `read_escape` in `crates/syntax/src/lexer/escape.rs` gives the bytes of one escape,
+    as PUC-Rio's `read_string` saves them, and a long string's value turns each line break, `\r\n`
+    and `\n\r` included, into `\n`, as `read_long_string` does. A short f-string's text has the
+    same escapes, and in text, not specs, `{{` and `}}` stand for one brace each.
   - Depends: M1.6
   - Do:
     - Build the compact tree from the same events, as [`specs/syntax.md`](specs/syntax.md#compact-tree)
@@ -368,6 +422,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.8 — syntax: size and nesting limits**
+  - Note (from M1.2): The lexer doesn't reproduce `chunk has too many lines`, which PUC-Rio gives at
+    line 2^31 − 1, or `lexical element too long`, about 2.9 GB into one token on a 32-bit target.
+    No test can build such a source, and the 16 MB source limit rules both out, but
+    `Options::trusted()` sets no source limit, so this task decides how to handle them.
   - Depends: M1.6
   - Do:
     - Enforce the source size and nesting limits of [`specs/sandbox.md`](specs/sandbox.md#limits),
@@ -388,6 +446,10 @@ builds on.
     each run's input only by mutation, in `fuzz/src/campaign.rs`, which is where generation from
     the run's seed joins it. The fuzzer runs in Cargo's dev profile, which keeps overflow checks but
     doesn't optimize; whether a million parser runs need a profile that does both is open.
+  - Note (from M1.2): `lex` is public, so the `lexer` target can call it on each input with both
+    `Origin` values. `gives_back_every_generated_source_from_its_tokens_and_trivia` in
+    `crates/syntax/tests/lexer.rs` checks the round trip on bytes drawn from an alphabet of the
+    bytes that start or end tokens.
   - Note (from M0.6): CI's Fuzz job runs `cargo xtask fuzz <target> --seed 0 --seconds 60` on each
     target that `cargo xtask fuzz --list` prints, so the `lexer` and `parser` targets join it with no
     change to `.github/workflows/ci.yml`. The test `lists_no_target_while_only_the_fixtures_exist`
@@ -700,6 +762,8 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
     state), which sets the shape of every handle.
   - Note (from M0.5): `cargo xtask record` runs each twin with an empty standard input, so the
     runner should give each Lunaferra script an empty standard input too.
+  - Note (from M1.2): `tests/conformance/lexer.lua` uses only `print` and operators, so it runs on
+    the base library of M2.13. Its twin is the same script, as it uses no syntax Lunaferra changes.
   - Do:
     - Build `Lua::new`, `Lua::load`, and `exec` and `eval` for `nil`, booleans, numbers, and strings, as
       [`specs/lunaferra.md`](specs/lunaferra.md) sketches.
@@ -1289,6 +1353,8 @@ with a message that names the manifest.
   - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M4.3 — syntax: type annotations**
+  - Note (from M1.2): The lexer takes the longest token, so `list<list<T>>` ends with one `>>`
+    token, and `>>=` is one token too. The parser of type arguments splits them.
   - Depends: M4.1
   - Do:
     - Parse the annotation grammar of [`specs/language.md`](specs/language.md#type-annotations-adr-0006),

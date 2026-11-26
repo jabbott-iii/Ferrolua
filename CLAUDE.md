@@ -15,17 +15,17 @@ commits. Read the rule for each kind of file you touch.
 ## Status
 
 Design and the first test tools: the documents in `docs/` exist, and the Cargo workspace has every
-crate of the crate map in `docs/01-architecture.md` except `lunaferra-toml` and
-`lunaferra-package`, which M14.9 and M14.1 add once their decision records are accepted. Each
-crate holds only its crate docs, except `lunaferra-syntax`, which holds source IDs, spans, and line
-maps (M1.1); `lunaferra-testkit`, which holds the seeded random generator and the property-test
-runner (M0.2); `lunaferra-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and
-`xtask`, which holds `cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and
-`cargo xtask record` (M0.5).
-`tests/conformance/` holds one script, `hello.lua`, and its Lua 5.5 twin with the twin's recorded
-`hello.out`. `.github/workflows/ci.yml` runs a CI job for each automated check and a fuzz job on every pull
-request, and each job must pass before a merge to `main` (M0.6). The next task is M1.2, which adds
-the lexer to `lunaferra-syntax`.
+crate of the crate map in `docs/01-architecture.md` except `lunaferra-toml` and `lunaferra-package`,
+which M14.9 and M14.1 add once their decision records are accepted. Each crate holds only its crate
+docs, except `lunaferra-syntax`, which holds source IDs, spans, and line maps (M1.1) and the lexer
+(M1.2); `lunaferra-testkit`, which holds the seeded random generator and the property-test runner
+(M0.2); `lunaferra-fuzz`, the fuzzer, with only its two fixture targets (M0.4); and `xtask`, which
+holds `cargo xtask coverage` (M0.3), `cargo xtask fuzz` (M0.4), and `cargo xtask record` (M0.5).
+`tests/conformance/` holds two scripts, `hello.lua` and `lexer.lua`, and their Lua 5.5 twins with
+the twins' recorded `.out` files. `.github/workflows/ci.yml` runs a CI job for each automated check
+and a fuzz job on every pull request, and each job must pass before a merge to `main` (M0.6). The
+next task is M1.3, which adds the parser's events and the lossless tree, following ADR-0009 (one
+parser for the compiler and the tools), which is still proposed.
 
 ## Read before working
 

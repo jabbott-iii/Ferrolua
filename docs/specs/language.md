@@ -61,6 +61,10 @@ Lunaferra implements all of Lua 5.5 that this spec doesn't change, including wha
   and unary `~` stays bitwise NOT.
 - The reserved words are Lua 5.5's 23 and `is` (ADR-0024). `in`, `not`, `if`, and `else`
   are already reserved in Lua.
+- `global` is reserved, as §3.1 of the manual lists it. PUC-Rio Lua 5.5.1's default build sets
+  `LUA_COMPAT_GLOBAL` to 1 in `luaconf.h`, which keeps `global` a name except at the start of a
+  declaration, so `local global = 1` runs there but is a syntax error in Lunaferra. Conformance
+  scripts and their twins don't use `global` as a name.
 - A comment wins over every new token: `--` always starts a comment, so `x -=- 1` is `x` followed
   by `-=`, then `-` and `1`, while `x--=1` is `x` followed by a comment.
 - The lexer takes the longest token it can: `**=` before `**`, and `**` before `*`.
@@ -281,6 +285,41 @@ print(f"{{n}} is {n}")              --> {n} is 3
 - Formatting a field is a conversion the code asks for, so f-strings keep ADR-0023's rule that
   nothing converts between strings and numbers on its own.
 - `f"x"` is no longer a call of a function named `f`; that call is written `f("x")` or `f "x"`.
+
+The lexer (M1.2) settles these details within ADR-0026's rules, and
+[`syntax.md`](syntax.md#f-strings-as-tokens) gives the tokens it makes:
+
+- A field holds ordinary code, so it may span lines and hold comments, even in a short f-string,
+  as in Python 3.12. The text and the spec of a short f-string may not span lines, as a short
+  string may not.
+- The lexer counts `(`, `[`, and `{` against `)`, `]`, and `}` in a field to find its top level.
+  There, `}` ends the field. `!s` or `!r` is a conversion only when `:` or `}` follows it
+  directly; any other `!` starts `!=` or is a byte the parser reports. `:` is a method call only
+  when a name that isn't a reserved word touches it and `(` touches the name, as in
+  `{p:length()}`, so `{p: length()}` and `{p:length ()}` have specs. A `:` that starts a spec never
+  joins the next `:` into `::`, so `{x::>8}` has the spec `:>8`, as in Python.
+- In a spec, `{` always starts a field, `}` ends the spec's field, and nothing stands for a brace.
+  A short f-string's spec keeps the escapes of its text.
+- An escape never starts or ends a field: `f"\x7B"` is the text `{`.
+- In text or in a spec, the closing quote or bracket ends the f-string, so `f"{x:>8"` ends at its
+  second `"` and the parser reports the missing `}`. In a field's code, a quote starts a string of
+  its own, as in `f"{t["key"]}"`.
+
+An f-string with a mistake in its text gets one of these messages:
+
+| Mistake | Message |
+| :- | :- |
+| A `}` in the text that isn't part of `}}` and ends no field | `single '}' in f-string near '<text>'` |
+| A line break in a short f-string's text or spec | `unfinished string near '<text>'` |
+| An escape that fails in a short f-string's text or spec | The message of a short string, such as `invalid escape sequence near '<text>'` |
+| The end of the source inside a short f-string | `unfinished string near <eof>` |
+| The end of the source inside a long f-string | `unfinished long string (starting at line N) near <eof>`, where line N holds its `f` |
+
+The `<text>` is the source of the stretch of text that holds the mistake. It starts at the token
+that began the stretch: the f-string's `f"`, the `}` that ended the field before it, or the `:`
+that started the spec. It ends after the `}` or the byte of the escape that failed, or before the
+line break. So `f"a}b"` gives `single '}' in f-string near 'f"a}'`, and `f"{x}}"` gives
+`single '}' in f-string near '}}'`. The lexer reports the first mistake in each stretch.
 
 ## Scoping (ADR-0025)
 

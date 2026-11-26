@@ -1,0 +1,17 @@
+0	7	1234567890	9223372036854775807
+255	255	10	9223372036854775807	-1	1
+9.2233720368547758e+18	true
+1.5	0.5	5.0	300.0	0.03	1000.0	5.0	inf	0.0
+16.0	0.5	10.5	0.25	inf	true
+true	true
+a	b	it's	q"q	back\slash	'	"
+true	true	true	true	true	true	true
+ABC7	AbJ	HI	true
+1	2	3	4	5	6	6	true
+3	true	ab	line one
+line two
+a	b]]c]=	1	0	true
+two
+lines
+after a long comment
+after a short comment

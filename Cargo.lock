@@ -68,6 +68,9 @@ version = "0.0.0"
 [[package]]
 name = "lunaferra-syntax"
 version = "0.0.0"
+dependencies = [
+ "lunaferra-testkit",
+]
 
 [[package]]
 name = "lunaferra-testkit"

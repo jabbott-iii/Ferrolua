@@ -92,9 +92,19 @@ impl LineMap {
     ///
     /// Returns [`Error::SourceTooLong`] if `source` is longer than [`MAX_SOURCE_LEN`] bytes.
     pub fn new(source: &[u8]) -> Result<Self, Error> {
+        Self::counting_from(source, 0)
+    }
+
+    /// Builds the line map of `source` as [`LineMap::new`] does, except that the bytes before
+    /// offset `from` are all on line 1, whatever they hold.
+    ///
+    /// PUC-Rio Lua 5.5.1 reads a file whose first line starts with `#` as if that line, up to
+    /// its first `\n`, were empty, so a lone `\r` in it ends no line. The lexer builds the line
+    /// map of such a file with `from` at that `\n`. `from` past the end counts no line breaks.
+    pub(crate) fn counting_from(source: &[u8], from: usize) -> Result<Self, Error> {
         let len = checked_len(source.len())?;
         Ok(Self {
-            starts: line_starts(source, len),
+            starts: line_starts(source, from, len),
             len,
         })
     }
@@ -129,13 +139,14 @@ fn checked_len(len: usize) -> Result<u32, Error> {
     }
 }
 
-/// Returns the offset where each line of `source` starts, from line 1 at offset 0. `len` is the
-/// length of `source`.
-fn line_starts(source: &[u8], len: u32) -> Vec<u32> {
+/// Returns the offset where each line of `source` starts, from line 1 at offset 0, counting
+/// only the line breaks that start at offset `from` or after it. `len` is the length of
+/// `source`.
+fn line_starts(source: &[u8], from: usize, len: u32) -> Vec<u32> {
     let mut starts = vec![0];
     // The source comes first in the zip, so the offsets stop at the last byte's, which
     // `MAX_SOURCE_LEN` keeps within a `u32`.
-    let mut bytes = source.iter().copied().zip(0_u32..).peekable();
+    let mut bytes = source.iter().copied().zip(0_u32..).skip(from).peekable();
     while let Some((byte, _)) = bytes.next() {
         if let Some(partner) = partner(byte) {
             // `\r\n` and `\n\r` end one line, because `inclinenumber` takes the other byte of

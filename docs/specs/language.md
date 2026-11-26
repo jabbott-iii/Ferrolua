@@ -623,6 +623,8 @@ them, with no new syntax:
   module of the `json` dependency, and only when `json`'s manifest exports it.
 - A script outside every package uses `require` as Lua 5.5 does, with the host's modules first
   (ADR-0036).
+- A package will be called a crater (ADR-0040: a Lunaferra package is named a crater). M14.1
+  settles which names in [`package.md`](package.md) change with it.
 
 ```lua
 local json = require("json")          -- a dependency's root module

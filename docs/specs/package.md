@@ -13,6 +13,10 @@ with Git, and a host reads files through its own loader. ADR-0038 (packages and 
 has) and ADR-0039 (dependencies from paths and Git, pinned in a lock file), both proposed, shaped
 it. It lands in M14.
 
+A package will be called a crater (ADR-0040: a Lunaferra package is named a crater, as Rust users
+call a package a crate). This spec says "package" until the rename, and M14.1 settles which names
+in the manifest, the commands, and the messages change with it.
+
 ## Why packages modeled on Cargo
 
 Lua finds a module by trying the patterns in `package.path`, such as `./?.lua`, so any file can

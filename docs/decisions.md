@@ -1764,7 +1764,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0038 — Organize scripts into packages and modules, as Cargo organizes Rust code
 
-- **Status:** Proposed
+- **Status:** Proposed; ADR-0040, accepted, names a package a crater
 - **Date:** 2026-11-25
 - **Context:**
   - Lua finds a module by trying the patterns in `package.path`, such as `./?.lua`. Any file can
@@ -1944,3 +1944,37 @@ it is `Proposed`, and no code may depend on it.
     sources too, but it needs a cryptographic hash written here.
 - **Revisit when:** the standard library gains TLS or a cryptographic hash, a user needs a
   dependency that Git can't fetch, or a public registry for Lunaferra packages is wanted.
+
+## ADR-0040 — Call a Lunaferra package a crater
+
+- **Status:** Accepted
+- **Date:** 2026-11-25
+- **Context:**
+  - ADR-0038 (packages and modules, as Cargo has, proposed) calls Lunaferra's unit of code a
+    package: a folder whose manifest, `Lunaferra.toml`, names it, gives its version, and lists its
+    dependencies. It is Lunaferra's counterpart of what Rust users call a crate, the name crates.io
+    gives each package it lists.
+  - The documents use "crate" for the Rust crates of this workspace, such as `lunaferra-syntax`,
+    as Cargo and crates.io do, and "package" for Lunaferra's unit.
+  - On 2026-11-25, the owner asked that the documents note that Lunaferra's crates will be called
+    craters, and chose, when asked, Lunaferra's packages over the workspace's Rust crates as the
+    thing renamed.
+- **Decision** (the owner's choice on 2026-11-25): Lunaferra's package, the folder that a
+  `Lunaferra.toml` with a `[package]` table describes, will be called a crater, as Rust users call
+  a package a crate. The Rust crates of this workspace keep the name crate, as Cargo gives it.
+  Until the rename, the documents say "package" and note the coming name where they define the
+  term.
+- **Consequences:**
+  - Good: the name sets Lunaferra's unit apart from the Rust crates of the workspace, so a sentence
+    that mentions both can't be misread.
+  - Bad: a Rust programmer must learn one more word for a familiar idea.
+  - Bad: until the rename, the documents use "package" for what will be a crater.
+  - Follow-up: M14.1, which builds the manifest and waits on ADR-0038's acceptance, settles with the
+    owner which names change with the term: the `[package]` table and its keys, the commands, the
+    messages such as `module 'x' is private to package 'y'`, and the name of `lunaferra-package`.
+- **Alternatives considered:**
+  - Keep "package", ADR-0038's word: one less term, but the owner chose crater.
+  - Call the workspace's Rust crates craters: the owner chose the packages instead, and Cargo,
+    crates.io, and `Cargo.toml` would still call those crates.
+- **Revisit when:** M14.1 settles which names in the manifest, the commands, and the messages
+  change, or a user's issue shows the name confused with Rust's crates.

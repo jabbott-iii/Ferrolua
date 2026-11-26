@@ -1217,6 +1217,10 @@ based on Cargo. It sits after M3, because a state's packages build on `require` 
   - Note: 2026-11-25, the owner chose TOML files used the way Cargo uses them, so this task reads
     `Lunaferra.toml` and `config.toml` with `lunaferra-toml` (M14.9) instead of building a reader
     for data-only Lua files; it was "package: data-only files and the manifest".
+  - Note: 2026-11-25, the owner's choice (ADR-0040): a package will be called a crater. Before
+    building the manifest, this task settles with the owner which names change with the term: the
+    `[package]` table and its keys, the commands, the messages, and the name of
+    `lunaferra-package`.
   - Depends: M14.9, M1.6
   - Decide first: the owner accepts ADR-0038 (packages and modules).
   - Do:

@@ -41,7 +41,7 @@ statements it reads.
 | Memory, reference counting, the loop collector, `__gc`, weak tables | [`docs/specs/memory.md`](docs/specs/memory.md) |
 | Libraries a host grants, limits, untrusted input | [`docs/specs/sandbox.md`](docs/specs/sandbox.md) |
 | Diagnostics, codes, and `[lints]` and `[tools]` in `Lunaferra.toml` | [`docs/specs/diagnostics.md`](docs/specs/diagnostics.md) |
-| Packages, modules, `require` across packages, `Lunaferra.toml`, `Lunaferra.lock`, `config.toml`, versions, and fetching with Git | [`docs/specs/package.md`](docs/specs/package.md) |
+| Packages, which will be called craters (ADR-0040), modules, `require` across packages, `Lunaferra.toml`, `Lunaferra.lock`, `config.toml`, versions, and fetching with Git | [`docs/specs/package.md`](docs/specs/package.md) |
 | `crates/syntax` | [`docs/specs/syntax.md`](docs/specs/syntax.md) |
 | `crates/bytecode` | [`docs/specs/bytecode.md`](docs/specs/bytecode.md) |
 | `crates/math` | [`docs/specs/math.md`](docs/specs/math.md) and [`docs/03-platforms.md`](docs/03-platforms.md) |

@@ -2,12 +2,13 @@
 //! Lunaferra uses to point into source text, source IDs, byte spans, and line maps; the lexer,
 //! which splits a source into tokens; the parser, which reads every statement and expression,
 //! with Python's operators and their precedence, goes on after each syntax error, and emits the
-//! events of a tree; the lossless syntax tree, which keeps every byte of the source and is built
-//! from those events; and the diagnostic type that every tool reports. The compact tree for the
-//! compiler joins it in milestone M1 of the [roadmap], as the [syntax spec] describes.
+//! events of a tree; the two trees built from those events, the lossless syntax tree, which keeps
+//! every byte of the source, and the compact tree, which holds only what the compiler needs; and
+//! the diagnostic type that every tool reports. The [syntax spec] describes each part, and the
+//! [roadmap] the parts still to come.
 //!
-//! It depends on nothing but the standard library. The compiler and the analysis tools will read
-//! the trees it builds.
+//! It depends on nothing but the standard library. The compiler will read the compact tree, and
+//! the analysis tools the lossless tree.
 //!
 //! # The parts
 //!
@@ -26,6 +27,10 @@
 //!   its events, and [`SyntaxNode`], [`SyntaxToken`], and [`SyntaxElement`] read it. The typed
 //!   views in [`ast`], such as [`ast::IfStat`], give each kind of node named accessors, and
 //!   [`ast::Stat`] and [`ast::Expr`] view every statement and every expression.
+//! - The compact tree: [`CompactTree::build`] builds a [`CompactTree`] from the same tokens and
+//!   events, for a source with no error, and indexing it with the ids and lists in [`compact`],
+//!   such as [`compact::ExprId`], gives each [`compact::Stat`] and [`compact::Expr`], with names
+//!   and literals as values and the span of each part.
 //! - A source's errors: [`source_errors`] gives every lexical and syntax error as a
 //!   [`SourceError`], in the order PUC-Rio Lua's parser meets them, and [`diagnostics`] gives each
 //!   as a [`Diagnostic`], the shape every tool reports a problem in, with its [`Code`],
@@ -83,10 +88,19 @@
 //! root is its source, byte for byte. The tree is stored as one flat list, so building, walking,
 //! printing, and dropping it never recurse, however deeply its nodes nest.
 //!
+//! # The compact tree
+//!
+//! [`CompactTree::build`] refuses a source with any lexical or syntax error, events that make no
+//! tree, and a node that doesn't hold the parts of its kind, so every node of a [`CompactTree`]
+//! has the parts of its kind. It too is stored as flat lists, so building, cloning, and dropping
+//! it never recurse. Its enums, such as [`compact::StatKind`], are exhaustive, so a `match` on one
+//! needs no `_` arm.
+//!
 //! [syntax spec]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/specs/syntax.md
 //! [roadmap]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/roadmap.md
 
 pub mod ast;
+pub mod compact;
 mod diagnostic;
 mod error;
 mod event;
@@ -97,6 +111,7 @@ mod source_error;
 mod token;
 mod tree;
 
+pub use compact::CompactTree;
 pub use diagnostic::{Code, Diagnostic, Edit, Fix, Label, Severity, Tool};
 pub use error::Error;
 pub use event::{Event, NodeKind};

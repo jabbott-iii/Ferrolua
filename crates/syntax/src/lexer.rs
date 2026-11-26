@@ -177,46 +177,109 @@ fn file_prefix(source: &[u8]) -> (usize, usize) {
 /// For a short string, that is its quotes around the bytes that its characters and escapes stand
 /// for, as `read_string` saves them, so `"a\65"` gives `"aA"`. For a long string, it is its
 /// brackets around its text, with each line break written as `\n` and without the line break
-/// right after the opening bracket, as `read_long_string` saves them. `text` must be a string
+/// right after the opening bracket, as `read_long_string` saves them. Either way, the string's
+/// value, which [`string_value`] gives, sits between its delimiters. `text` must be a string
 /// token's bytes, which the lexer has checked.
 pub(crate) fn string_as_read(text: &[u8]) -> Vec<u8> {
+    let (_, delimiter, _) = string_parts(text);
     let mut out = Vec::with_capacity(text.len());
-    if let Some(&quote @ (b'"' | b'\'')) = text.first() {
-        // Every escape in a checked string is whole and ends before the closing quote.
-        let end = text.len().saturating_sub(1);
-        out.push(quote);
-        let mut at = 1;
-        while let Some(&byte) = text.get(at).filter(|_| at < end) {
-            if byte == b'\\' {
-                at = read_escape(text, at, &mut out).unwrap_or(end);
-            } else {
-                out.push(byte);
-                at = at.saturating_add(1);
-            }
-        }
-        out.push(quote);
-        return out;
+    out.extend_from_slice(text.get(..delimiter).unwrap_or(&[]));
+    string_value(text, &mut out);
+    out.extend_from_slice(
+        text.get(text.len().saturating_sub(delimiter)..)
+            .unwrap_or(&[]),
+    );
+    out
+}
+
+/// How a string or an f-string is written: between quotes, where a `\` starts an escape, or
+/// between long brackets, where it doesn't.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Quoting {
+    /// Between quotes, as `"a\n"` is.
+    Short,
+    /// Between long brackets, as `[[a]]` is.
+    Long,
+}
+
+/// Whether the text of an f-string's [`TokenKind::FStringText`] token writes a brace as two.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Braces {
+    /// A brace is one byte, as in a string.
+    Single,
+    /// `{{` and `}}` stand for one brace each, as in an f-string's text.
+    Doubled,
+}
+
+/// Appends the value of the [`TokenKind::String`] token `text` to `out`: the bytes its characters
+/// and escapes stand for, between its quotes, or the text between its long brackets, without the
+/// line break right after the opening bracket and with each other line break, `\r\n` and `\n\r`
+/// included, as `\n`. That is the string PUC-Rio Lua 5.5.1's `read_string` and `read_long_string`
+/// make. `text` must be a string token's bytes, which the lexer has checked.
+pub(crate) fn string_value(text: &[u8], out: &mut Vec<u8>) {
+    let (quoting, delimiter, body) = string_parts(text);
+    let end = text.len().saturating_sub(delimiter);
+    push_value(text, body, end, quoting, Braces::Single, out);
+}
+
+/// Appends the value of the [`TokenKind::FStringText`] token `text`, in an f-string written with
+/// `quoting`, to `out`: as [`string_value`] reads a string's characters, escapes, and line breaks,
+/// with `{{` and `}}` standing for one brace each. A spec's text holds no brace, so the same
+/// reading gives its value. `text` must be a text token's bytes, which the lexer has checked.
+pub(crate) fn fstring_text_value(text: &[u8], quoting: Quoting, out: &mut Vec<u8>) {
+    push_value(text, 0, text.len(), quoting, Braces::Doubled, out);
+}
+
+/// Returns how the string token `text` is written, the length of each of its delimiters, which is
+/// the same for both, and the offset where its text starts.
+fn string_parts(text: &[u8]) -> (Quoting, usize, usize) {
+    if let Some(b'"' | b'\'') = text.first() {
+        return (Quoting::Short, 1, 1);
     }
     let level = text
         .iter()
         .skip(1)
         .take_while(|&&byte| byte == b'=')
         .count();
-    let bracket = level.saturating_add(2);
-    let close = text.len().saturating_sub(bracket);
-    out.extend_from_slice(text.get(..bracket).unwrap_or(&[]));
-    let mut at = long_body_start(text, 0, level);
-    while let Some(&byte) = text.get(at).filter(|_| at < close) {
-        if byte == b'\n' || byte == b'\r' {
-            out.push(b'\n');
-            at = line_break_end(text, at);
-        } else {
-            out.push(byte);
-            at = at.saturating_add(1);
-        }
+    (
+        Quoting::Long,
+        level.saturating_add(2),
+        long_body_start(text, 0, level),
+    )
+}
+
+/// Appends the value of the bytes of `text` from `start` to `end`, written with `quoting`, to
+/// `out`: each escape of a short string as the bytes it stands for, each line break as `\n`, and,
+/// with [`Braces::Doubled`], each `{{` or `}}` as one brace. A short string's text holds no line
+/// break but the ones its escapes write, and every escape in checked text is whole and ends
+/// before `end`.
+fn push_value(
+    text: &[u8],
+    start: usize,
+    end: usize,
+    quoting: Quoting,
+    braces: Braces,
+    out: &mut Vec<u8>,
+) {
+    let mut at = start;
+    while let Some(&byte) = text.get(at).filter(|_| at < end) {
+        at = match (byte, quoting, braces) {
+            (b'\\', Quoting::Short, _) => read_escape(text, at, out).unwrap_or(end),
+            (b'\n' | b'\r', _, _) => {
+                out.push(b'\n');
+                line_break_end(text, at)
+            }
+            // Checked text holds a brace only as one of a pair.
+            (b'{' | b'}', _, Braces::Doubled) => {
+                out.push(byte);
+                at.saturating_add(2)
+            }
+            _ => {
+                out.push(byte);
+                at.saturating_add(1)
+            }
+        };
     }
-    out.extend_from_slice(text.get(close..).unwrap_or(&[]));
-    out
 }
 
 /// Converts an offset or a count to a `u32`. Every offset and count fits, because [`lex`]

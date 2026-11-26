@@ -497,9 +497,93 @@ text tokens and the fields in order as `FStringPart`s.
 ## Compact tree
 
 The compact tree is built from the same events, holds only what the compiler needs, and is built
-only when there are no errors. It records each node's line for debug information, and keeps type
-annotations as compact type expressions, so the compiler can store JIT hints without the type
-checker.
+only when there are no errors. It keeps no keyword, symbol, space, comment, or empty statement,
+and it holds names and literals as values: each numeral's [`Number`](#lexer), and each string's
+bytes with its escapes read. It records the span of each part the compiler takes a line from,
+for debug information, and from M4 it keeps type annotations as compact type expressions, so the
+compiler can store JIT hints without the type checker.
+
+Built in M1.7 as described here:
+
+```rust
+impl CompactTree {
+    pub fn build(source: &[u8], lexed: &Lexed, events: &[Event]) -> Result<CompactTree, Error>;
+    pub fn block(&self) -> List<StatId>;   // the chunk's statements
+    pub fn eof(&self) -> Span;             // the end of the source
+    pub fn lines(&self) -> &LineMap;
+}
+// `tree[id]` gives a part, and `tree[list]` a slice, for each of these:
+impl Index<StatId> for CompactTree { type Output = Stat; }
+impl Index<ExprId> for CompactTree { type Output = Expr; }
+impl Index<FunctionId> for CompactTree { type Output = Function; }
+impl Index<Bytes> for CompactTree { type Output = [u8]; }   // a name or a string's value
+impl Index<List<ExprId>> for CompactTree { type Output = [ExprId]; }   // and each other list
+
+// In the module `compact`:
+pub struct Stat { pub kind: StatKind, pub span: Span }
+pub struct Expr { pub kind: ExprKind, pub span: Span }
+pub enum StatKind {
+    Assign { targets: List<Target>, values: List<ExprId> }, Call(Call), Label(Name), Break,
+    Goto(Name), Do(List<StatId>), While { .. }, Repeat { .. }, If { branches, else_body },
+    NumericFor { .. }, GenericFor { .. }, Function { path, method, function },
+    LocalFunction { .. }, GlobalFunction { .. }, Local { names, values }, Global { names, values },
+    GlobalAll { attrib }, Nonlocal(List<Name>), Return(List<ExprId>),
+}
+pub enum ExprKind {
+    Nil, True, False, Number(Number), String(Bytes), Vararg, Name(Bytes), Paren(ExprId),
+    Field { .. }, Index { .. }, Call(Call), Binary { left, operator, operator_span, right },
+    Unary { .. }, Compare { first, rest: List<Comparison> }, Conditional { .. },
+    Function(FunctionId), Table(List<TableField>), List(List<ExprId>), Tuple(List<ExprId>),
+    FString(List<FStringPart>),
+}
+```
+
+The tree is stored as one flat list for each kind of part, so building, cloning, and dropping it
+never recurse, and a chain of 100,000 additions, each the left operand of the next, can't overflow
+the call stack. A node refers to another by an id, and to several by a `List`, a range of one of
+the tree's lists. The compiler that reads it will need a stack of its own, not recursion, for
+such a chain.
+
+What the compact tree keeps, and what it leaves out, apart from the tokens of each node:
+
+- **Spans** (the owner's choice, 2026-11-26, over one line for each node). Each statement,
+  expression, assignment target, function body, and call's arguments keeps its span, from the
+  start of its first token to the end of its last, and each binary operator and each comparison
+  keeps its operator's span, both tokens of `not in` and `is not` included. The tree keeps the
+  line map, so the compiler can take whichever line PUC-Rio Lua 5.5.1 gives: a call's from its
+  `(`, an operator's from the operator, a generic `for`'s from the first value after `in`, a
+  function statement's first line from its `function`, that of a function expression or a local
+  or global function from its `(`, and a function's last line from its `end`.
+- **Values** (the owner's choice, 2026-11-26, over spans the compiler decodes). A name is its
+  bytes. A short string is the bytes its characters and escapes stand for, as `read_string`
+  saves them; a long string is its text without the line break right after the opening bracket,
+  with each other line break as `\n`, as `read_long_string` saves it. The parser's
+  `near` text of a string is its value between its delimiters, so both come from one function. An
+  f-string's text reads the same way for its form, with each `{{` and `}}` as one brace; a spec's
+  text holds no brace. A field with `=` keeps its expression's source text, from the start of its
+  first token to the end of its last, so the text of `{ x =}` is `x`, which the field writes
+  before `=` and the value.
+- **What only the syntax shows.** An empty statement and a `;` after `return` are left out. A
+  call's arguments are a list of values, whether written as `(...)`, a string, or a table. Each
+  declared name has its attribute: its own, or else the one before the first name. An assignment's
+  targets are each a name, a field, or an index, a `Target` of its own, and a call statement holds
+  a `Call`, so the compiler meets no other kind there. `(x)` stays a parenthesized expression,
+  because it keeps only the first value of a call or `...`.
+
+`build` refuses a source with a lexical error and events with an `Error` event,
+`Error::SourceHasErrors`; events that make no tree, with the errors of `SyntaxTree::build`; and a
+node that doesn't hold the parts of its kind, in order and with every keyword and symbol, as
+[Statement nodes](#statement-nodes) and [Expression nodes](#expression-nodes) list them,
+`Error::MalformedNode`, with the position of its `Start` event. An `Error` node is always
+malformed, and so is a root that isn't a chunk. So `build` accepts the events of every source
+`source_errors` finds no error in, and never panics on others.
+
+The enums of the compact tree, `StatKind`, `ExprKind`, and the kinds of their parts, are
+exhaustive, unlike `NodeKind`, `TokenKind`, and the views of `ast` (the owner's choice,
+2026-11-26). So the compiler, a crate of its own, can match every kind with no `_` arm, which no
+test could reach, and a kind that M4 adds will fail the compiler's build until it handles it. Adding one breaks the crate's API, which
+matters only once the crates are released. Its structs are `#[non_exhaustive]`, so M4 can add
+fields, such as a declared name's type.
 
 ## Syntax errors
 
@@ -601,7 +685,15 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   every conformance script and its twin, and parses a chain of 100,000 fields and one of 100,000
   calls. `crates/syntax/tests/expression.rs` parses a chain of 100,000 `+`, one of 100,000 `<`, and
   a list, a tuple, a table, and an f-string of 100,000 elements each.
-- Invariant 3: a property test on generated valid programs.
+- Invariant 3: `crates/syntax/tests/compact.rs` writes the shape of each tree, every statement and
+  expression with its span and its parts, once from the compact tree and once from the lossless
+  tree through its typed views, and checks that the two agree for 2,000 generated programs of
+  every statement and expression, for every conformance script, and for each form of each
+  statement and expression. Other tests there check each escape of a short string, the line breaks
+  of a long one, numerals, f-string text and specs, a field's text before `=`, conversions,
+  attributes, the spans a line comes from, every list of events that `build` refuses, and chains
+  of 100,000 additions, 100,000 fields, and 100,000 nested parentheses, built and dropped without
+  recursion.
 - Invariant 4: `tests/conformance/syntax_errors.lua` loads broken chunks with `load` and prints each
   message, recorded from its Lua 5.5 twin on PUC-Rio Lua 5.5.1; it runs once the conformance runner
   does (M2.14), and invariant 11's test checks its messages until then. For the lexer's errors,

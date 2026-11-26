@@ -553,7 +553,30 @@ builds on.
     - `load`'s message for each broken chunk matches PUC-Rio's.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.7 — syntax: compact tree for the compiler**
+- [x] **M1.7 — syntax: compact tree for the compiler**
+  - Note: Built on 2026-11-26. `crates/syntax/src/compact.rs` holds `CompactTree` and the types of
+    the statements, expressions, and parts it holds, and `crates/syntax/src/compact/build.rs`
+    builds it from the events with a stack, never recursing, as
+    [`specs/syntax.md`](specs/syntax.md#compact-tree) describes. `string_value` and
+    `fstring_text_value` in `crates/syntax/src/lexer.rs` give the value of a string and of an
+    f-string's text, and `string_as_read` now writes a string's delimiters around `string_value`, so
+    the parser's tests of `near` text, recorded from PUC-Rio Lua 5.5.1, check the values too.
+    `build` returns `Error::SourceHasErrors` for a source with an error and `Error::MalformedNode`
+    for a node without the parts of its kind.
+  - Note: 2026-11-26, the owner's choices: each statement, expression, target, function body,
+    call's arguments, and operator keeps its span, and the tree keeps the line map, rather than one
+    line for each node, because PUC-Rio takes a call's line from its `(` and an operator's from the
+    operator; names and literals are values, rather than spans the compiler decodes; and the
+    tree's enums are exhaustive, though `rust.md` asks for `#[non_exhaustive]` on enums that may
+    grow, so the compiler can match them with no `_` arm that no test reaches.
+  - Note: `crates/syntax/tests/compact.rs` writes the shape of each tree twice, from the compact
+    tree and from the lossless tree's views, and compares them for 2,000 generated programs, every
+    conformance script, and 65 forms of the statements and expressions. `generate_program` moved
+    from `tests/parser.rs` to `tests/program/mod.rs`, which both tests use. The project has no
+    mutation tool, so the tests were checked by hand: each of 18 edits to the builder and to the
+    reading of literals, such as swapping a `for`'s start and stop or giving a comparison's `not in`
+    the span of `not` alone, failed a test, once a test was added for the one that didn't: a comma
+    after the last value of a list that refuses one.
   - Note (from M1.6): The parser goes on after each error, so an `Error` node can be anywhere a node
     can, including as an operand: a token the lexer couldn't read, such as `0x`, is an `Error` node
     in an expression's place. The compact tree is built only when `source_errors` gives nothing, so
@@ -577,6 +600,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.8 — syntax: size and nesting limits**
+  - Note (from M1.7): `CompactTree::build` reads the events with a stack of the nodes that are
+    open, so it needs no limit of its own, and builds and drops 100,000 nested parentheses in
+    `crates/syntax/tests/compact.rs`. The hostile-input tests can build each valid input's compact
+    tree as well as its lossless tree.
   - Note (from M1.6): After an error, the parser unwinds through every level it is in, and goes on
     at the next block's statements, so the error for one level past the limit can recover like any
     other: its tokens up to the next stop go in an `Error` node. Recovery calls
@@ -609,16 +636,19 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
+  - Note (from M1.7): `generate_program` moved to `crates/syntax/tests/program/mod.rs`, which the
+    tests in `tests/parser.rs` and `tests/compact.rs` share. The `parser` target can also build the
+    compact tree of each input that `source_errors` finds no error in, which must succeed.
   - Note (from M1.6): The parser goes on after each error, so a loop in recovery is a hang the
     `parser` target must catch. `makes_a_tree_of_every_generated_source_that_gives_it_back` in
     `crates/syntax/tests/parser.rs` checks 5,000 generated sources, and a run of 300,000 on
     2026-11-26 found no failure. The target can also call `source_errors` and `diagnostics`, which
     read the events.
-  - Note (from M1.5): `generate_program` in `crates/syntax/tests/parser.rs` writes every expression
+  - Note (from M1.5): `generate_program` in `crates/syntax/tests/program/mod.rs` writes every expression
     too, with each operator's operands simple or in parentheses, so every program it writes is
     valid. `generate_expression` in `crates/syntax/tests/expression.rs` writes expressions from the
     precedence grammar, with the grouping of each.
-  - Note (from M1.4): `generate_program` in `crates/syntax/tests/parser.rs` writes valid programs
+  - Note (from M1.4): `generate_program` in `crates/syntax/tests/program/mod.rs` writes valid programs
     of the statements and the expressions M1.4 reads. Its loops go on only for a choice of 1:
     while shrinking, the runner gives 0 once a case's choices run out, so a loop that went on for
     0 never ended.
@@ -736,6 +766,13 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
 - [ ] **M2.5 — compiler: names, upvalues, globals, and self-recursion**
   - Note: 2026-11-24, the owner's choice (ADR-0025): names are local to the whole function that
     assigns them, unless `global` or `nonlocal` says otherwise.
+  - Note (from M1.7): The compiler reads `CompactTree`: `tree[tree.block()]` gives the chunk's
+    statements, and `tree[id]` and `tree[list]` give each part. Its enums are exhaustive, so each
+    `match` needs no `_` arm. An assignment's targets are `Target`s, a name, a field, or an index,
+    and each declared name already has its attribute, its own or the list's. `build` checks the
+    shape of each node, not the parser's rules, so the events of a `break` outside a loop without
+    their `Error` event would still build; the compiler meets only trees of sources that
+    `source_errors` passed.
   - Depends: M1.7, M2.1
   - Do:
     - Build name resolution by [`specs/compiler.md`](specs/compiler.md#name-resolution), with
@@ -775,6 +812,11 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Verify: `cargo test -p lunaferra-math --locked`
 
 - [ ] **M2.6 — compiler: expressions, registers, and constant folding**
+  - Note (from M1.7): A chain of 100,000 additions or fields, each the left operand of the next, is
+    valid, as PUC-Rio's `subexpr` and `suffixedexp` read such chains in a loop, and its compact
+    tree nests 100,000 levels deep, so the compiler needs a stack of its own, not recursion, for
+    a left operand. Each binary operator and comparison keeps its operator's span, and a call its
+    arguments' span, which give the lines PUC-Rio's `luaK_posfix` and `funcargs` use.
   - Depends: M2.5, M2.19
   - Do:
     - Compile every expression, including chained comparisons that evaluate each middle operand

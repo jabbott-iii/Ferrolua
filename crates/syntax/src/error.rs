@@ -30,6 +30,21 @@ pub enum Error {
     /// The events end before the tree is whole: with no node at all, with a node still open, or
     /// with tokens of the source that no event names.
     EventsEndEarly,
+    /// The source has a lexical error, or the events report a syntax error with an
+    /// [`Error`](crate::Event::Error) event, so it has no
+    /// [`CompactTree`](crate::CompactTree). [`source_errors`](crate::source_errors) gives each
+    /// error.
+    SourceHasErrors,
+    /// A node doesn't hold the parts of its kind, as the
+    /// [syntax spec](https://github.com/jabbott-iii/Lunaferra/blob/main/docs/specs/syntax.md#lossless-tree)
+    /// lists them, such as an [`IfStat`](crate::NodeKind::IfStat) without its condition or an
+    /// [`Error`](crate::NodeKind::Error) node, or the root isn't a
+    /// [`Chunk`](crate::NodeKind::Chunk).
+    MalformedNode {
+        /// The position in the list of the node's [`Start`](crate::Event::Start) event, counted
+        /// from 0.
+        event: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -48,6 +63,11 @@ impl fmt::Display for Error {
             Self::EventsEndEarly => write!(
                 f,
                 "the events end before every node is finished and every token is named"
+            ),
+            Self::SourceHasErrors => write!(f, "the source has a lexical or syntax error"),
+            Self::MalformedNode { event } => write!(
+                f,
+                "the node that event {event} starts doesn't hold the parts of its kind"
             ),
         }
     }

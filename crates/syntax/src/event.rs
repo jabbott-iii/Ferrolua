@@ -3,8 +3,9 @@
 //!
 //! These are a module of their own because two builders read the same events: the lossless tree
 //! for the tools, which [`SyntaxTree::build`](crate::SyntaxTree::build) builds, and the compact
-//! tree for the compiler. Both see the same program, because both read what the one parser saw
-//! (ADR-0009: one parser for the compiler and the tools).
+//! tree for the compiler, which [`CompactTree::build`](crate::CompactTree::build) builds. Both
+//! see the same program, because both read what the one parser saw (ADR-0009: one parser for the
+//! compiler and the tools).
 
 use crate::{ParseError, Span, TokenKind};
 

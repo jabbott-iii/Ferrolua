@@ -78,7 +78,7 @@ pub(crate) const TARGETS: &[Target] = &[
 
 /// Returns the target named `name`.
 pub(crate) fn find(name: &str) -> Option<&'static Target> {
-    TARGETS.iter().find(|target| target.name == name)
+    TARGETS.iter().find(|target|target.name==name)
 }
 
 /// The names of the targets in `targets` that check Lunaferra's code, one per line, which

@@ -29,13 +29,13 @@ so they can fill them in.
 
 - **Crates:** the members of the Cargo workspace, one for each crate in the crate map in
   `docs/01-architecture.md`, which gives the job of each and the task that builds it. Each holds
-  only its crate docs until that task, and `lunaferra-package` joins the workspace in M14.1. They
-  are the parser, the package manifests and dependency resolver, the bytecode format, the
-  compiler, the VM with its reference-counted heap and deterministic loop collector, the
-  just-in-time (JIT) compiler for x86-64, the standard library, the embedding API, the analysis
-  crates (a semantic model, a type checker, a linter, a formatter, and static application security
-  testing (SAST)), JSON, the language server, the debug adapter, the command-line tool, and the
-  test tools
+  only its crate docs until that task, and `lunaferra-toml` and `lunaferra-package` join the
+  workspace in M14.9 and M14.1. They are the parser, the TOML parser, the package manifests and
+  dependency resolver, the bytecode format, the compiler, the VM with its reference-counted heap
+  and deterministic loop collector, the just-in-time (JIT) compiler for x86-64, the standard
+  library, the embedding API, the analysis crates (a semantic model, a type checker, a linter, a
+  formatter, and static application security testing (SAST)), JSON, the language server, the debug
+  adapter, the command-line tool, and the test tools
 - **Toolchain:** edition 2024, Rust 1.100.0 pinned in `rust-toolchain.toml`, and
   `rust-version = "1.100"` in `[workspace.package]`
 - **Check commands:** `cargo fmt --all --check`,

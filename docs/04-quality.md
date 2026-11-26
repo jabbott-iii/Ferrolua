@@ -141,9 +141,20 @@ saved inputs must still fail as each is built to.
 
 ```bash
 cargo xtask fuzz <target> --seed 0 --runs 100000
+cargo xtask fuzz <target> --seed 0 --seconds 60
 cargo xtask fuzz <target> --replay fuzz/regressions/<target>/<hash>.bin
 cargo xtask fuzz --replay-saved
+cargo xtask fuzz --list
 ```
+
+Without a failure, a campaign stops once it has made its runs: 100,000, unless `--runs` says
+otherwise. With `--seconds <n>`, it also stops once `n` seconds have passed, and with no `--runs`,
+only the time stops it. It checks the time before each batch, so it can run past `n` seconds by up
+to one batch. How many runs fit in the time depends on the machine, but run `n` still makes its
+input from the seed `s + n`, so the seed in a report, with the same corpus, makes the failing input
+again.
+`cargo xtask fuzz --list` prints the name of each target that checks Lunaferra's code, one per
+line, leaving out the fixtures, and CI fuzzes each one (see "Continuous integration" below).
 
 `cargo xtask fuzz` with nothing after it lists every option and target. A target is a function in
 `fuzz/src/target.rs` that takes an input's bytes, and it must keep no state from one input to the
@@ -219,21 +230,43 @@ cargo xtask coverage
 cargo tree --workspace --edges normal,build,dev --target all --prefix none
 ```
 
-The last command must list only Lunaferra's own crates. Once M7 lands, `lunaferra fmt --check` and
+The last command must list only Lunaferra's own crates, and CI fails when it lists any other
+package. Once M7 lands, `lunaferra fmt --check` and
 `lunaferra lint` also check every Lunaferra script in `tests/` and `benches/`, skipping the Lua 5.5
 twins in `reference/` folders.
 
 ## Continuous integration
 
-CodeQL already scans the workflows and the Rust code on every push and pull request to `main`, and
-once a week (`.github/workflows/codeql.yml`). Dependabot proposes each new Rust release for
-`rust-toolchain.toml` as a pull request (`.github/dependabot.yml`). The CI workflow,
-`.github/workflows/ci.yml`, lands in M0.6. It runs every automated check above on `ubuntu-latest`,
-plus a short fuzz run from a fixed seed. From M3.18 on, a job for each target in
-[`03-platforms.md`](03-platforms.md#targets) runs `cargo xtask test` there, and coverage runs on
-Linux, Windows, and macOS (ADR-0027: six platforms); from M13.6 on, each JIT target also runs the
-forced pass and a short differential fuzz run. The owner then makes each job required before a merge
-to `main`. CI never installs PUC-Rio Lua: it compares against the recorded `.out` files.
+CodeQL scans the workflows and the Rust code on every push and pull request to `main`, and once a
+week (`.github/workflows/codeql.yml`). Dependabot proposes each new Rust release for
+`rust-toolchain.toml`, and each new release of an action that the workflows use, as a pull request
+(`.github/dependabot.yml`).
+
+The CI workflow, `.github/workflows/ci.yml` (M0.6), runs on the same pushes and pull requests. Each
+automated check above is a job of its own on `ubuntu-latest`, so a pull request shows which check
+failed:
+
+| Job | What it runs |
+| :- | :- |
+| Format | `cargo fmt --all --check` |
+| Clippy | `cargo clippy --workspace --all-targets --locked -- -D warnings` |
+| Test | `cargo test --workspace --locked` |
+| Documentation | `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked` |
+| Coverage | `cargo xtask coverage` |
+| Dependencies | The `cargo tree` command above, and a check that each package it lists is named `lunaferra`, `lunaferra-<part>`, or `xtask` and is in this repository |
+| Fuzz | `cargo xtask fuzz <target> --seed 0 --seconds 60` for each target that `cargo xtask fuzz --list` prints |
+
+Each job installs the Rust version that `rust-toolchain.toml` pins, with its components, may only
+read the repository's contents, and fails if it runs longer than 30 minutes. Every action is pinned
+to a full commit hash. A target that checks Lunaferra's code joins the Fuzz job once it is in
+`TARGETS` in `fuzz/src/target.rs`, and there is none to fuzz until the lexer and parser targets of
+M1.9.
+
+From M3.18 on, a job for each target in [`03-platforms.md`](03-platforms.md#targets) runs
+`cargo xtask test` there, and coverage runs on Linux, Windows, and macOS (ADR-0027: six platforms);
+from M13.6 on, each JIT target also runs the forced pass and a short differential fuzz run. The
+owner makes each job required before a merge to `main`. CI never installs PUC-Rio Lua: it compares
+against the recorded `.out` files.
 
 ## Review checklists
 

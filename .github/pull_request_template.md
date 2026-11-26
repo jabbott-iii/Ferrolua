@@ -4,10 +4,9 @@
 
 ## How it was checked
 
-<!-- Each check you ran, and its result. -->
+<!-- CI runs every check in `CONTRIBUTING.md` on this pull request, one job each, and fuzzes each fuzz target. List any other check you ran, and its result. -->
 
-- [ ] `cargo fmt`, `cargo clippy`, `cargo test`, and `cargo doc` pass, as `CONTRIBUTING.md` shows
-- [ ] `cargo xtask coverage` passes: 100% of lines and regions
+- [ ] The checks in `CONTRIBUTING.md` pass on your machine, including `cargo xtask coverage` at 100% of lines and regions
 - [ ] New behavior has tests, and a change to how a script runs has a conformance script with its
   Lua 5.5 twin, or an extension script
 - [ ] Each new `unsafe` block has a `// SAFETY:` comment and an accepted decision record

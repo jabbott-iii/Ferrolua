@@ -30,12 +30,12 @@ optional line break in it when it doesn't.
 
 ## Options
 
-| Setting in the manifest's `tools` table | Values | Default |
+| Key in the manifest's `[tools.format]` | Values | Default |
 | :- | :- | :- |
-| `format.indent_style` | `"spaces"`, `"tabs"` | `"spaces"` |
-| `format.indent_width` | 1 to 16 | 2 |
-| `format.line_width` | 40 to 400 | 100 |
-| `format.quote_style` | `"double"`, `"single"`, `"keep"` | `"double"` |
+| `indent-style` | `"spaces"`, `"tabs"` | `"spaces"` |
+| `indent-width` | 1 to 16 | 2 |
+| `line-width` | 40 to 400 | 100 |
+| `quote-style` | `"double"`, `"single"`, `"keep"` | `"double"` |
 
 A string is requoted only when that needs no new escapes.
 

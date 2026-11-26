@@ -1,0 +1,173 @@
+# The automated checks of `docs/04-quality.md`, run on every pull request to `main` and every push
+# to it, with the same commands and flags as on a contributor's machine. Each check is a job of its
+# own, so a pull request shows which one failed, and the owner makes each job required before a
+# merge to `main`. Each job installs the Rust version that `rust-toolchain.toml` pins, with its
+# components, and fails if it runs longer than 30 minutes. Every action is pinned to a full commit
+# hash, with its release's tag in a comment, and Dependabot proposes each new release
+# (`.github/dependabot.yml`).
+name: "CI"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions: {}
+
+defaults:
+  run:
+    # An explicit `bash` runs each script with `-e` and `-o pipefail`, so a step fails when any
+    # command in it fails, even one in the middle of a pipe.
+    shell: bash
+
+jobs:
+  format:
+    name: "Format"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Check the formatting"
+        run: cargo fmt --all --check
+
+  clippy:
+    name: "Clippy"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Run Clippy, with every warning an error"
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  test:
+    name: "Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Run the tests, the conformance scripts, and every saved fuzz input"
+        run: cargo test --workspace --locked
+
+  doc:
+    name: "Documentation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Build the documentation, with every warning an error"
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+
+  coverage:
+    name: "Coverage"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Check that the tests run every line and region"
+        run: cargo xtask coverage
+
+  dependencies:
+    name: "Dependencies"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Check that every package is one of Lunaferra's own crates"
+        run: |
+          cargo tree --workspace --edges normal,build,dev --target all --prefix none > tree.txt
+          cat tree.txt
+          # Each of Lunaferra's crates is named `lunaferra`, `lunaferra-<part>`, or `xtask`, and is
+          # in this repository, so Cargo prints its path after its version. A package from a
+          # registry has no path, and one from Git has its URL there. `(*)` marks a package that
+          # the list already showed. grep prints each other line, and exits with status 1 when it
+          # finds none, 0 when it finds one, and 2 when it can't read the list.
+          crate="(lunaferra(-[a-z]+)?|xtask) v[0-9]+\.[0-9]+\.[0-9]+ \(${GITHUB_WORKSPACE}/[^)]*\)( \(\*\))?"
+          status=0
+          grep --invert-match --line-regexp --extended-regexp "(${crate})?" tree.txt || status=$?
+          if [ "$status" -ne 1 ]; then
+            echo "::error::cargo tree lists a package that isn't one of Lunaferra's own crates"
+            exit 1
+          fi
+
+  fuzz:
+    name: "Fuzz"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the code
+    steps:
+      - name: "Check out the repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install the Rust version in rust-toolchain.toml"
+        run: |
+          rustup toolchain install
+          rustc --version
+      - name: "Fuzz each target that checks Lunaferra's code for 60 s from seed 0"
+        run: |
+          # `--list` leaves out the two fixture targets, which fail on purpose. A failing run fails
+          # the job, and its report names the run's seed, which makes its input again from the
+          # same corpus.
+          targets=$(cargo xtask fuzz --list)
+          if [ -z "$targets" ]; then
+            echo "No fuzz target checks Lunaferra's code yet."
+          fi
+          for target in $targets; do
+            cargo xtask fuzz "$target" --seed 0 --seconds 60
+          done

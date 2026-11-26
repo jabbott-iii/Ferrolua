@@ -5,10 +5,11 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::campaign::Options;
+use crate::campaign::{BATCH, Options};
 use crate::target::{self, TARGETS, Target};
 
-/// How many runs a campaign makes unless `--runs` says otherwise.
+/// How many runs a campaign makes unless `--runs` or `--seconds` says otherwise. With `--seconds`
+/// and no `--runs`, the number of runs has no limit.
 pub(crate) const DEFAULT_RUNS: u64 = 100_000;
 
 /// How many milliseconds one input may run unless `--time-limit` says otherwise.
@@ -33,6 +34,8 @@ pub(crate) enum Command {
         /// How long one input may run.
         time_limit: Duration,
     },
+    /// Print the name of each target that checks Lunaferra's code.
+    List,
     /// Run the batch on standard input as a child process of a campaign or a replay.
     Child(&'static Target),
 }
@@ -53,6 +56,7 @@ pub(crate) fn parse(args: &[OsString]) -> Option<Command> {
             target: find(name)?,
             path: PathBuf::from(path),
         }),
+        [flag] if flag == "--list" => Some(Command::List),
         [name, rest @ ..] => {
             let target = find(name)?;
             let flags = flags(
@@ -60,15 +64,26 @@ pub(crate) fn parse(args: &[OsString]) -> Option<Command> {
                 &[
                     "--seed",
                     "--runs",
+                    "--seconds",
                     "--time-limit",
                     "--corpus",
                     "--regressions",
                 ],
             )?;
+            let duration = match flags.get("--seconds") {
+                Some(value) => Some(Duration::from_secs(whole(value)?)),
+                None => None,
+            };
+            let runs = if duration.is_some() {
+                u64::MAX
+            } else {
+                DEFAULT_RUNS
+            };
             Some(Command::Fuzz(Options {
                 target,
                 seed: number(&flags, "--seed", 0)?,
-                runs: number(&flags, "--runs", DEFAULT_RUNS)?,
+                runs: number(&flags, "--runs", runs)?,
+                duration,
                 time_limit: time_limit(&flags)?,
                 corpus: folder(&flags, "--corpus", "corpus"),
                 regressions: folder(&flags, "--regressions", "regressions"),
@@ -91,21 +106,25 @@ pub(crate) fn usage() -> String {
         .collect();
     format!(
         "\
-usage: cargo xtask fuzz <target> [--seed <n>] [--runs <n>] [--time-limit <ms>]
-                        [--corpus <folder>] [--regressions <folder>]
+usage: cargo xtask fuzz <target> [--seed <n>] [--runs <n>] [--seconds <n>]
+                        [--time-limit <ms>] [--corpus <folder>] [--regressions <folder>]
        cargo xtask fuzz <target> --replay <file>
        cargo xtask fuzz --replay-saved [--regressions <folder>] [--time-limit <ms>]
+       cargo xtask fuzz --list
 
 The fuzzer runs <target> on inputs mutated from its corpus until one panics, crashes, or runs
 past the time limit. Then it shrinks that input, saves it, and stops.
 
   --seed <n>              the seed of the first run; run i uses seed <n> + i (default 0)
-  --runs <n>              how many inputs to run (default {DEFAULT_RUNS})
+  --runs <n>              how many inputs to run (default {DEFAULT_RUNS}, or no limit with --seconds)
+  --seconds <n>           start no batch of {BATCH} runs after <n> seconds (default no limit)
   --time-limit <ms>       how long one input may run (default {DEFAULT_TIME_LIMIT_MS})
   --corpus <folder>       the folder of each target's corpus folder (default fuzz/corpus)
   --regressions <folder>  the folder of each target's saved inputs (default fuzz/regressions)
   --replay <file>         run <target> on one input, in this process
   --replay-saved          run every saved input, and check that each runs as it should
+  --list                  print each target that checks Lunaferra's code, one name per line,
+                          leaving out the fixtures
 
 targets:
 {targets}"
@@ -138,9 +157,12 @@ fn flags<'a>(
 /// The number that flag `name` gives, or `default` when it isn't given. Returns `None` when the
 /// value isn't a number from 0 to `u64::MAX`.
 fn number(flags: &BTreeMap<&str, &OsStr>, name: &str, default: u64) -> Option<u64> {
-    flags.get(name).map_or(Some(default), |value| {
-        value.to_str().and_then(|value| value.parse().ok())
-    })
+    flags.get(name).copied().map_or(Some(default), whole)
+}
+
+/// Reads `value` as a number from 0 to `u64::MAX`, or returns `None` when it isn't one.
+fn whole(value: &OsStr) -> Option<u64> {
+    value.to_str().and_then(|value| value.parse().ok())
 }
 
 /// The time limit that `--time-limit` gives in milliseconds.
@@ -183,6 +205,7 @@ mod tests {
                 target: target::find("fixture-panic").unwrap(),
                 seed: 0,
                 runs: DEFAULT_RUNS,
+                duration: None,
                 time_limit: Duration::from_millis(1000),
                 corpus: fuzz_folder("corpus"),
                 regressions: fuzz_folder("regressions"),
@@ -203,6 +226,8 @@ mod tests {
                 "inputs",
                 "--time-limit",
                 "250",
+                "--seconds",
+                "60",
                 "--seed",
                 "18446744073709551615",
             ]),
@@ -210,11 +235,33 @@ mod tests {
                 target: target::find("fixture-hang").unwrap(),
                 seed: u64::MAX,
                 runs: 5,
+                duration: Some(Duration::from_secs(60)),
                 time_limit: Duration::from_millis(250),
                 corpus: PathBuf::from("inputs"),
                 regressions: PathBuf::from("saved"),
             }))
         );
+    }
+
+    #[test]
+    fn reads_a_campaign_with_seconds_and_no_limit_on_runs() {
+        assert_eq!(
+            parse_args(&["fixture-panic", "--seconds", "0"]),
+            Some(Command::Fuzz(Options {
+                target: target::find("fixture-panic").unwrap(),
+                seed: 0,
+                runs: u64::MAX,
+                duration: Some(Duration::ZERO),
+                time_limit: Duration::from_millis(1000),
+                corpus: fuzz_folder("corpus"),
+                regressions: fuzz_folder("regressions"),
+            }))
+        );
+    }
+
+    #[test]
+    fn reads_a_list_of_the_targets() {
+        assert_eq!(parse_args(&["--list"]), Some(Command::List));
     }
 
     #[test]
@@ -274,6 +321,11 @@ mod tests {
             &["fixture-panic", "--seed", "-1"],
             &["fixture-panic", "--runs", "many"],
             &["fixture-panic", "--time-limit", "1.5"],
+            &["fixture-panic", "--seconds", "soon"],
+            &["fixture-panic", "--seconds", "-1"],
+            &["fixture-panic", "--seconds"],
+            &["--list", "fixture-panic"],
+            &["fixture-panic", "--list"],
             &["fixture-panic", "--replay"],
             &["--replay-saved", "--seed", "1"],
             &["--replay-saved", "--time-limit", "soon"],

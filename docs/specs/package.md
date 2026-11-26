@@ -1,15 +1,17 @@
 # Subsystem: `lunaferra-package`
 
 `lunaferra-package` organizes Lunaferra code into packages, the way Cargo organizes Rust code. A
-package is a folder with a manifest, `Lunaferra.lua`, that names it, gives its version, lists the
+package is a folder with a manifest, `Lunaferra.toml`, that names it, gives its version, lists the
 modules other packages may use, and lists the packages it depends on; its modules are the files
 under its `src/` folder. A lock file, `Lunaferra.lock`, records the exact version and Git commit of
-every dependency, so every run of a project uses the same code. The crate reads manifests and lock
-files, compares versions, chooses the version of each dependency, and builds the module graph that
-`require` follows, for the embedding API and the analysis tools alike. It does no input or output
-of its own: `lunaferra-cli` fetches dependencies with Git, and a host reads files through its own
-loader. ADR-0038 (packages and modules, as Cargo has) and ADR-0039 (dependencies from paths and
-Git, pinned in a lock file), both proposed, shaped it. It lands in M14.
+every dependency, so every run of a project uses the same code. Both are TOML files in the shapes
+Cargo gives `Cargo.toml` and `Cargo.lock`. The crate reads manifests, lock files, and the
+`config.toml` files of the package commands, compares versions, chooses the version of each
+dependency, and builds the module graph that `require` follows, for the embedding API and the
+analysis tools alike. It does no input or output of its own: `lunaferra-cli` fetches dependencies
+with Git, and a host reads files through its own loader. ADR-0038 (packages and modules, as Cargo
+has) and ADR-0039 (dependencies from paths and Git, pinned in a lock file), both proposed, shaped
+it. It lands in M14.
 
 ## Why packages modeled on Cargo
 
@@ -18,39 +20,42 @@ Lua finds a module by trying the patterns in `package.path`, such as `./?.lua`, 
 records which version of a library a program was tested with. That works for one program in one
 folder, but not for a program built from libraries that other people write and change.
 
-Cargo solves the same problem for Rust, and Rust programmers already know its shape. Each package
-says in one file what it is and what it uses; a crate reaches only the crates its manifest names;
-a module is private unless it is marked public; and a lock file pins every version. Lunaferra
-copies that shape and leaves out what doesn't fit a scripting language or its security rules:
+Cargo solves the same problem for Rust, and Rust programmers, who write every Lunaferra host,
+already know its shape. Each package says in one file what it is and what it uses; a crate reaches
+only the crates its manifest names; a module is private unless it is marked public; and a lock
+file pins every version. Lunaferra copies that shape, its file formats included, and leaves out
+what doesn't fit a scripting language or its security rules:
 
 | Cargo | Lunaferra |
 | :- | :- |
-| `Cargo.toml`, a TOML file | `Lunaferra.lua`, a Lua file that is read as data and never run (ADR-0016) |
-| `Cargo.lock` | `Lunaferra.lock`, data-only Lua too |
+| `Cargo.toml` | `Lunaferra.toml`, with Cargo's section names and kebab-case keys |
+| `Cargo.lock` | `Lunaferra.lock`, in `Cargo.lock`'s shape |
+| `.cargo/config.toml`, and `config.toml` in `~/.cargo` | `.lunaferra/config.toml`, and `config.toml` in `~/.lunaferra` |
 | A library crate, rooted at `src/lib.rs` | A package's root module, `src/init.lua` |
 | A binary crate, `src/main.rs` | The package's program, `src/main.lua` |
 | `mod a;`, in `src/a.rs` or `src/a/mod.rs` | Module `a`, in `src/a.lua` or `src/a/init.lua` |
-| `pub mod a;` | `a` listed in the manifest's `exports` |
+| `pub mod a;` | `exports = ["a"]` in `[package]` |
 | `use serde::de;` | `local de = require("serde.de")` |
-| `[dependencies]` and `[dev-dependencies]` | `dependencies` and `dev_dependencies` |
-| `[workspace]` | `workspace` |
+| `[dependencies]` and `[dev-dependencies]` | The same tables |
+| `[workspace]`, with `[workspace.package]`, `[workspace.dependencies]`, and `[workspace.lints]` | The same tables, plus `[workspace.tools]`, inherited with `workspace = true` |
+| `[lints]` | `[lints]`, by diagnostic code, such as `L0001 = "off"` |
 | Sources: crates.io, Git, and paths | Sources: Git and paths; a registry kept in Git is in the backlog |
-| `~/.cargo`, the per-user cache | `~/.lunaferra`, or the folder `LUNAFERRA_HOME` names |
+| `CARGO_HOME`, by default `~/.cargo` | `LUNAFERRA_HOME`, by default `~/.lunaferra` |
 | `cargo new`, `add`, `remove`, `fetch`, `update`, `tree`, and `vendor` | `lunaferra new`, `add`, `remove`, `fetch`, `update`, `tree`, and `vendor` |
 | Build scripts, `build.rs` | None: building or installing a package runs none of its code |
 | Features | None yet; the backlog holds optional dependencies |
 
-The cost is a second layout to learn for Lua programmers used to `package.path`, and a manifest
-format that becomes a public interface: a field, once released, keeps its meaning. Scripts outside
-any package still run as they do today.
+The cost is a second layout to learn for Lua programmers used to `package.path`, a TOML parser of
+Lunaferra's own ([`toml.md`](toml.md)), and file formats that become a public interface: a key,
+once released, keeps its meaning. Scripts outside any package still run as they do today.
 
 ## Packages and modules
 
-A package is a folder that holds a manifest with a `package` table. Its layout:
+A package is a folder that holds a manifest with a `[package]` table. Its layout:
 
 ```text
 game/
-  Lunaferra.lua       the manifest
+  Lunaferra.toml      the manifest
   Lunaferra.lock      the lock file, at the root of a package or a workspace
   src/
     init.lua          the root module: require("game")
@@ -99,8 +104,8 @@ local host = require("host")          -- a module the host added
 - Each package has namespaces of its own. Two packages can depend on different versions of
   `json`, and each one's `require("json")` returns the version it asked for. That is how Cargo
   links two incompatible versions of one crate into one program.
-- A dependency's key in `dependencies` is the name the depending package uses. A `package` field
-  names the real package when the key differs, so one package can use two series of `json` as
+- A dependency's key in `[dependencies]` is the name the depending package uses. A `package` key
+  names the real package when the two differ, so one package can use two series of `json` as
   `json` and `json1`.
 - The host's modules come first, as ADR-0036 says. A package named after one of them, or with a
   dependency named after one, is refused when the host installs the packages, so a host module
@@ -115,92 +120,125 @@ local host = require("host")          -- a module the host added
   then the root and exported modules of each installed package by package name, then, when
   `package` is granted, `package`'s searchers.
 
-## The manifest: `Lunaferra.lua`
+## The manifest: `Lunaferra.toml`
 
-The manifest is a data-only Lua file in the format ADR-0016 set: one statement, `return` followed
-by a table constructor holding only table constructors, strings, numbers, booleans, and comments.
-`lunaferra-package` parses it with `lunaferra-syntax` and never runs it, so a manifest can't execute
-code, read the environment, or depend on the machine it is read on.
+The manifest is a TOML 1.0.0 file with Cargo's section names and Cargo's style of keys: lowercase
+words joined by `-`. `lunaferra-toml` reads it ([`toml.md`](toml.md)). TOML holds only data, with
+no expressions and no calls, so reading a manifest can't run code, read the environment, or depend
+on the machine it is read on.
 
-```lua
-return {
-  package = {
-    name = "game",
-    version = "0.3.1",
-    description = "The rules and AI of a tile-based strategy game",
-    license = "MIT",
-    lunaferra = "0.1",      -- the Lunaferra releases it runs on
-  },
+```toml
+[package]
+name = "game"
+version = "0.3.1"
+description = "The rules and AI of a tile-based strategy game"
+license = "MIT"
+lunaferra-version = "0.1"   # the Lunaferra releases it runs on
+exports = ["rules", "ai"]   # modules other packages may require, besides the root module
 
-  -- Modules that other packages may require, besides the root module.
-  exports = { "rules", "ai" },
+[dependencies]
+json = { git = "https://github.com/example/lf-json", version = "1.4" }
+util = { path = "../util" }
 
-  dependencies = {
-    json = { git = "https://github.com/example/lf-json", version = "1.4" },
-    util = { path = "../util" },
-  },
+[dev-dependencies]
+check = { git = "https://github.com/example/lf-check", tag = "v2.0.0" }
 
-  dev_dependencies = {
-    check = { git = "https://github.com/example/lf-check", tag = "v2.0.0" },
-  },
+# Severities for `lunaferra check`, `lint`, and `sast`, by diagnostic code.
+[lints]
+L0001 = "off"
 
-  -- Settings for `lunaferra check`, `lint`, `fmt`, and `sast`.
-  tools = {
-    strict = true,
-    rules = { L0001 = "off" },
-    format = { line_width = 100 },
-  },
-}
+# Settings for the tools.
+[tools]
+strict = true
+
+[tools.format]
+line-width = 100
 ```
 
-| Field | Value | Meaning |
+| Key | Value | Meaning |
 | :- | :- | :- |
 | `package.name` | String | The package's name; required in a package |
 | `package.version` | String | Its version under Semantic Versioning; required in a package |
 | `package.description` | String | One sentence for people choosing a package |
 | `package.license` | String | A Software Package Data Exchange (SPDX) license expression, such as `MIT OR Apache-2.0` |
-| `package.lunaferra` | String | A version requirement on Lunaferra itself; a release that doesn't meet it refuses the package, with a message that names this field |
-| `exports` | List of module names | The modules other packages may require, besides the root module |
-| `dependencies` | Table of dependencies | The packages the package's modules use, by the name they use |
-| `dev_dependencies` | Table of dependencies | Packages only `tests/` and `examples/` use; dependents never fetch them |
-| `workspace.members` | List of folder patterns | Makes this manifest a workspace root, as [Workspaces](#workspaces) describes |
-| `tools` | Table | The tool settings that [`diagnostics.md`](diagnostics.md#configuration-the-manifests-tools-table) lists |
+| `package.lunaferra-version` | String | A version requirement on Lunaferra itself, as Cargo's `rust-version` is on Rust; a release that doesn't meet it refuses the package, with a message that names this key |
+| `package.exports` | Array of module names | The modules other packages may require, besides the root module |
+| `[dependencies]` | Table of dependencies | The packages the package's modules use, by the name they use |
+| `[dev-dependencies]` | Table of dependencies | Packages only `tests/` and `examples/` use; dependents never fetch them |
+| `[workspace]` | Table | Makes this manifest a workspace root, as [Workspaces](#workspaces) describes |
+| `[lints]` | Table of codes | Each diagnostic code's severity: `"off"`, `"note"`, `"warning"`, or `"error"` ([`diagnostics.md`](diagnostics.md#configuration-lints-and-tools-in-the-manifest)) |
+| `[tools]` | Table | The tool settings that [`diagnostics.md`](diagnostics.md#configuration-lints-and-tools-in-the-manifest) lists |
 
-A dependency is a table with one source and, for a Git source, at most one way to pick a commit:
+A dependency is an inline table, as in Cargo, with one source and, for a Git source, at most one
+way to pick a commit:
 
-| Field | Meaning |
+| Key | Meaning |
 | :- | :- |
 | `path` | A folder, relative to the manifest, that holds the package's manifest |
 | `git` | A repository URL: `https://`, `ssh://`, or `file://` |
 | `version` | A version requirement. With `git`, it picks among the repository's version tags; with `path`, the package's version must meet it |
 | `tag`, `branch`, `rev` | With `git` and no `version`: a tag, a branch, or a full commit hash |
 | `package` | The real package's name, when the key is another name |
+| `workspace` | `true` takes the dependency from `[workspace.dependencies]` |
 
-- A package name is 1 to 64 bytes of lowercase letters, digits, and `_`, starting with a letter.
-  The names of the standard libraries, such as `string`, `table`, `list`, and `package`, are
-  reserved, because `require("string")` returns the `string` library.
-- A field the format doesn't define is an error, with a hint naming the closest field that exists,
-  so a typo such as `dependancies` can't drop a dependency without anyone noticing.
-- A manifest with no `package` table is a virtual manifest. It can hold `workspace` or `tools`, so
-  a folder of loose scripts still has one place for its tool settings.
-- Errors in a manifest or a lock file are diagnostics with `M` codes, with spans in the file
-  ([`diagnostics.md`](diagnostics.md#codes)).
+- In Cargo, a bare string such as `json = "1.4"` means a version from crates.io. Lunaferra has no
+  registry yet, so a bare string is an error whose hint says to add `git` or `path`.
+- A package name is 1 to 64 bytes of lowercase letters, digits, and `_`, starting with a letter,
+  so it can be the first part of a module name. The names of the standard libraries, such as
+  `string`, `table`, `list`, and `package`, are reserved, because `require("string")` returns the
+  `string` library.
+- A key the format doesn't define is an error, with a hint naming the closest key that exists, so
+  a typo such as `[dev_dependencies]` or `dependancies` can't drop a dependency without anyone
+  noticing.
+- A manifest with no `[package]` table is a virtual manifest. It can hold `[workspace]`, `[lints]`,
+  or `[tools]`, so a folder of loose scripts still has one place for its tool settings.
+- Errors in a manifest, a lock file, or a config file are diagnostics with `M` codes, at the span
+  of the key or value that is wrong ([`diagnostics.md`](diagnostics.md#codes)).
 
 ## Workspaces
 
 A workspace is a set of packages developed together, as in Cargo. Its root manifest lists the
-member folders, and each member has a manifest of its own:
+member folders, and can declare what its members share:
 
-```lua
-return {
-  workspace = { members = { "game", "packages/*" } },
-}
+```toml
+[workspace]
+members = ["game", "packages/*"]
+
+[workspace.package]
+version = "0.3.1"
+license = "MIT"
+
+[workspace.dependencies]
+json = { git = "https://github.com/example/lf-json", version = "1.4" }
+
+[workspace.lints]
+L0001 = "off"
 ```
 
-- A pattern may end in `*`, which matches each folder at that level that holds a manifest.
+A member takes what it shares with `workspace = true`, as a Cargo member does:
+
+```toml
+[package]
+name = "game"
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+json.workspace = true
+util = { path = "../util" }
+
+[lints]
+workspace = true
+```
+
+- A pattern in `members` may end in `*`, which matches each folder at that level that holds a
+  manifest.
 - Members share one `Lunaferra.lock`, at the workspace root, so they agree on every version.
 - Members depend on each other by `path`.
-- A member that has no `tools` table of its own uses the root's.
+- `[workspace.package]` can hold `version`, `license`, and `lunaferra-version`. A member that sets
+  `workspace = true` on a key the root doesn't define is an error.
+- `[workspace.lints]` and `[workspace.tools]` reach only the members whose `[lints]` or `[tools]`
+  says `workspace = true`, so a member never inherits a setting without saying so.
 
 ## Versions and requirements
 
@@ -229,7 +267,7 @@ them:
 ## Sources
 
 - **Path.** The package in a folder. A path dependency always uses the folder's current files, and
-  the lock file records its version but no commit.
+  the lock file records its version but no source, as `Cargo.lock` does.
 - **Git.** A package at the root of a Git repository, at one commit. `rev` names a full commit
   hash, 40 hexadecimal digits for a SHA-1 repository or 64 for a SHA-256 one; a short hash is
   refused, because it can match more than one commit. `tag` and `branch` name the commit that the
@@ -265,32 +303,72 @@ input, so the step limit makes a hostile set of manifests fail fast instead of h
 ## The lock file: `Lunaferra.lock`
 
 `lunaferra fetch` writes the lock file at the root of a package or workspace, and the project
-commits it. It is data-only Lua, which the same reader reads:
+commits it. It is TOML in the shape of `Cargo.lock`: a `version` key for the file's format, then
+one `[[package]]` table for each package the workspace's members need, dev-dependencies included.
 
-```lua
--- Written by `lunaferra fetch`. Edit the manifests instead of this file.
-return {
-  format = 1,
-  packages = {
-    { name = "check", version = "2.0.0", git = "https://github.com/example/lf-check",
-      commit = "52d7e0c4a19f3b6e8d2c5a7f0b4e9d1c3a6f8b2e" },
-    { name = "game", version = "0.3.1", path = ".",
-      dependencies = { "check 2.0.0", "json 1.4.2", "util 0.2.0" } },
-    { name = "json", version = "1.4.2", git = "https://github.com/example/lf-json",
-      commit = "9c1f5e0d2a7b4c3e8f6a1d0b5e2c7f4a9b3d6e8c" },
-    { name = "util", version = "0.2.0", path = "../util" },
-  },
-}
+```toml
+# Written by `lunaferra fetch`. Edit the manifests instead of this file.
+version = 1
+
+[[package]]
+name = "check"
+version = "2.0.0"
+source = "git+https://github.com/example/lf-check?tag=v2.0.0#52d7e0c4a19f3b6e8d2c5a7f0b4e9d1c3a6f8b2e"
+
+[[package]]
+name = "game"
+version = "0.3.1"
+dependencies = [
+  "check",
+  "json",
+  "util",
+]
+
+[[package]]
+name = "json"
+version = "1.4.2"
+source = "git+https://github.com/example/lf-json?tag=v1.4.2#9c1f5e0d2a7b4c3e8f6a1d0b5e2c7f4a9b3d6e8c"
+
+[[package]]
+name = "util"
+version = "0.2.0"
 ```
 
-- The lock file holds every package the workspace's members need, dev-dependencies included.
-- Entries are sorted by name and then version, and each `dependencies` list is sorted, so the file
-  changes only where the resolution does, and the same resolution gives the same bytes on every
-  platform.
-- `format` is the lock file's own version. A release that can't read a format refuses the file
-  with a message naming the release that can.
+- A Git package's `source` is written as Cargo writes it: `git+`, the URL, the tag, branch, or
+  rev it was picked by, and `#` with the full commit hash. A path package has no `source`.
+- Each `dependencies` entry is a package's name, or its name and version, such as `"json 1.4.2"`,
+  when the lock file holds more than one version of that name, as in `Cargo.lock`.
+- Packages are sorted by name and then version, each `dependencies` array is sorted, and the
+  writer of [`toml.md`](toml.md#the-writer) lays out every file the same way, so the file changes
+  only where the resolution does, and the same resolution gives the same bytes on every platform.
+- `version` is the lock file's format. A release that can't read a format refuses the file with a
+  message naming the release that can.
 - With `--locked`, a command that would change the lock file fails instead, naming the first
   package that would change. CI runs with `--locked`, so a stale lock file fails the build.
+
+## Configuration: `config.toml`
+
+The package commands read settings from `config.toml` files, as Cargo reads `.cargo/config.toml`:
+
+1. `.lunaferra/config.toml` in the current folder and in each folder above it, nearest first;
+2. `config.toml` in the cache folder, `LUNAFERRA_HOME` or `.lunaferra` in the home folder.
+
+A key in a nearer file wins over the same key in a farther one, a file read twice counts once, and
+a command-line flag wins over every file.
+
+```toml
+[net]
+offline = true        # as if every command had --offline
+
+[source]
+vendor = "vendor"     # read packages from this folder, which lunaferra vendor wrote
+```
+
+- These are the only keys. No key names a program, so a config file in a project someone else
+  wrote can't make `lunaferra` run anything but `git`.
+- `source.vendor` is relative to the folder that holds `.lunaferra/`. With it, every command reads
+  locked packages from that folder and never fetches; a package missing from it is an error that
+  names the package.
 
 ## Fetching with Git
 
@@ -325,9 +403,10 @@ programs.
   an error that names the package.
 
 `lunaferra vendor` copies every locked package's manifest and `src/` into
-`vendor/<name>-<version>/`, so a project can build with no network and a host can bundle its
-packages. A host on iOS or the web, where there is no `git` to run, ships the vendored files inside
-its binary.
+`vendor/<name>-<version>/`, then prints the `[source]` lines to add to `.lunaferra/config.toml`, as
+`cargo vendor` does. A project can then build with no network, and a host can bundle its packages.
+A host on iOS or the web, where there is no `git` to run, ships the vendored files inside its
+binary.
 
 ## How a state uses the graph
 
@@ -352,8 +431,9 @@ the language server resolve each `require` to the module the VM would load
 The sketch shows the shape; M14.1 to M14.4 settle the names.
 
 ```rust
-pub struct Manifest { /* package, exports, dependencies, dev_dependencies, workspace, tools */ }
-pub struct Lock { /* sorted entries: name, version, source, commit, dependencies */ }
+pub struct Manifest { /* package, dependencies, dev_dependencies, workspace, lints, tools */ }
+pub struct Lock { /* sorted packages: name, version, source, dependencies */ }
+pub struct Config { /* net.offline, source.vendor */ }
 pub struct Version { /* major, minor, patch, pre-release, build metadata */ }
 pub struct VersionReq { /* the comparators of one requirement */ }
 
@@ -391,8 +471,8 @@ M14.1 and M14.3 set them.
 
 | Limit | Default |
 | :- | :- |
-| Size of a manifest or a lock file | 1 MB |
-| Nesting depth of the tables in a manifest | 16 |
+| Size of a manifest, a lock file, or a config file | 1 MB |
+| Nesting depth of the arrays and tables in a manifest | 16 |
 | Dependencies of one package | 1,000 |
 | Packages in one resolved graph | 10,000 |
 | Resolver steps | 1,000,000 |
@@ -402,8 +482,8 @@ M14.1 and M14.3 set them.
 
 ## Invariants
 
-1. Reading a manifest or a lock file runs no code: any expression besides a table constructor, a
-   string, a number, or a boolean is rejected.
+1. A manifest, a lock file, or a config file that isn't TOML 1.0.0, holds a key this spec doesn't
+   define, or gives a value of the wrong type is rejected with an `M` diagnostic at its span.
 2. A module can require only its own package's modules, the root and exported modules of the
    packages its manifest lists, and the host's modules.
 3. Every version the resolver chooses meets every requirement on its series in the graph.
@@ -415,12 +495,16 @@ M14.1 and M14.3 set them.
    nothing reaches it but regular files.
 8. With `--locked`, no command changes `Lunaferra.lock`; with `--offline`, no command starts a
    network operation.
+9. No file this spec defines names a program, so `git` is the only program a package command
+   starts.
 
 ## Tests
 
-- Invariant 1: hostile-input tests in `crates/package/tests/hostile_manifest.rs` give manifests
-  and lock files with calls, operators, names, and each limit one past its value, and expect each
-  exact error; the `manifest` and `lock` fuzz targets.
+- Invariant 1: hostile-input tests in `crates/package/tests/hostile_manifest.rs` give manifests,
+  lock files, and config files with unknown keys, `[dev_dependencies]` for `[dev-dependencies]`,
+  a bare version string, values of the wrong type, `workspace = true` on a key the root lacks, and
+  each limit one past its value, and expect each exact diagnostic; the `manifest` and `lock` fuzz
+  targets. [`toml.md`](toml.md#tests) tests TOML itself.
 - Invariant 2: integration tests in `crates/lunaferra/tests/packages.rs` require a private module
   of another package, a package the manifest doesn't list, and a host module, each in a sandboxed
   state, and check each result and message.
@@ -436,5 +520,7 @@ M14.1 and M14.3 set them.
 - Invariant 8: end-to-end tests run every package command with `--locked` and compare the lock
   file before and after. With `--offline`, the tests first move the remote repositories away, and
   each command either succeeds from the cache or fails naming the missing package.
+- Invariant 9: a test compares the keys the config reader accepts with the table in
+  [Configuration](#configuration-configtoml), so a new key needs a change to this spec.
 - The `version` fuzz target, and a property test that parsing a version's text gives the same
   version back.

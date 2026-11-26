@@ -7,16 +7,18 @@ reference counting, with a loop collector that runs at points the program fixes,
 the same values in the same order.
 
 **Status:** design and the first test tools. The design documents in [`docs/`](docs/) are
-written, and the Cargo workspace has a crate for each part, apart from the package manager's,
-which waits for its decision records. Each holds only its documentation,
+written, and the Cargo workspace has a crate for each part, apart from the two that packages need,
+which wait for their decision records. Each holds only its documentation,
 except the test tools: the test kit, which has a seeded random generator and a property-test
 runner; the fuzzer, which runs its targets on mutated inputs and saves each input that makes one
 fail; and `xtask`, whose `cargo xtask coverage` measures which lines and regions of code the tests
 run, whose `cargo xtask fuzz` runs the fuzzer, and whose `cargo xtask record` saves what PUC-Rio
 Lua 5.5.1 prints for the Lua 5.5 twin of each conformance script. The fuzzer has only the two
 targets that test it so far. The one conformance script, `hello.lua`, has its twin's output
-recorded, and waits for the conformance runner that M2.14 builds. The next task is M0.6 in the
-[roadmap](docs/roadmap.md), which adds the continuous integration (CI) workflow.
+recorded, and waits for the conformance runner that M2.14 builds. The continuous integration (CI)
+workflow runs every check on each pull request, and each of its jobs must pass before a merge. The
+next task is M1.1 in the [roadmap](docs/roadmap.md), which starts the parser with source text,
+spans, and line maps.
 
 ## What is planned
 
@@ -37,7 +39,7 @@ recorded, and waits for the conformance runner that M2.14 builds. The next task 
 - **Six platforms:** Linux, Windows, macOS, Android, iOS, and the web, with the JIT on every one
   that allows it and the same results on each, as [`docs/03-platforms.md`](docs/03-platforms.md)
   plans.
-- **Packages, as Cargo has them:** a manifest, `Lunaferra.lua`, will name each package, its
+- **Packages, as Cargo has them:** a TOML manifest, `Lunaferra.toml`, will name each package, its
   version, the modules it exports, and its dependencies, from a folder or a Git repository; a lock
   file, `Lunaferra.lock`, will pin the version and commit of each; and a module will reach only
   its own package and the packages its manifest lists, as the [package spec](docs/specs/package.md)

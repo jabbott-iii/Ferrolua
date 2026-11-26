@@ -54,7 +54,8 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
   [`testing.md`](.claude/rules/testing.md) has the details.
 - Use `unsafe` only where an accepted architecture decision record (ADR) allows it, as the unsafe
   policy in [`rust.md`](.claude/rules/rust.md) describes.
-- Run every check before you open a pull request:
+- Run every check before you open a pull request. CI runs the same commands on it, as
+  "Pull requests" below describes:
 
   ```bash
   cargo fmt --all --check
@@ -62,12 +63,14 @@ format tools, as [`dependencies.md`](.claude/rules/dependencies.md) describes.
   cargo test --workspace --locked
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
   cargo xtask coverage
+  cargo tree --workspace --edges normal,build,dev --target all --prefix none
   ```
 
   A passing run prints no warnings, and each command exits with status 0. `cargo test` ends the
   summary of each test binary with `test result: ok.` and `0 failed`, and `cargo xtask coverage`
   ends its report with `every line and region is covered`. When it doesn't, it lists each line and
   region that no test ran, as [`docs/04-quality.md`](docs/04-quality.md#xtask) describes.
+  `cargo tree` lists only Lunaferra's own crates, each with its path in your clone.
 
 ## Commit
 
@@ -111,9 +114,11 @@ Update them in the same change, in the shape
 
 - Open each pull request against `main`. Its template asks what changed and why, how you checked
   it, and what is left for later.
-- Every check in "Make a change" must pass. CodeQL scans each pull request on GitHub; until a
-  continuous integration (CI) workflow runs the other checks, run them yourself and list them in
-  the description.
+- Every check in "Make a change" must pass. On each pull request, the continuous integration (CI)
+  workflow, `.github/workflows/ci.yml`, runs each check as a job of its own, and fuzzes each fuzz
+  target for 60 s, as [`docs/04-quality.md`](docs/04-quality.md#continuous-integration) describes.
+  CodeQL also scans the code. The pull request shows each job's result, and a failed job's log
+  shows the command that failed, so you can run it again on your machine.
 - [@jabbott-iii](https://github.com/jabbott-iii) reviews each pull request, as
   `.github/CODEOWNERS` assigns.
 

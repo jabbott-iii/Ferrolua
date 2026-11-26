@@ -1,13 +1,15 @@
 //! A campaign: `cargo xtask fuzz <target>` runs the target on one mutated input after another, in
 //! batches of [`BATCH`] runs to a child process, and stops at the first input that fails. It then
-//! shrinks that input, saves it, and reports it.
+//! shrinks that input, saves it, and reports it. Without a failure, it stops once it has made the
+//! runs that `--runs` asks for, or once the time that `--seconds` gives is up. It checks the time
+//! before each batch, so a campaign can run past its time by up to one batch.
 //!
 //! A campaign stops at the first failure, because the inputs after it would most often find the
 //! same bug again. Once the bug is fixed, the next campaign from the same seed runs past it.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::error::Error;
 use crate::folder;
@@ -31,6 +33,8 @@ pub(crate) struct Options {
     pub(crate) seed: u64,
     /// How many runs to make, unless one fails first.
     pub(crate) runs: u64,
+    /// How long the campaign may start new batches of runs, or `None` for no limit.
+    pub(crate) duration: Option<Duration>,
     /// How long one input may run before it counts as a hang.
     pub(crate) time_limit: Duration,
     /// The folder of corpus folders, one for each target.
@@ -126,8 +130,13 @@ pub(crate) fn run(exe: &Path, work: PathBuf, options: &Options) -> Result<Report
     let target = options.target;
     let corpus = folder::corpus(&options.corpus.join(target.name))?;
     let runner = Runner::new(exe, options.time_limit, work)?;
+    let began = Instant::now();
     let mut start = 0;
-    while start < options.runs {
+    while start < options.runs
+        && options
+            .duration
+            .is_none_or(|duration| began.elapsed() < duration)
+    {
         let end = options.runs.min(start.saturating_add(BATCH));
         let mut inputs: Vec<Vec<u8>> = (start..end)
             .map(|run| mutate(&corpus, options.seed.wrapping_add(run)))
@@ -140,7 +149,7 @@ pub(crate) fn run(exe: &Path, work: PathBuf, options: &Options) -> Result<Report
     }
     Ok(Report::Passed {
         target: target.name,
-        runs: options.runs,
+        runs: start,
         seed: options.seed,
     })
 }
@@ -204,6 +213,7 @@ mod tests {
             target: target::find("fixture-panic").unwrap(),
             seed: 0,
             runs: 10,
+            duration: None,
             time_limit: Duration::from_millis(1000),
             corpus: folder.join("corpus"),
             regressions: folder.join("regressions"),
@@ -242,6 +252,30 @@ mod tests {
         let folder = folder("no-runs");
         let options = Options {
             runs: 0,
+            ..options(&folder)
+        };
+        let report = run(
+            &folder.join("no-such-program"),
+            folder.join("work"),
+            &options,
+        )
+        .unwrap();
+        assert_eq!(
+            report,
+            Report::Passed {
+                target: "fixture-panic",
+                runs: 0,
+                seed: 0
+            }
+        );
+        fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn makes_no_run_once_its_time_is_up() {
+        let folder = folder("no-time");
+        let options = Options {
+            duration: Some(Duration::ZERO),
             ..options(&folder)
         };
         let report = run(

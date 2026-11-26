@@ -42,17 +42,18 @@ branches".
   and in `benches/lua/`, where PUC-Rio runs each script's Lua 5.5 twin, and M5.9 makes each agreed
   budget a check that fails the build
 - **Security checks:** hostile-input tests for the lexer, parser, compiler, bytecode loader,
-  sandbox limits, package manifests and lock files, and Git sources in each crate's `tests/`; and
-  fuzz targets for every parser of outside data, in `fuzz/`, run by Lunaferra's own std-only fuzzer
-  from a fixed seed. Every input that ever crashed a target is saved in `fuzz/regressions/` and
-  replayed by `cargo test`. How long each target runs in CI is set when the CI workflow lands. No
-  dependency audit runs, because Lunaferra has no
-  dependencies
-- **CI:** none yet: Lunaferra has no GitHub Actions workflows. The first,
-  `.github/workflows/ci.yml`, will run the **Check commands**, the **Test commands**, and the
-  **Coverage command** on x86-64 Linux, and from M3.18 on the tests on every target in
-  `docs/03-platforms.md`, with coverage on Linux, Windows, and macOS, and every job required before
-  a merge to `main`
+  sandbox limits, TOML files, package manifests and lock files, and Git sources in each crate's
+  `tests/`; and fuzz targets for every parser of outside data, in `fuzz/`, run by Lunaferra's own
+  std-only fuzzer from a fixed seed. Every input that ever crashed a target is saved in
+  `fuzz/regressions/` and replayed by `cargo test`. CI fuzzes each target that
+  `cargo xtask fuzz --list` prints, which leaves out the two fixtures, for 60 s from seed 0. No
+  dependency audit runs, because Lunaferra has no dependencies
+- **CI:** `.github/workflows/ci.yml`, on every pull request to `main` and every push to it, runs the
+  **Check commands**, the **Test commands**, the **Coverage command**, the dependency check of
+  `docs/04-quality.md`, and the fuzz run of the **Security checks** on x86-64 Linux, one job each.
+  From M3.18 on, it also runs the tests on every target in `docs/03-platforms.md`, with coverage on
+  Linux, Windows, and macOS. The owner makes every job required before a merge to `main`, once a
+  pull request has shown each one passing (M0.6)
 
 ## A failing test means the code is wrong
 

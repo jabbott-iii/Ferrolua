@@ -49,7 +49,8 @@ describes; the `lunaferra` crate's scope is `lunaferra`.
 | `lunaferra-fmt` | Formatter | syntax | Yes | [fmt](specs/fmt.md) | M7.4 |
 | `lunaferra-sast` | Taint analysis and security rules, with SARIF output | analysis, types, json | Yes | [sast](specs/sast.md) | M8.1 |
 | `lunaferra-json` | JSON values, parser, writer, and protocol message framing | — | Yes | [json](specs/json.md) | M6.9 |
-| `lunaferra-package` | Package manifests, lock files, versions, the dependency resolver, and the module graph (ADR-0038, ADR-0039) | syntax | Yes | [package](specs/package.md) | M14.1 |
+| `lunaferra-toml` | TOML values, parser, writer, and a document that keeps comments for editing (ADR-0038) | — | Yes | [toml](specs/toml.md) | M14.9 |
+| `lunaferra-package` | Package manifests, lock files, config files, versions, the dependency resolver, and the module graph (ADR-0038, ADR-0039) | syntax, toml | Yes | [package](specs/package.md) | M14.1 |
 | `lunaferra-lsp` | Language server | json, analysis, types, lint, fmt, sast | Yes | [lsp](specs/lsp.md) | M9 |
 | `lunaferra-dap` | Debug adapter | json, lunaferra | Yes | [dap](specs/dap.md) | M10 |
 | `lunaferra-cli` | The `lunaferra` command, including fetching packages with Git | all of the above | Yes | [cli](specs/cli.md) | M1.10 |
@@ -72,7 +73,7 @@ A crate may depend only on crates in lower layers, or on lower crates in its own
 | 3. Front ends | `lunaferra-cli`, `lunaferra-dap` | `lunaferra-cli`, `lunaferra-lsp` |
 | 2. Services | `lunaferra` (embedding API) | `lunaferra-lint`, `lunaferra-sast`, `lunaferra-fmt` |
 | 1. Engines | `lunaferra-compiler`, `lunaferra-vm`, `lunaferra-stdlib`, `lunaferra-jit` | `lunaferra-analysis`, `lunaferra-types` |
-| 0. Foundations | `lunaferra-syntax`, `lunaferra-package`, `lunaferra-bytecode`, `lunaferra-json` | `lunaferra-syntax`, `lunaferra-package`, `lunaferra-json` |
+| 0. Foundations | `lunaferra-syntax`, `lunaferra-toml`, `lunaferra-package`, `lunaferra-bytecode`, `lunaferra-json` | `lunaferra-syntax`, `lunaferra-toml`, `lunaferra-package`, `lunaferra-json` |
 
 - The runtime stack never depends on the analysis stack, so a host that embeds Lunaferra doesn't
   build the type checker. The compiler reads type annotations from the syntax tree and stores them
@@ -108,6 +109,7 @@ flowchart TB
   bytecode["lunaferra-bytecode<br/>(M2.1)"]:::planned
   syntax["lunaferra-syntax<br/>(M1)"]:::planned
   json["lunaferra-json<br/>(M6.9)"]:::planned
+  toml["lunaferra-toml<br/>(M14.9)"]:::planned
   pkg["lunaferra-package<br/>(M14.1)"]:::planned
   math["lunaferra-math<br/>(M2.19)"]:::planned
 
@@ -145,6 +147,7 @@ flowchart TB
   analysis -.-> syntax
   fmt -.-> syntax
   pkg -.-> syntax
+  pkg -.-> toml
   api -.-> pkg
   analysis -.-> pkg
   cli -.-> pkg
@@ -195,8 +198,9 @@ docs/                 these documents
 ## Building a project from packages
 
 1. `lunaferra fetch`, or any command that runs or checks a package, reads the manifest,
-   `Lunaferra.lua`, of the package or workspace it runs in, with `lunaferra-package`, which parses
-   it and never runs it (ADR-0016: a data-only Lua file).
+   `Lunaferra.toml`, of the package or workspace it runs in, and the `config.toml` files above it,
+   with `lunaferra-package` and its TOML parser, `lunaferra-toml`. TOML holds only data, so reading
+   them runs no code.
 2. The resolver picks a version of each dependency that meets every requirement, trying the
    versions in `Lunaferra.lock` first, and writes the lock file again only if a choice changed
    (ADR-0039, proposed: dependencies from paths and Git, pinned in a lock file).
@@ -209,8 +213,8 @@ docs/                 these documents
 
 ## Checking a script
 
-1. `lunaferra check`, `lint`, or `sast`, or the language server, reads the `tools` table of the
-   nearest manifest, `Lunaferra.lua` (ADR-0016; ADR-0038), and the files it names.
+1. `lunaferra check`, `lint`, or `sast`, or the language server, reads `[lints]` and `[tools]` from
+   the nearest manifest, `Lunaferra.toml` (ADR-0038), and the files `[tools]` names.
 2. `lunaferra-syntax` builds a lossless tree for each file, with errors marked in place, so a file
    that doesn't parse still gets checked.
 3. `lunaferra-analysis` resolves names, builds each function's control flow graph, and links the
@@ -236,9 +240,10 @@ messages inside the VM's debug hook instead of on a thread of its own.
 | Libraries, limits, JIT mode, and strict-mode defaults for a state | `lunaferra::Options` | The host |
 | Chunk name, text or binary mode, and strict mode for one chunk | `lunaferra::ChunkOptions` | The host |
 | Strict mode for one file | A first line of `--!strict` (ADR-0008) | The script's author |
-| A package's name, version, exports, and dependencies | `Lunaferra.lua` (ADR-0038) | The package's author |
+| A package's name, version, exports, and dependencies | `Lunaferra.toml` (ADR-0038) | The package's author |
 | The exact version and commit of every dependency | `Lunaferra.lock` (ADR-0039), committed with the project | `lunaferra fetch` and `lunaferra update` |
-| Tool settings: paths, rules, format style, taint sources and sinks | The `tools` table of `Lunaferra.lua` (ADR-0016, ADR-0038) | The project |
+| Rule severities, and tool settings: paths, format style, taint sources and sinks | `[lints]` and `[tools]` in `Lunaferra.toml` (ADR-0038) | The project |
+| Working offline, and reading vendored packages | `.lunaferra/config.toml`, and `config.toml` in the cache folder (ADR-0039) | The project and the user |
 | Where fetched packages are kept | `LUNAFERRA_HOME`, or `.lunaferra` in the home folder | The user |
 | One run of a tool | Command-line flags, which override the manifest | The user |
 

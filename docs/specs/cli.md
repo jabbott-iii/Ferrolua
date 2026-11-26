@@ -38,12 +38,14 @@ the logic lives.
 | `lunaferra` | With no arguments, starts an interactive prompt when standard input is a terminal, and otherwise runs standard input as a script (ADR-0033) | M3.19 |
 
 The checking commands share `--format text|json|sarif` and `--manifest <file>`. With no paths, they
-check the files the manifest's `tools.include` names; in a package without one, its `src/`,
-`tests/`, and `examples/`; and otherwise every `.lua` file under the current directory.
+check the files that `include` in the manifest's `[tools]` names; in a package without it, its
+`src/`, `tests/`, and `examples/`; and otherwise every `.lua` file under the current directory.
 
 The commands that read packages share `--locked`, which fails instead of changing
-`Lunaferra.lock`, and `--offline`, which starts no network operation and uses only the cache
-([`package.md`](package.md#the-lock-file-lunaferralock)).
+`Lunaferra.lock` ([`package.md`](package.md#the-lock-file-lunaferralock)), and `--offline`, which
+starts no network operation and uses only the cache. They also read the `config.toml` files that
+[`package.md`](package.md#configuration-configtoml) describes, as Cargo reads
+`.cargo/config.toml`, and a flag wins over every file.
 
 ## The interactive prompt (ADR-0033)
 

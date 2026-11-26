@@ -1428,13 +1428,72 @@ fn gives_back_every_conformance_script_and_its_twin_from_its_parsed_tree() {
     assert!(scripts >= 4);
 }
 
-/// Pieces of statements that generated sources are built from: every token that starts or ends
-/// a statement, names that are attributes or keywords in some places, and broken tokens.
-const PIECES: [&str; 50] = [
-    "local", "global", "function", "nonlocal", "return", "break", "goto", "do", "end", "while",
-    "repeat", "until", "if", "then", "elseif", "else", "for", "in", "x", "y", "const", "close",
-    "=", ",", ".", ":", "::", ";", "(", ")", "[", "]", "<", ">", "*", "...", "1", "'s'", "[[l]]",
-    "nil", "+", "{", "f\"{x}\"", "0x", "'open", "--[[", "@", "\0", "\n", "-- c\n",
+/// Pieces of statements and expressions that generated sources are built from: every token that
+/// starts or ends a statement, names that are attributes or keywords in some places, operators,
+/// Lua's operators that Lunaferra replaced, and broken tokens.
+const PIECES: [&str; 62] = [
+    "local",
+    "global",
+    "function",
+    "nonlocal",
+    "return",
+    "break",
+    "goto",
+    "do",
+    "end",
+    "while",
+    "repeat",
+    "until",
+    "if",
+    "then",
+    "elseif",
+    "else",
+    "for",
+    "in",
+    "x",
+    "y",
+    "const",
+    "close",
+    "=",
+    ",",
+    ".",
+    ":",
+    "::",
+    ";",
+    "(",
+    ")",
+    "[",
+    "]",
+    "<",
+    ">",
+    "*",
+    "...",
+    "1",
+    "'s'",
+    "[[l]]",
+    "nil",
+    "+",
+    "{",
+    "f\"{x}\"",
+    "0x",
+    "'open",
+    "--[[",
+    "@",
+    "\0",
+    "\n",
+    "-- c\n",
+    "}",
+    "-",
+    "**",
+    "not",
+    "is",
+    "and",
+    "or",
+    "==",
+    "..",
+    "~=",
+    "~",
+    "f\"{x:>{y}}\"",
 ];
 
 /// Chooses a number below `bound`, as a `usize`.
@@ -1493,7 +1552,7 @@ struct Scope {
     vararg: bool,
 }
 
-/// Generates a valid program of Lua 5.5's statements and the expressions M1.4 reads.
+/// Generates a valid program of Lua 5.5's statements and of every expression.
 ///
 /// Each loop goes on, and each optional part is added, only for a choice of 1, so that a choice
 /// of 0, which the runner gives once a shrunk case's choices run out, ends the program. An index
@@ -1745,7 +1804,79 @@ fn generate_exprs(source: &mut Source, scope: Scope, out: &mut String) {
     }
 }
 
+/// The binary operators, comparisons included, with a space on each side, because `- -` must
+/// not become a comment.
+const BINARY: [&str; 25] = [
+    " or ", " and ", " < ", " <= ", " > ", " >= ", " == ", " != ", " in ", " not in ", " is ",
+    " is not ", " | ", " ^ ", " & ", " << ", " >> ", " + ", " - ", " * ", " / ", " // ", " % ",
+    " ** ", " <\n ",
+];
+
+/// Generates an expression: a simple one, or, while the depth lasts, an operator and its
+/// operands, a conditional expression, or a constructor. Each operand is simple or in
+/// parentheses, so that no `not` or conditional expression lands where the grammar forbids one;
+/// the precedence property test in `tests/expression.rs` checks how operators group.
 fn generate_expr(source: &mut Source, scope: Scope, out: &mut String) {
+    let inner = Scope {
+        depth: scope.depth.saturating_sub(1),
+        ..scope
+    };
+    if scope.depth == 0 {
+        generate_simple(source, scope, out);
+        return;
+    }
+    match below(source, 14) {
+        0..=6 => generate_simple(source, scope, out),
+        7 => {
+            generate_operand(source, inner, out);
+            out.push_str(BINARY[below(source, BINARY.len())]);
+            generate_operand(source, inner, out);
+        }
+        8 => {
+            out.push_str(["-", "+", "~", "#", "not"][below(source, 5)]);
+            out.push(' ');
+            generate_operand(source, inner, out);
+        }
+        9 => {
+            generate_operand(source, inner, out);
+            out.push_str(" if ");
+            generate_operand(source, inner, out);
+            out.push_str(" else ");
+            generate_operand(source, inner, out);
+        }
+        10 => generate_table(source, inner, out),
+        11 => {
+            out.push_str(if source.below(2) == 1 { "[ " } else { "(" });
+            let close = if out.ends_with('(') { ")" } else { "]" };
+            if source.below(3) != 0 {
+                generate_exprs(source, inner, out);
+                if close == ")" || source.below(2) == 1 {
+                    out.push(',');
+                }
+            }
+            out.push_str(close);
+        }
+        12 => generate_fstring(source, inner, out),
+        _ => {
+            out.push_str("function");
+            generate_body(source, inner, out);
+        }
+    }
+}
+
+/// Generates an operand: a simple expression, or any expression in parentheses.
+fn generate_operand(source: &mut Source, scope: Scope, out: &mut String) {
+    if source.below(3) == 1 {
+        out.push('(');
+        generate_expr(source, scope, out);
+        out.push(')');
+    } else {
+        generate_simple(source, scope, out);
+    }
+}
+
+/// Generates a literal, `...`, or a prefix expression.
+fn generate_simple(source: &mut Source, scope: Scope, out: &mut String) {
     match below(source, 8) {
         0 => out.push_str("nil"),
         1 => out.push_str(if source.below(2) == 1 {
@@ -1762,6 +1893,59 @@ fn generate_expr(source: &mut Source, scope: Scope, out: &mut String) {
         4 if scope.vararg => out.push_str("..."),
         _ => generate_prefix(source, scope, out),
     }
+}
+
+/// Generates a table constructor, with fields of each kind.
+fn generate_table(source: &mut Source, scope: Scope, out: &mut String) {
+    out.push('{');
+    while source.below(3) != 0 {
+        match below(source, 4) {
+            0 => generate_expr(source, scope, out),
+            1 => {
+                out.push_str(name(source));
+                out.push_str(" = ");
+                generate_expr(source, scope, out);
+            }
+            2 => {
+                out.push_str("[ ");
+                generate_expr(source, scope, out);
+                out.push_str("] = ");
+                generate_expr(source, scope, out);
+            }
+            _ => {
+                // A list, which a field that starts with `[` and has no `=` after its `]` is.
+                out.push_str("[ ");
+                generate_expr(source, scope, out);
+                out.push_str("] + [ ]");
+            }
+        }
+        out.push_str(if source.below(2) == 1 { ", " } else { "; " });
+    }
+    out.push('}');
+}
+
+/// Generates an f-string, with text, fields, conversions, and specs. Each field's expression
+/// is in parentheses, so a `:` or `!` inside it is never the field's own.
+fn generate_fstring(source: &mut Source, scope: Scope, out: &mut String) {
+    out.push_str("f\"a");
+    while source.below(3) != 0 {
+        out.push_str("{(");
+        generate_expr(source, scope, out);
+        out.push(')');
+        if source.below(3) == 1 {
+            out.push('=');
+        }
+        if source.below(3) == 1 {
+            out.push_str("!r");
+        }
+        if source.below(3) == 1 {
+            out.push_str(":>{(");
+            generate_expr(source, scope, out);
+            out.push_str(")}.2");
+        }
+        out.push_str("}{{b}}");
+    }
+    out.push('"');
 }
 
 /// Generates a name or a parenthesized expression, then fields, indexes, and calls.
@@ -1842,7 +2026,7 @@ fn generate_call(source: &mut Source, scope: Scope, out: &mut String) {
 }
 
 #[test]
-fn accepts_every_generated_program_of_the_statements_it_reads() {
+fn accepts_every_generated_program_of_every_statement_and_expression() {
     Config::default()
         .with_cases(2_000)
         .assert(generate_program, |program| {

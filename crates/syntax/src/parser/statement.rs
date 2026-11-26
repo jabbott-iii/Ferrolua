@@ -2,7 +2,8 @@
 //! PUC-Rio Lua 5.5.1's `statement` reads them, with the parts they share: blocks, attributes, and
 //! function bodies.
 
-use super::{Done, Function, ParseErrorKind, Parser};
+use super::expression::IfAfter;
+use super::{Done, Function, Marker, ParseErrorKind, Parser, PendingIf};
 use crate::{NodeKind, Span, TokenKind};
 
 use NodeKind as N;
@@ -37,9 +38,17 @@ impl Parser<'_> {
     }
 
     /// Reads statements up to a token that ends a block, as PUC-Rio's `statlist` does: a
-    /// `return` is always the last.
+    /// `return` is always the last. An `if` statement that a statement's last expression left
+    /// pending comes right after that statement.
     pub(super) fn statements(&mut self) {
-        while !self.block_ends() {
+        loop {
+            if let Some(pending) = self.pending_if.take() {
+                self.pending_if_stat(pending);
+                continue;
+            }
+            if self.block_ends() {
+                return;
+            }
             if self.at(T::Return) {
                 self.return_stat();
                 return;
@@ -120,6 +129,24 @@ impl Parser<'_> {
         let stat = self.start();
         self.bump();
         self.expr();
+        self.if_rest(stat, line);
+    }
+
+    /// Reads an `if` statement whose `if` and condition the parser read after an expression:
+    /// it puts back their events, and goes on from the condition, which may still be the first
+    /// part of a conditional expression, as in `if a if b else c then`.
+    fn pending_if_stat(&mut self, pending: PendingIf) {
+        let stat = self.start();
+        self.events.extend(pending.events);
+        if let Some(condition) = pending.condition {
+            self.conditional(condition, IfAfter::Conditional);
+        }
+        self.if_rest(stat, pending.line);
+    }
+
+    /// Reads the rest of an `if` statement after its condition: `then` and a block, each
+    /// `elseif` part, the `else` part, and `end`. The `if` ends on `line`.
+    fn if_rest(&mut self, stat: Marker, line: u32) {
         self.expect(T::Then);
         self.block();
         while self.at(T::Elseif) {
@@ -157,7 +184,7 @@ impl Parser<'_> {
         self.bump();
         self.loop_block();
         self.expect_closing(T::Until, T::Repeat, line);
-        self.expr();
+        self.expr_before(IfAfter::ConditionalOrStatement);
         self.complete(stat, N::RepeatStat);
     }
 
@@ -291,7 +318,7 @@ impl Parser<'_> {
         }
         self.complete(list, N::AttNameList);
         if self.eat(T::Equal) {
-            self.expr_list();
+            self.expr_list_before(IfAfter::ConditionalOrStatement);
         }
         self.complete(stat, N::LocalStat);
     }
@@ -327,7 +354,7 @@ impl Parser<'_> {
         }
         self.complete(list, N::AttNameList);
         if self.eat(T::Equal) {
-            self.expr_list();
+            self.expr_list_before(IfAfter::ConditionalOrStatement);
         }
         self.complete(stat, N::GlobalStat);
     }
@@ -431,7 +458,7 @@ impl Parser<'_> {
         let targets = self.complete(list, N::ExprList);
         let stat = self.precede(targets);
         self.expect(T::Equal);
-        self.expr_list();
+        self.expr_list_before(IfAfter::ConditionalOrStatement);
         self.complete(stat, N::AssignStat);
     }
 

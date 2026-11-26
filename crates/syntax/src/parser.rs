@@ -1,12 +1,12 @@
 //! The parser: [`parse`] reads the tokens of a source and returns the [`Event`]s of its tree,
 //! which [`SyntaxTree::build`](crate::SyntaxTree::build) turns into the lossless tree.
 //!
-//! It is hand-written, with recursive descent, and follows PUC-Rio Lua 5.5.1's `lparser.c` rule
-//! by rule, so it accepts the same statements and reports each mistake with the same message and
-//! line. It reads every statement, and the expressions that statements are built from; the rest
-//! of the expressions join it in M1.5. The statements and the expressions are modules of their
-//! own, and this module holds what both use: the cursor over the tokens, the markers that open
-//! and close nodes, and the errors.
+//! It is hand-written, with recursive descent for statements and precedence climbing for
+//! expressions. Where the syntax is Lua 5.5's, it follows PUC-Rio Lua 5.5.1's `lparser.c` rule by
+//! rule, so it accepts the same statements and reports each mistake with the same message and
+//! line; its expressions have Python's operators and precedence, as the language spec defines
+//! them. The statements and the expressions are modules of their own, and this module holds what
+//! both use: the cursor over the tokens, the markers that open and close nodes, and the errors.
 //!
 //! # Markers
 //!
@@ -19,6 +19,17 @@
 //! [`Parser::into_events`] writes each placeholder's `Start`, preceded by those of the nodes
 //! linked to it, so each node opens before what it holds. Every step takes constant time, so a
 //! chain of a million fields takes time in proportion to its length, not its square.
+//!
+//! # An `if` after an expression
+//!
+//! Lua needs nothing between two statements, so in `x = f if c then g() end`, an `if` statement
+//! follows an assignment, while in `x = f if c else g`, the `if` is part of a conditional
+//! expression. Both start with `if` and a condition after the expression, and only the token
+//! after the condition tells them apart. So the parser reads the `if` and the condition as a
+//! conditional expression's, and when no `else` follows and the statement may end after the
+//! expression, it moves their events aside, out of the statement's nodes. The statement finishes
+//! without them, and the `if` statement then starts with them, and goes on from the condition.
+//! Each event moves once, so the parser never reads a token twice.
 
 mod error;
 mod expression;
@@ -99,6 +110,22 @@ struct Parser<'s> {
     /// One entry for each function the parser is inside, the innermost last. The first is the
     /// main chunk's.
     functions: Vec<Function>,
+    /// The `if` statement that starts with the `if` and the condition read last after an
+    /// expression, until the statement that holds the expression is finished.
+    pending_if: Option<PendingIf>,
+}
+
+/// The start of an `if` statement that the parser read after an expression, as the start of a
+/// conditional expression, before the token after the condition showed it to be an `if`
+/// statement's.
+#[derive(Debug)]
+struct PendingIf {
+    /// The events of the `if` token and the condition, moved out of the statement before it.
+    events: Vec<Raw>,
+    /// The line where the `if` ends.
+    line: u32,
+    /// The condition's node, or `None` after an error that leaves none.
+    condition: Option<Done>,
 }
 
 /// A function the parser is inside.
@@ -173,6 +200,7 @@ impl<'s> Parser<'s> {
                 vararg: true,
                 loops: 0,
             }],
+            pending_if: None,
         }
     }
 
@@ -351,6 +379,19 @@ impl<'s> Parser<'s> {
     /// Reports `kind` near the current token, on the line where it ends, as PUC-Rio's
     /// `luaX_syntaxerror` does, and stops.
     fn error(&mut self, kind: ParseErrorKind) {
+        let near = self.near(self.token());
+        self.error_with(kind, near);
+    }
+
+    /// Reports `kind` at the current token, without `near`, on the line where the token ends, and
+    /// stops. The messages for Lua's operators take this form, because each names its token.
+    fn error_without_near(&mut self, kind: ParseErrorKind) {
+        self.error_with(kind, None);
+    }
+
+    /// Reports `kind` at the current token, on the line where it ends, with `near` after the
+    /// message, and stops.
+    fn error_with(&mut self, kind: ParseErrorKind, near: Option<Near>) {
         if self.stops_quietly() {
             return;
         }
@@ -359,7 +400,7 @@ impl<'s> Parser<'s> {
             kind,
             span: token.span,
             line: self.end_line(token),
-            near: self.near(token),
+            near,
         };
         self.events.push(Raw::Error(error));
         self.skip_rest();

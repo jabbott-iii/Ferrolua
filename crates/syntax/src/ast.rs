@@ -37,8 +37,10 @@
 //! ```
 
 pub use expression::{
-    Args, CallExpr, Expr, ExprList, FieldExpr, IndexExpr, LiteralExpr, MethodCallExpr, NameExpr,
-    ParenExpr, VarargExpr,
+    Args, BinaryExpr, CallExpr, CompareExpr, CompareOp, ConditionalExpr, Expr, ExprList,
+    FStringExpr, FStringField, FStringPart, FieldExpr, FormatSpec, FunctionExpr, IndexExpr,
+    IndexField, ListExpr, LiteralExpr, MethodCallExpr, NameExpr, NamedField, ParenExpr,
+    PositionalField, TableExpr, TableField, TupleExpr, UnaryExpr, VarargExpr,
 };
 pub use statement::{
     AssignStat, AttName, AttNameList, Attrib, BreakStat, CallStat, DoStat, ElseClause,

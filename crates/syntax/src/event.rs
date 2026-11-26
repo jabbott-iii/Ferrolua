@@ -42,11 +42,10 @@ pub enum Event {
 
 /// What a node of a syntax tree is.
 ///
-/// The kinds follow the grammar of Lua 5.5 (§9 of the manual) and Lunaferra's additions to it.
-/// Each statement and each part of one has a kind, and so do the expressions that statements are
-/// built from: names, parenthesized expressions, fields, indexes, calls, method calls, literals,
-/// and `...`. The other expressions gain theirs with their grammar, in task M1.5 of the roadmap.
-/// The [syntax spec](https://github.com/jabbott-iii/Lunaferra/blob/main/docs/specs/syntax.md#lossless-tree)
+/// The kinds follow the grammar of Lua 5.5 (§9 of the manual) and Lunaferra's additions to it:
+/// Python's operators and their precedence, conditional expressions, lists, tuples, and
+/// f-strings. Each statement, each expression, and each part of one has a kind. The
+/// [syntax spec](https://github.com/jabbott-iii/Lunaferra/blob/main/docs/specs/syntax.md#lossless-tree)
 /// gives the children of each kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -154,11 +153,61 @@ pub enum NodeKind {
     /// An expression, `:`, the method's name, and its [`Args`](NodeKind::Args), such as
     /// `s:upper()`.
     MethodCallExpr,
-    /// A call's arguments: `(`, an [`ExprList`](NodeKind::ExprList) if there are any, and `)`,
-    /// or one string.
+    /// A call's arguments: `(`, an [`ExprList`](NodeKind::ExprList) if there are any, and `)`;
+    /// one string; or one [`TableExpr`](NodeKind::TableExpr).
     Args,
     /// `nil`, `true`, `false`, a numeral, or a string.
     LiteralExpr,
     /// `...`, the vararg expression.
     VarargExpr,
+    /// A binary operator and its two operands, such as `a + b` or `a and b`: the left operand,
+    /// the operator's token, and the right operand. A comparison is a
+    /// [`CompareExpr`](NodeKind::CompareExpr) instead.
+    BinaryExpr,
+    /// A unary operator and its operand, such as `-x`, `#t`, or `not x`: the operator's token,
+    /// then the operand.
+    UnaryExpr,
+    /// One comparison or a chain of them, such as `a < b` or `a < b <= c`: the operands, with
+    /// the tokens of a comparison operator between each two. `not in` and `is not` are two
+    /// tokens each.
+    CompareExpr,
+    /// A conditional expression, such as `x if c else y`: the value when the condition is true,
+    /// `if`, the condition, `else`, and the value otherwise.
+    ConditionalExpr,
+    /// A function expression: `function` and a [`FuncBody`](NodeKind::FuncBody).
+    FunctionExpr,
+    /// A table constructor: `{`, each [`IndexField`](NodeKind::IndexField),
+    /// [`NamedField`](NodeKind::NamedField), and
+    /// [`PositionalField`](NodeKind::PositionalField), with a `,` or `;` after each but the last
+    /// and after the last if wanted, and `}`.
+    TableExpr,
+    /// A table field with a key in brackets, such as `[k] = v`: `[`, the key, `]`, `=`, and the
+    /// value.
+    IndexField,
+    /// A table field with a name for its key, such as `x = 1`: the name, `=`, and the value.
+    NamedField,
+    /// A table field with no key, such as the `1` of `{1}`, which takes the next position: its
+    /// value.
+    PositionalField,
+    /// A list literal, such as `[1, 2]`: `[`, the elements with a `,` between each two and after
+    /// the last if wanted, and `]`.
+    ListExpr,
+    /// A tuple literal, such as `(1, 2)`, `(1,)`, or `()`: `(`, the elements with a `,` after
+    /// each but the last, and after the last if wanted, and `)`. Only a comma makes a tuple, so
+    /// `(1)` is a [`ParenExpr`](NodeKind::ParenExpr).
+    TupleExpr,
+    /// An f-string, such as `f"a{x}b"`: its [`TokenKind::FStringStart`] token, each
+    /// [`TokenKind::FStringText`] token and [`FStringField`](NodeKind::FStringField) in order,
+    /// and its [`TokenKind::FStringEnd`] token.
+    FStringExpr,
+    /// A field of an f-string, such as `{x!r:>8}`: its [`TokenKind::FStringFieldStart`] token,
+    /// the expression, the `=` that writes the expression's text if there is one, the
+    /// [`TokenKind::FStringConversion`] token if there is one, the
+    /// [`FormatSpec`](NodeKind::FormatSpec) if there is one, and its
+    /// [`TokenKind::FStringFieldEnd`] token.
+    FStringField,
+    /// The format spec of an f-string's field, such as the `:>8` of `{x:>8}`: its
+    /// [`TokenKind::FStringSpec`] token, then each [`TokenKind::FStringText`] token and
+    /// [`FStringField`](NodeKind::FStringField) in order, as in `:>{width}`.
+    FormatSpec,
 }

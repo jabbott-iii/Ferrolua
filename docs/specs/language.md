@@ -56,9 +56,10 @@ Lunaferra implements all of Lua 5.5 that this spec doesn't change, including wha
 | `?` | Optional parameter or type |
 | `->` | Return type in a function type |
 
-- Lua's `..`, `~=`, and binary `~` aren't operators. The parser reports each with a message that
-  names its replacement, `+`, `!=`, or `^`, which M1.5 records here. `...` stays the vararg token,
-  and unary `~` stays bitwise NOT.
+- Lua's `..`, `~=`, and binary `~` aren't operators. After an operand, the parser reports each
+  with a message that names its replacement, `+`, `!=`, or `^`, as
+  [Operators](#operators-adr-0023) records. `...` stays the vararg token, and unary `~` stays
+  bitwise NOT.
 - The reserved words are Lua 5.5's 23 and `is` (ADR-0024). `in`, `not`, `if`, and `else`
   are already reserved in Lua.
 - `global` is reserved, as §3.1 of the manual lists it. PUC-Rio Lua 5.5.1's default build sets
@@ -94,6 +95,21 @@ Lunaferra implements all of Lua 5.5 that this spec doesn't change, including wha
 `and`, `or`, and `not` keep their spellings. Their meanings follow Python where the two languages
 differ, as the list below says.
 
+After an operand, each of Lua's operators that Lunaferra replaced stops the parse with a message
+that names the operator to write instead. The message names its token, so it has no `near`:
+
+| Lua's operator | Message |
+| :- | :- |
+| `..` | `'..' is not an operator: use '+' to join strings` |
+| `~=` | `'~=' is not an operator: use '!=' to test inequality` |
+| `~` after an operand | `'~' is not a binary operator: use '^' for bitwise XOR` |
+
+So `x = a .. b` gives `input:1: '..' is not an operator: use '+' to join strings`, on the line
+where the `..` ends. Where no operand comes before it, each is an unexpected symbol, as in Lua:
+`x = .. b` gives `unexpected symbol near '..'`. A statement that starts with an expression must
+be a call or an assignment, as in Lua, so the statement `a .. b` gives PUC-Rio's
+`syntax error near '..'`, as `a + b` does.
+
 ### Precedence
 
 From the loosest binding to the tightest, as in Python:
@@ -120,6 +136,13 @@ From the loosest binding to the tightest, as in Python:
   `(not a) == b`.
 - Joining strings has the precedence of `+`, where Lua's `..` bound more loosely than `+`. Lua's
   `"total: " .. a + b` adds first; Lunaferra writes `"total: " + tostring(a + b)`.
+- `not` may start only an operand of `and`, `or`, or another `not`, as `notexp` below says, so
+  `a == not b`, `a + not b`, and `-not a` give `unexpected symbol near 'not'`, as they would in
+  Python, where Lua reads them. Write `a == (not b)`.
+- Only a prefix expression, a name or a parenthesized expression, takes a field, an index, or a
+  call, as in Lua, where `"abc":upper()` must be written `("abc"):upper()`. A list or a tuple
+  literal isn't one, so `x = (1, 2)[0]` assigns the tuple and gives
+  `unexpected symbol near '['`. Write `((1, 2))[0]`.
 
 ```text
 exp        ::= orexp ['if' orexp 'else' exp]
@@ -208,6 +231,18 @@ the same way on both paths, so the parser never reads a token twice.
 local label = "even" if n % 2 == 0 else "odd"
 local x = f if c then g() end     -- an assignment, then an if statement
 ```
+
+A statement may end after the last value of an assignment or of a `local` or `global`
+declaration, and after the condition of `until`, so only there can the `if` start an `if`
+statement. That statement's errors are then PUC-Rio's: `x = f if c` gives
+`'then' expected near <eof>`. Everywhere else, such as after `return`, in the condition of `if`,
+`elseif`, or `while`, in a `for` loop's expressions, an argument, a table field, an index,
+parentheses, a list, a tuple, or an f-string's field, the `if` starts a conditional expression,
+and anything but `else` after its condition is an error: `return f if c then end` gives
+`'else' expected near 'then'`, where PUC-Rio Lua 5.5.1, which has no conditional expressions,
+gives `<eof> expected near 'if'`. An `if` statement's condition may itself be a conditional
+expression, so `x = f if a if b else c then g() end` is an assignment, then an `if` statement
+whose condition is `a if b else c`.
 
 ## Indexes and ranges (ADR-0023)
 
@@ -321,6 +356,16 @@ that started the spec. It ends after the `}` or the byte of the escape that fail
 line break. So `f"a}b"` gives `single '}' in f-string near 'f"a}'`, and `f"{x}}"` gives
 `single '}' in f-string near '}}'`. The lexer reports the first mistake in each stretch.
 
+The parser reads a field as `{`, an expression, `=` if wanted, a conversion, a spec, and `}`, so a
+mistake in a field gets the message it would get in any expression:
+
+| Mistake | Example | Message |
+| :- | :- | :- |
+| A field with no expression | `f"{}"` | `unexpected symbol near '}'` |
+| A token after the expression that is no part of the field | `f"{a b}"` | `'}' expected near 'b'` |
+| A spec that the closing quote ends | `f"{x:>8"` | `'}' expected near '"'` |
+| A conditional expression without `else` | `f"{a if b}"` | `'else' expected near '}'` |
+
 ## Scoping (ADR-0025)
 
 Every function, the main chunk included, owns the names its body assigns. A name resolves, from
@@ -408,6 +453,22 @@ ADR-0026.
 - `[[` always starts a long string, so a list whose first element is a list is written with a
   space: `[ [1, 2], [3] ]`. A `(` or `[` at the start of a line continues the expression before it,
   as `(` does in Lua, so `f()` followed by a line that starts with `[1]` indexes `f()`'s result.
+- A table field that starts with `[` is a key, as in Lua, when the brackets hold one expression
+  and `=` follows them: `{[k] = v}`. Otherwise the brackets are a list literal that starts the
+  field's value, so `{[1, 2], [3]}` holds two lists and `{[1] + xs}` one. A field that PUC-Rio
+  reads as a key with a mistake after it, Lunaferra reads as a list, so these broken fields get
+  other messages, and `{[1]}` is valid:
+
+  | Source | Lunaferra | PUC-Rio Lua 5.5.1 |
+  | :- | :- | :- |
+  | `x = {[1] 2}` | `'}' expected near '2'` | `'=' expected near '2'` |
+  | `x = {\n[1]` | `'}' expected (to close '{' at line 1) near <eof>` | `'=' expected near <eof>` |
+  | `x = {[1, 2] = 3}` | `'}' expected near '='` | `']' expected near ','` |
+  | `x = {[] = 1}` | `'}' expected near '='` | `unexpected symbol near ']'` |
+  | `x = {[\n1,` | `unexpected symbol near <eof>` | `']' expected near ','` |
+
+  Each is on line 1, apart from the two whose source holds a line break, `\n`, which are on
+  line 2 in both.
 
 ```lua
 local xs = [3, 1, 2]
@@ -667,9 +728,10 @@ return { load = function(text) return rules.check(json.decode(text)) end }
 
 ## Tests
 
-- Invariant 1: a property test in `lunaferra-syntax` generates expressions with `lunaferra-testkit`,
-  prints each parse fully parenthesized, and compares it with the grouping that a separate
-  precedence-climbing function in the test gives (M1.5).
+- Invariant 1: a property test in `crates/syntax/tests/expression.rs` generates 3,000 expressions
+  from the grammar of [Precedence](#precedence) with `lunaferra-testkit`, prints each parse fully
+  parenthesized, and compares it with the grouping that the grammar gives and with the one that a
+  separate precedence-climbing function in the test gives.
 - Invariant 2: a property test in `lunaferra-compiler` compiles generated typed programs with and
   without their annotations and compares the bytecode (M4.3).
 - Invariant 3: `tests/extensions/compound_assignment.lua` (M4.2) and

@@ -19,10 +19,12 @@ pub struct ParseError {
     /// name at fault: the attribute's name, or the second `<close>` variable's.
     pub span: Span,
     /// The line that PUC-Rio's message names: the line where the token the parser stopped at
-    /// ends, or, for an error written without `near`, where the last token it read ends.
+    /// ends, or, for an error that PUC-Rio writes without `near`, where the last token it read
+    /// ends.
     pub line: u32,
-    /// What the message says the error is near, or `None` for an error that PUC-Rio writes
-    /// without it: an attribute error, and an unexpected zero byte.
+    /// What the message says the error is near, or `None` for an error written without it: an
+    /// attribute error and an unexpected zero byte, which PUC-Rio writes so, and Lua's
+    /// operators that Lunaferra replaced, whose messages name the operator themselves.
     pub near: Option<Near>,
 }
 
@@ -54,7 +56,9 @@ impl std::error::Error for ParseError {}
 
 /// The kinds of [`ParseError`], each with the words of its message.
 ///
-/// Every kind comes from PUC-Rio Lua 5.5.1's parser, `lparser.c`, with the same words.
+/// Every kind but three comes from PUC-Rio Lua 5.5.1's parser, `lparser.c`, with the same words.
+/// The three that Lunaferra adds report Lua's operators that it replaced with Python's, after an
+/// expression, and name the replacement.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ParseErrorKind {
@@ -104,6 +108,15 @@ pub enum ParseErrorKind {
     /// `global variables cannot be to-be-closed`: a `<close>` attribute in a `global`
     /// declaration.
     GlobalToBeClosed,
+    /// `'..' is not an operator: use '+' to join strings`: Lua's operator that joins two
+    /// strings, after an expression.
+    LuaConcatenation,
+    /// `'~=' is not an operator: use '!=' to test inequality`: Lua's not-equal operator, after
+    /// an expression.
+    LuaNotEqual,
+    /// `'~' is not a binary operator: use '^' for bitwise XOR`: Lua's XOR operator, after an
+    /// expression. Before an operand, `~` is still bitwise NOT.
+    LuaBitwiseXor,
 }
 
 impl fmt::Display for ParseErrorKind {
@@ -137,6 +150,15 @@ impl fmt::Display for ParseErrorKind {
                 f.write_str("multiple to-be-closed variables in local list")
             }
             Self::GlobalToBeClosed => f.write_str("global variables cannot be to-be-closed"),
+            Self::LuaConcatenation => {
+                f.write_str("'..' is not an operator: use '+' to join strings")
+            }
+            Self::LuaNotEqual => {
+                f.write_str("'~=' is not an operator: use '!=' to test inequality")
+            }
+            Self::LuaBitwiseXor => {
+                f.write_str("'~' is not a binary operator: use '^' for bitwise XOR")
+            }
         }
     }
 }

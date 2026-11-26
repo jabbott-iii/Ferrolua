@@ -1,10 +1,10 @@
 //! `lunaferra-syntax` reads Lunaferra source. Today it holds the positions that every part of
 //! Lunaferra uses to point into source text, source IDs, byte spans, and line maps; the lexer,
-//! which splits a source into tokens; the parser, which reads every statement and the expressions
-//! that statements are built from, and emits the events of a tree; and the lossless syntax tree,
-//! which keeps every byte of the source and is built from those events. The rest of the
-//! expressions, error recovery, the compact tree for the compiler, and the diagnostic type that
-//! every tool shares join it in milestone M1 of the [roadmap], as the [syntax spec] describes.
+//! which splits a source into tokens; the parser, which reads every statement and expression,
+//! with Python's operators and their precedence, and emits the events of a tree; and the lossless
+//! syntax tree, which keeps every byte of the source and is built from those events. Error
+//! recovery, the compact tree for the compiler, and the diagnostic type that every tool shares
+//! join it in milestone M1 of the [roadmap], as the [syntax spec] describes.
 //!
 //! It depends on nothing but the standard library. The compiler and the analysis tools will read
 //! the trees it builds.
@@ -20,7 +20,8 @@
 //!   [`numeral_value`] gives a numeral's [`Number`].
 //! - The parser: [`parse`] reads a source's tokens and returns its [`Event`]s, each of which
 //!   starts a node of a [`NodeKind`], adds a token to it, finishes it, or reports a
-//!   [`ParseError`], with a [`ParseErrorKind`] and the message PUC-Rio Lua 5.5.1 gives.
+//!   [`ParseError`], with a [`ParseErrorKind`] and the message PUC-Rio Lua 5.5.1 gives where the
+//!   syntax is Lua's.
 //! - The lossless tree: [`SyntaxTree::build`] builds a [`SyntaxTree`] from a source's tokens and
 //!   its events, and [`SyntaxNode`], [`SyntaxToken`], and [`SyntaxElement`] read it. The typed
 //!   views in [`ast`], such as [`ast::IfStat`], give each kind of node named accessors, and

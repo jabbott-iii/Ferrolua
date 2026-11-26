@@ -14,8 +14,9 @@ counting lines as PUC-Rio Lua 5.5.1 does; the lexer, which splits source text in
 the spaces and comments around each one, and reports a malformed token with the message PUC-Rio
 Lua 5.5.1 gives; the lossless syntax tree, which keeps every byte of the source and is built
 from the events a parser emits, with typed views that name the parts of each node; and the parser,
-which reads every statement and the expressions that statements are built from, and reports the
-first syntax error with the message and line PUC-Rio Lua 5.5.1 gives. The other
+which reads every statement and every expression, with Python's operators and their precedence,
+and reports the first syntax error with the message and line PUC-Rio Lua 5.5.1 gives where the
+syntax is Lua's. The other
 crates hold only their documentation, except the test tools: the test kit, which has a seeded random generator and a property-test runner; the fuzzer,
 which runs its targets on mutated inputs and saves each input that makes one fail; and `xtask`,
 whose `cargo xtask coverage` measures which lines and regions of code the tests run, whose
@@ -24,8 +25,8 @@ Lua 5.5.1 prints for the Lua 5.5 twin of each conformance script. The fuzzer has
 targets that test it so far. The two conformance scripts, `hello.lua` and `lexer.lua`, have their
 twins' output recorded, and wait for the conformance runner that M2.14 builds. The continuous
 integration (CI) workflow runs every check on each pull request, and each of its jobs must pass
-before a merge. The next task is M1.5 in the [roadmap](docs/roadmap.md), which adds the rest of
-the expressions, with Python's operators and their precedence.
+before a merge. The next task is M1.6 in the [roadmap](docs/roadmap.md), which lets the parser go
+on after a syntax error and adds the diagnostic type that every tool reports.
 
 ## What is planned
 

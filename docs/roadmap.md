@@ -419,7 +419,32 @@ builds on.
     - Each statement form parses to its node kind, and each nearby error has a test with its message.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.5 — syntax: expressions and operator precedence**
+- [x] **M1.5 — syntax: expressions and operator precedence**
+  - Note: Built on 2026-11-26. `crates/syntax/src/parser/expression.rs` reads every expression by
+    precedence climbing over the table of [`specs/language.md`](specs/language.md#precedence), and
+    `NodeKind` gains 14 kinds, each with a view in `ast/expression.rs`, where `TableField`,
+    `FStringPart`, and `CompareOp` join them, as
+    [`specs/syntax.md`](specs/syntax.md#expression-nodes) lists. Every comparison is a
+    `CompareExpr`, chained or not. `ParseErrorKind` gains `LuaConcatenation`, `LuaNotEqual`, and
+    `LuaBitwiseXor`, whose messages, such as `'..' is not an operator: use '+' to join strings`,
+    [`specs/language.md`](specs/language.md#operators-adr-0023) records.
+  - Note: An `if` after the last value of an assignment, of a `local` or `global` declaration, or
+    after `until`'s condition starts an `if` statement unless `else` follows its condition. The
+    parser moves the events of the `if` and the condition aside, in `Parser::pending_if`, until
+    the statement is finished, so no token is read twice. Anywhere else, the `if` starts a
+    conditional expression, and a missing `else` is `'else' expected`.
+  - Note: The spec's grammar settles a table field that starts with `[`: it is a key only when one
+    expression, `]`, and `=` follow, and otherwise the brackets are a list, so `{[1, 2]}` holds a
+    list. Five broken fields therefore get messages other than PUC-Rio's, which
+    [`specs/language.md`](specs/language.md#lists-tuples-and-sets-adr-0025) lists.
+  - Note: `crates/syntax/tests/expression.rs` compares 48 broken chunks of Lua's syntax with the
+    message and line that `load` gave on PUC-Rio Lua 5.5.1 on 2026-11-26, from the build in
+    `~/.local/share/lua/src/lua-5.5.1` that M1.2 checked. Its precedence property test checks
+    3,000 generated expressions against the grouping the grammar gives and against a precedence
+    climber written in the test. The project has no mutation tool, so the tests were checked by
+    hand: each of 20 edits to the parser and the views, such as making `**` group from left to
+    right or letting an expression list go on past a pending `if`, failed a test, once
+    `{[a, b] * 2}` was added for the one that didn't.
   - Note: 2026-11-24, the owner's choice (ADR-0023): expressions follow Python's operators and
     precedence, with chained comparisons, conditional expressions, `in`, and `is`.
   - Note: 2026-11-24, the owner accepted ADR-0024 (the details Python's operators and 0-based
@@ -463,6 +488,12 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.6 — syntax: error recovery and the diagnostic type**
+  - Note (from M1.5): `Parser::error_with`, in `crates/syntax/src/parser.rs`, is the one place a
+    syntax error is reported. When the parser stops inside the condition of an `if` after a value,
+    as in `x = f if @`, the condition's events and the error node move into the `if` statement
+    that the `if` starts, so recovery decides where such an error belongs. Lua's `..`, `~=`, and
+    binary `~` are errors with no `near`, a span on the operator, and a fix that a `Diagnostic`
+    could offer: the operator to write instead.
   - Note (from M1.4): `Event::Error` carries a `ParseError`, with PUC-Rio's message, line, and
     `near` text, which the `Diagnostic` replaces. The parser stops at its first error in
     `Parser::skip_rest`, which recovery replaces, and reports no syntax error at or past the token
@@ -484,6 +515,11 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.7 — syntax: compact tree for the compiler**
+  - Note (from M1.5): The events stay in source order when a pending `if` moves, so a builder
+    that reads them in order meets each `if` statement after the statement before it. Every
+    comparison is a `CompareExpr`, with `not in` and `is not` as two tokens each, and a positional
+    table field is a node that holds its value, as
+    [`specs/syntax.md`](specs/syntax.md#expression-nodes) lists.
   - Note (from M1.2): `numeral_value` gives a numeral's value. The lexer checks strings but keeps
     no value: `read_escape` in `crates/syntax/src/lexer/escape.rs` gives the bytes of one escape,
     as PUC-Rio's `read_string` saves them, and a long string's value turns each line break, `\r\n`
@@ -498,6 +534,13 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.8 — syntax: size and nesting limits**
+  - Note (from M1.5): The parser also calls itself for each unary operator, the right operand of
+    each binary operator, each `**` in a chain, each conditional expression's `else` value, and each
+    nested table, list, tuple, function, f-string, and field, so a chain of 100,000 `**`, `-`, or
+    conditionals can overflow the stack. A chain of an operator that groups from left to right is a
+    loop, and `crates/syntax/tests/expression.rs` parses 100,000 `+` and 100,000 `<`. PUC-Rio's
+    `subexpr` counts a level for each of its calls, with `enterlevel`, so matching its limit for
+    Lua's own syntax means counting where it does.
   - Note (from M1.4): The parser calls itself once for each level of a nested block, function
     body, parenthesized expression, index, or argument list, with no limit yet, so deep nesting can
     overflow the stack. A chain of fields, indexes, and calls is a loop, and 100,000 of them parse
@@ -517,6 +560,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
+  - Note (from M1.5): `generate_program` in `crates/syntax/tests/parser.rs` writes every expression
+    too, with each operator's operands simple or in parentheses, so every program it writes is
+    valid. `generate_expression` in `crates/syntax/tests/expression.rs` writes expressions from the
+    precedence grammar, with the grouping of each.
   - Note (from M1.4): `generate_program` in `crates/syntax/tests/parser.rs` writes valid programs
     of the statements and the expressions M1.4 reads. Its loops go on only for a choice of 1:
     while shrinking, the runner gives 0 once a case's choices run out, so a loop that went on for

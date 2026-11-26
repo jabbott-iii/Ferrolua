@@ -292,7 +292,7 @@ against the recorded `.out` files.
 
 **The language:**
 
-- The precedence property test still passes (M1.5).
+- The precedence property test in `crates/syntax/tests/expression.rs` still passes.
 - [`specs/language.md`](specs/language.md) describes the change, its decision record is accepted,
   and a script in `tests/extensions/` covers it, with output written from the spec.
 

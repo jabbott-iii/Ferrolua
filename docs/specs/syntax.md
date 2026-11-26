@@ -113,7 +113,7 @@ trivia.
 `TokenKind` has a kind for each reserved word, `Name`, `Integer`, `Float`, `String` for short and
 long strings, the parts of an f-string, and each operator and symbol. Three more kinds carry what
 the parser reports: `DotDot` and `TildeEqual` are Lua's `..` and `~=`, read so the parser can name
-`+` and `!=` (M1.5); `Unknown` is one byte that starts no token, such as `@`, a lone `!`, or a byte
+`+` and `!=`; `Unknown` is one byte that starts no token, such as `@`, a lone `!`, or a byte
 outside ASCII, which PUC-Rio's parser reports as an `unexpected symbol`; and `Error` holds bytes
 the lexer couldn't read. The lexer takes the longest token it can, so `list<list<T>>` ends with
 `>>`; the parser of type annotations (M4.3) splits it.
@@ -170,7 +170,7 @@ node that is open, `Token` adds the source's next token to the node that is open
 closes it, and `Error` reports a syntax error.
 
 Built in M1.4 as described here, with the statements and the expressions that statements are built
-from; the other expressions join it in M1.5:
+from; M1.5 added the rest of the expressions:
 
 ```rust
 pub fn parse(source: &[u8], lexed: &Lexed) -> Vec<Event>;
@@ -196,6 +196,7 @@ pub enum ParseErrorKind {
     UnexpectedSymbol, SyntaxError, EqualOrInExpected, NameOrVarargExpected,
     FunctionArgumentsExpected, BreakOutsideLoop, VarargOutsideVarargFunction,
     UnknownAttribute { name: Vec<u8> }, MultipleToBeClosed, GlobalToBeClosed,
+    LuaConcatenation, LuaNotEqual, LuaBitwiseXor,   // Lunaferra's own, for `..`, `~=`, and `~`
 }
 ```
 
@@ -214,11 +215,23 @@ declaration, has no place in Lunaferra, which drops that rule (ADR-0026). Lunafe
 `nonlocal` is a name everywhere but at the start of a statement before a name, so the parser looks
 one token ahead to read it as a keyword ([`language.md`](language.md#scoping-adr-0025)).
 
-Until M1.5, an expression is a literal (`nil`, `true`, `false`, a numeral, or a string), `...`, or a
-name or a parenthesized expression followed by fields, indexes, calls with `(...)` or a string,
-and method calls. A token that only the other expressions start, such as `{` or `-`, is an
-`unexpected symbol` where an expression must come, and an operator after an expression ends it,
-so `x = 1 + 2` reports `unexpected symbol near '+'`.
+Expressions follow the grammar of [`language.md`](language.md#precedence), read by one function
+that climbs the precedence table, as PUC-Rio's `subexpr` climbs Lua's: it reads an operand, then
+each binary operator that binds more tightly than the level it was called for, with that
+operator's right operand. Each operator but `**` groups from left to right, so a chain of 100,000
+`+` is a loop, not 100,000 nested calls, and a chain of comparisons is one node, whatever its
+length. Unary `not` may start only an operand of `and`, `or`, or `not`, as in Python. The operands
+are literals, `...`, f-strings, function expressions, table constructors, lists, tuples, and the
+prefix expressions of Lua, a name or a parenthesized expression followed by fields, indexes,
+calls, and method calls. A call's argument may be `(...)`, a string, or a table constructor, as in
+Lua. A tuple is not a prefix expression, so no field, index, or call follows it. After an operand,
+Lua's `..`, `~=`, and binary `~` each stop the parse with a message that names the operator to
+write instead, which `language.md` records.
+
+A table field that starts with `[` is read as PUC-Rio reads a key, `[`, an expression, and `]`,
+until the token after them: `=` makes the field a key and a value, and anything else makes the
+brackets a list literal, which the field's value starts with. A `,` after the first expression
+makes a list at once. Either way, no token is read twice.
 
 ### Markers
 
@@ -231,14 +244,24 @@ new one, and an abandoned node, such as the name list that a numeric `for` turns
 adds nothing. When the parse is done, each placeholder becomes the `Start` events of its own node
 and of every node linked to it, outermost first. That is how the parser wraps a field, an index, a
 call, or a method call around the expression before it, a call statement or an assignment around
-its first expression, and, in M1.5, a binary, chained, or conditional node around its left
-operand, including the condition after an `if` that follows an expression, before it knows
-whether the `if` starts a conditional expression or an `if` statement
-([`language.md`](language.md#conditional-expressions)). Each step takes constant time, so a chain
+its first expression, and a binary, chained, or conditional node around its left operand. Each
+step takes constant time, so a chain
 of 100,000 fields parses in time proportional to its length.
 
+An `if` after an expression may start a conditional expression or an `if` statement
+([`language.md`](language.md#conditional-expressions)). The parser reads the `if` and the
+condition as a conditional expression's. When `else` follows, it starts the conditional node
+around the value before the `if`. When anything else follows, and the statement may end after the
+expression, which it may after the last value of an assignment, a `local` or `global`
+declaration, or after the condition of `until`, the parser moves the events of the `if` and the
+condition out of the list it is writing and keeps them aside. The statement then finishes without
+them, and the block's next statement is an `if` statement that starts with those events and goes
+on from the condition. Each event moves once, so this takes time in proportion to the condition's
+length. Anywhere else, such as after `return` or in an argument, the `if` can only start a
+conditional expression, so a token other than `else` there is an `'else' expected` error.
+
 After `(` and an expression, a comma makes a tuple and `)` makes a parenthesized expression, and
-`()` is the empty tuple (M1.5); the parser decides after that expression in the same way. List and
+`()` is the empty tuple; the parser decides after that expression in the same way. List and
 tuple literals, and the fields of f-strings, parse as
 [`language.md`](language.md#lists-tuples-and-sets-adr-0025) and
 [`language.md`](language.md#formatted-string-literals-adr-0025) define them.
@@ -313,8 +336,9 @@ pub enum Expr<'t> { /* one variant for each expression's view, such as Call(Call
 ```
 
 M1.4 added a view for each node kind that it added, with `Stat` and `Expr` over the views of every
-statement and of every expression. [Statement nodes](#statement-nodes) lists the kinds and what
-each holds.
+statement and of every expression, and M1.5 added the views of the other expressions and their
+parts, with `TableField` over the three kinds of table field. [Statement nodes](#statement-nodes)
+and [Expression nodes](#expression-nodes) list the kinds and what each holds.
 
 `build` accepts a list of events only when it makes one tree over every token of the source: the
 first event opens the root, every later one falls inside the root, each `Finish` closes the node
@@ -335,8 +359,8 @@ printing, and dropping a tree therefore never recurse, so 100,000 nested parenth
 overflow the call stack, and `children` steps over a child node's descendants in one step.
 
 A view's accessors look among its node's children for each part, and give `None` for a part that
-isn't there, which is how the tools read a source with syntax errors. Each task that teaches the
-parser a statement or an expression adds its node kind and its view (M1.4, M1.5).
+isn't there, which is how the tools read a source with syntax errors. Every statement and every
+expression has its node kind and its view, and the syntax that M4 adds will get theirs with it.
 
 ### Statement nodes
 
@@ -383,7 +407,7 @@ FieldExpr      ::= expression '.' Name
 IndexExpr      ::= expression '[' expression ']'
 CallExpr       ::= expression Args
 MethodCallExpr ::= expression ':' Name Args
-Args           ::= '(' [ExprList] ')' | String
+Args           ::= '(' [ExprList] ')' | String | TableExpr
 LiteralExpr    ::= 'nil' | 'true' | 'false' | Integer | Float | String
 VarargExpr     ::= '...'
 ```
@@ -391,6 +415,43 @@ VarargExpr     ::= '...'
 The targets of an assignment are an `ExprList` of names, fields, and indexes, as Lua's `varlist`
 is. `Param` and `AttName` are nodes, though each holds one name so far, because the type
 annotations of M4.3 join them there.
+
+### Expression nodes
+
+The expressions that statements are built from are among the [statement nodes](#statement-nodes);
+the rest are these. Built in M1.5 as described here:
+
+```text
+BinaryExpr      ::= expression binop expression
+UnaryExpr       ::= unop expression
+CompareExpr     ::= expression compop expression {compop expression}
+ConditionalExpr ::= expression 'if' expression 'else' expression
+FunctionExpr    ::= 'function' FuncBody
+TableExpr       ::= '{' [field {fieldsep field} [fieldsep]] '}'
+IndexField      ::= '[' expression ']' '=' expression
+NamedField      ::= Name '=' expression
+PositionalField ::= expression
+ListExpr        ::= '[' [expression {',' expression} [',']] ']'
+TupleExpr       ::= '(' ')' | '(' expression ',' [expression {',' expression} [',']] ')'
+FStringExpr     ::= FStringStart {FStringText | FStringField} FStringEnd
+FStringField    ::= FStringFieldStart expression ['='] [FStringConversion] [FormatSpec]
+                    FStringFieldEnd
+FormatSpec      ::= FStringSpec {FStringText | FStringField}
+
+field    ::= IndexField | NamedField | PositionalField
+fieldsep ::= ',' | ';'
+binop    ::= 'or' | 'and' | '|' | '^' | '&' | '<<' | '>>' | '+' | '-' | '*' | '/' | '//' | '%'
+           | '**'
+unop     ::= 'not' | '-' | '+' | '~' | '#'
+compop   ::= '<' | '<=' | '>' | '>=' | '==' | '!=' | 'in' | 'not' 'in' | 'is' | 'is' 'not'
+```
+
+Every comparison is a `CompareExpr`, even one with a single operator, so the compiler reads `a < b`
+and `a < b < c` alike, and no `BinaryExpr` holds a comparison operator. Its view's `operators`
+gives each operator as a `CompareOp`, with `not in` and `is not` one operator each. A positional
+field is a node of its own, though it holds only its value, so that `TableExpr::fields` gives
+every field in order as a `TableField`. `FStringExpr::parts` and `FormatSpec::parts` give the
+text tokens and the fields in order as `FStringPart`s.
 
 ## Compact tree
 
@@ -415,7 +476,8 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   lexer is on once it has read that token: for a long string over three lines, the third.
 - The checks of attributes and of `<close>` variables write no `near`, as PUC-Rio's
   `luaK_semerror` doesn't, and name the line where the last token read ends, such as the `>` of
-  the attribute.
+  the attribute. The messages for Lua's `..`, `~=`, and binary `~` name the operator themselves, so
+  they write no `near` either, and name the line where the operator ends.
 - After `near` comes the token's text as PUC-Rio's lexer keeps it: a short string's quotes around
   the bytes its characters and escapes stand for, so `"a\65"` is written `'"aA"'`; a long string's
   brackets around its text, with each line break as `\n` and none right after the opening bracket;
@@ -461,8 +523,10 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   builds trees of random shape over the tokens of 2,000 generated sources and compares each root's
   text with its source, and other tests do the same for every conformance script and for a tree
   nested 100,000 levels deep. `crates/syntax/tests/parser.rs` checks the parser's half on 5,000
-  generated sources of statement keywords, names, symbols, and broken tokens, and on every
-  conformance script and its twin, and parses a chain of 100,000 fields and one of 100,000 calls.
+  generated sources of statement keywords, operators, names, symbols, and broken tokens, and on
+  every conformance script and its twin, and parses a chain of 100,000 fields and one of 100,000
+  calls. `crates/syntax/tests/expression.rs` parses a chain of 100,000 `+`, one of 100,000 `<`, and
+  a list, a tuple, a table, and an f-string of 100,000 elements each.
 - Invariant 3: a property test on generated valid programs.
 - Invariant 4: `tests/conformance/syntax_errors.lua` loads broken chunks with `load` and prints each
   message, recorded from its Lua 5.5 twin on PUC-Rio Lua 5.5.1. For the lexer's errors,
@@ -471,13 +535,22 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   `crates/syntax/tests/parser.rs` compares the first error of each of 188 broken chunks, with
   every kind of `ParseError` and each statement's nearby mistakes, with the message and line that
   `load` gave on PUC-Rio Lua 5.5.1 on 2026-11-25, from a build with `LUA_COMPAT_GLOBAL` set to 0 for
-  the `global` statements, and checks that a lexical error comes first where PUC-Rio's does. A
-  property test parses 2,000 generated programs of every statement and of the expressions M1.4
-  reads, and checks that none has an error, and other tests check that each form PUC-Rio accepts
-  parses, and to which nodes.
+  the `global` statements, and checks that a lexical error comes first where PUC-Rio's does.
+  `crates/syntax/tests/expression.rs` does the same for 48 broken chunks of Lua's operators,
+  tables, function expressions, and an `if` after a value, with the message and line that `load`
+  gave on PUC-Rio Lua 5.5.1 on 2026-11-26, and checks Lunaferra's own messages, which
+  [`language.md`](language.md) records. A property test parses 2,000 generated programs of every
+  statement and every expression, and checks that none has an error, and other tests check that
+  each form PUC-Rio accepts parses, and to which nodes.
 - Invariant 5: hostile-input tests at the limit and one level past it, for blocks, parentheses,
   tables, and function bodies.
-- Invariant 6: the precedence property test (M1.5).
+- Invariant 6: a property test in `crates/syntax/tests/expression.rs` generates 3,000 expressions
+  from the grammar of [`language.md`](language.md#precedence), with every operator, `not`, chained
+  comparisons, conditional expressions, and parentheses, and writes beside each the grouping that
+  the grammar gives it. A precedence-climbing function written in the test from the precedence
+  table groups the same tokens again, and the test checks that the parser's tree groups them as
+  both do. Other tests check the examples of the precedence section, and each level against the
+  levels next to it.
 - Invariant 7: `crates/syntax/tests/source.rs` checks the line and column of every offset of every
   source of up to seven bytes made from `a`, `\n`, `\r`, and 0xFF, a byte that never appears in
   valid UTF-8, against a model of `inclinenumber`. It also checks each line ending and a source of

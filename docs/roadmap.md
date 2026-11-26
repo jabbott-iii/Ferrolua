@@ -368,7 +368,33 @@ builds on.
     - Printing the tree gives back the source, byte for byte.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.4 — syntax: statements**
+- [x] **M1.4 — syntax: statements**
+  - Note: Built on 2026-11-26. `crates/syntax/src/parser.rs` holds `parse`, with the cursor over
+    the tokens, the markers, and the errors; `parser/statement.rs` and `parser/expression.rs`
+    hold the grammar, and `parser/error.rs` holds `ParseError` and `ParseErrorKind`. `Event` gains
+    `Error(ParseError)`, and `NodeKind` 40 kinds, each with a view in `ast/statement.rs` or
+    `ast/expression.rs`, where `Stat` and `Expr` view every statement and every expression, as
+    [`specs/syntax.md`](specs/syntax.md#statement-nodes) lists.
+  - Note: `crates/syntax/tests/parser.rs` compares 188 broken chunks with the message and line
+    that `load` gave on PUC-Rio Lua 5.5.1 on 2026-11-25. Lunaferra reserves `global`, so the
+    `global` cases come from a second build of the same 5.5.1 sources with `LUA_COMPAT_GLOBAL` set
+    to 0, made with GCC in a scratch folder; it gave the default build's messages for every other
+    case. The project has no mutation tool, so the tests were checked by hand: 14 of 15 edits to
+    the parser, such as flipping the line test in `Parser::expect_closing`, which names the opener
+    only when it is on another line, or ignoring an attribute written before the names, failed a
+    test. The one that didn't, finding the token of the first lexical error with `>=`, led to the
+    test of `@"abc`.
+  - Note: The parser makes the checks of `lparser.c` that need only the statement and the
+    constructs around it, such as `break outside loop`, and leaves to the compiler those that need
+    names resolved. Until M1.6, it stops at the first error, and puts the rest of the source in an
+    error node, as [`specs/syntax.md`](specs/syntax.md#stopping-at-the-first-error) describes.
+  - Note: 2026-11-25, the owner's choice: this task also parses the expressions that statements
+    are built from, moved here from M1.5: names, parenthesized expressions, fields, indexes, calls
+    with `(...)` or a string, method calls, `nil`, `true`, `false`, numerals, strings, and `...`,
+    each with its node kind and view. M1.5 keeps the rest.
+  - Note: 2026-11-25, the owner's choice: this task also parses `nonlocal` (ADR-0025), which no
+    task had, as `nonlocal Name {',' Name}`, a keyword only at the start of a statement and before
+    a name (ADR-0026).
   - Note (from M1.3): 2026-11-25, the owner's choice: this task also builds the parser that emits
     events, moved here from M1.3: its cursor over the tokens, the markers that open and close
     nodes, a way to start a node before a part already read, which an assignment or a call
@@ -398,6 +424,16 @@ builds on.
     precedence, with chained comparisons, conditional expressions, `in`, and `is`.
   - Note: 2026-11-24, the owner accepted ADR-0024 (the details Python's operators and 0-based
     indexes leave open), which makes `is` a reserved word.
+  - Note (from M1.4): `Parser::expr`, in `crates/syntax/src/parser/expression.rs`, is the stand-in
+    to replace with the full grammar, and `simple_expr` reads its atoms. `Parser::precede` starts
+    a node around a completed one, in constant time. Until this task, `{`, `function`, unary
+    operators, and f-strings are an `unexpected symbol`, and `Args` holds no table constructor.
+    `f'a'` touching its string is an f-string, so the tests of calls with a string use `g`.
+  - Note (from M1.4): 2026-11-25, the owner's choice: M1.4 parses the expressions that statements
+    are built from, moved there from this task: names, parenthesized expressions, fields, indexes,
+    calls with `(...)` or a string, method calls, `nil`, `true`, `false`, numerals, strings, and
+    `...`. This task keeps operators and precedence, table constructors and calls with one,
+    function expressions, lists, tuples, f-strings, and conditional expressions.
   - Note (from M1.3): 2026-11-25, the owner's choice: this task adds a `NodeKind` and a view in
     `crates/syntax/src/ast.rs` for each expression, with its grammar, and wraps a left operand with
     the parser's way, from M1.4, to start a node before a part already read.
@@ -427,6 +463,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.6 — syntax: error recovery and the diagnostic type**
+  - Note (from M1.4): `Event::Error` carries a `ParseError`, with PUC-Rio's message, line, and
+    `near` text, which the `Diagnostic` replaces. The parser stops at its first error in
+    `Parser::skip_rest`, which recovery replaces, and reports no syntax error at or past the token
+    of the first lexical error, so only the first error of a source matches PUC-Rio's.
   - Note (from M1.2): Each `LexError` has the line PUC-Rio's message names and `message()`, the
     bytes after the chunk name and the line. Only a source's first error is the one PUC-Rio
     reports. `Lexed::lines` is the line map to use, because a file's skipped first line changes
@@ -458,6 +498,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.8 — syntax: size and nesting limits**
+  - Note (from M1.4): The parser calls itself once for each level of a nested block, function
+    body, parenthesized expression, index, or argument list, with no limit yet, so deep nesting can
+    overflow the stack. A chain of fields, indexes, and calls is a loop, and 100,000 of them parse
+    in `crates/syntax/tests/parser.rs`.
   - Note (from M1.2): The lexer doesn't reproduce `chunk has too many lines`, which PUC-Rio gives at
     line 2^31 − 1, or `lexical element too long`, about 2.9 GB into one token on a 32-bit target.
     No test can build such a source, and the 16 MB source limit rules both out, but
@@ -473,6 +517,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
+  - Note (from M1.4): `generate_program` in `crates/syntax/tests/parser.rs` writes valid programs
+    of the statements and the expressions M1.4 reads. Its loops go on only for a choice of 1:
+    while shrinking, the runner gives 0 once a case's choices run out, so a loop that went on for
+    0 never ended.
   - Note (from M0.2): A generator in `lunaferra-testkit` is a function of `&mut Source` that makes
     each choice with `Source::below`. The program generator shrinks well if a choice of 0 gives the
     simplest program, for example when alternative 0 of each grammar rule is its shortest. Only the
@@ -636,6 +684,11 @@ what PUC-Rio Lua 5.5.1 prints for their Lua 5.5 twins, with memory freed by refe
   - Verify: `cargo test -p lunaferra-compiler --locked`
 
 - [ ] **M2.7 — compiler: statements and control flow**
+  - Note (from M1.4): The parser accepts a label defined twice and a `goto` with no visible label,
+    which PUC-Rio's parser rejects with `label 'x' already defined on line N` and
+    `no visible label 'x' for <goto> at line N`, so this task reports them. On PUC-Rio,
+    `::x::\n::x::` gives `input:2: label 'x' already defined on line 2`, because its check of the
+    first label runs after it has read the second.
   - Depends: M2.6
   - Do:
     - Compile every statement, including `goto`, both `for` forms, with the numeric `for`'s

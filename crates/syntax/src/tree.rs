@@ -96,7 +96,8 @@ impl SyntaxTree {
     ///
     /// The events make a tree when the first opens the root with a
     /// [`Start`](Event::Start), every later one falls inside the root, and each
-    /// [`Finish`](Event::Finish) closes the node opened last that is still open. The
+    /// [`Finish`](Event::Finish) closes the node opened last that is still open. An
+    /// [`Error`](Event::Error) event adds nothing to the tree. The
     /// [`Token`](Event::Token) events must name each token of `lexed` once, in order, by its kind
     /// and span, up to and including the [`TokenKind::Eof`] token, and the last event must close
     /// the root. Building copies the source and its trivia, so it takes time in proportion to the
@@ -104,8 +105,8 @@ impl SyntaxTree {
     ///
     /// # Errors
     ///
-    /// - [`Error::EventOutsideRoot`] for a `Start` after the root is closed, or a `Token` or a
-    ///   `Finish` with no node open.
+    /// - [`Error::EventOutsideRoot`] for a `Start` after the root is closed, or a `Token`, a
+    ///   `Finish`, or an `Error` with no node open.
     /// - [`Error::TokenOutOfOrder`] for a `Token` event that doesn't name the next token of
     ///   `lexed`, or comes after its last one.
     /// - [`Error::EventsEndEarly`] if the events end with no node at all, with a node still open,
@@ -145,6 +146,12 @@ impl SyntaxTree {
                     // `node` is the position where this loop pushed the node, and the list
                     // only grows, so the position is inside it.
                     elements[node] = Element::Node(NodeData { kind, end });
+                }
+                // An error adds nothing to the tree, whose error node marks the place.
+                Event::Error(_) => {
+                    if open.is_empty() {
+                        return Err(outside);
+                    }
                 }
             }
         }
@@ -254,9 +261,28 @@ impl<'t> SyntaxNode<'t> {
 
     /// Returns the first child that is a token of `kind`.
     pub(crate) fn child_token(&self, kind: TokenKind) -> Option<SyntaxToken<'t>> {
+        self.child_tokens(kind).next()
+    }
+
+    /// Returns the children that are nodes of view `N`'s kinds, as that view, in order.
+    pub(crate) fn children_of<N: AstNode<'t>>(&self) -> impl Iterator<Item = N> + use<'t, N> {
+        self.children()
+            .filter_map(|child| child.into_node().and_then(N::cast))
+    }
+
+    /// Returns the children that are tokens of `kind`, in order.
+    pub(crate) fn child_tokens(
+        &self,
+        kind: TokenKind,
+    ) -> impl Iterator<Item = SyntaxToken<'t>> + use<'t> {
         self.children()
             .filter_map(SyntaxElement::into_token)
-            .find(|token| token.kind() == kind)
+            .filter(move |token| token.kind() == kind)
+    }
+
+    /// Returns the first child that is a token, of any kind.
+    pub(crate) fn first_token(&self) -> Option<SyntaxToken<'t>> {
+        self.children().find_map(SyntaxElement::into_token)
     }
 }
 

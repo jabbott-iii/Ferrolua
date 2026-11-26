@@ -166,42 +166,107 @@ sets none; M1.8, the task that enforces the source limit, decides how to handle 
 The parser is hand-written, with recursive descent for statements and precedence climbing for
 expressions, using the precedence table of [`language.md`](language.md#precedence). It emits
 events, which list the tree in the order a reader meets its parts: `Start` opens a node inside the
-node that is open, `Token` adds the source's next token to the node that is open, and `Finish`
-closes it.
+node that is open, `Token` adds the source's next token to the node that is open, `Finish`
+closes it, and `Error` reports a syntax error.
+
+Built in M1.4 as described here, with the statements and the expressions that statements are built
+from; the other expressions join it in M1.5:
 
 ```rust
+pub fn parse(source: &[u8], lexed: &Lexed) -> Vec<Event>;
+
 pub enum Event {
     Start(NodeKind),
     Token(TokenKind, Span),
     Finish,
-    Error(Diagnostic),
+    Error(ParseError),   // the Diagnostic of M1.6 replaces ParseError
 }
 
-pub enum NodeKind { Chunk, Block, Error, /* one for each statement and expression */ }
+pub struct ParseError {
+    pub kind: ParseErrorKind,
+    pub span: Span,
+    pub line: u32,
+    pub near: Option<Near>,   // None for the errors PUC-Rio writes without `near`
+}
+impl ParseError {
+    pub fn message(&self) -> Vec<u8>;   // such as `'then' expected near <eof>`
+}
+pub enum ParseErrorKind {
+    Expected(TokenKind), Unclosed { expected: TokenKind, opener: TokenKind, line: u32 },
+    UnexpectedSymbol, SyntaxError, EqualOrInExpected, NameOrVarargExpected,
+    FunctionArgumentsExpected, BreakOutsideLoop, VarargOutsideVarargFunction,
+    UnknownAttribute { name: Vec<u8> }, MultipleToBeClosed, GlobalToBeClosed,
+}
 ```
 
-`Event` and `NodeKind` were built in M1.3, with only the three kinds that frame a source: `Chunk`,
-the root, which holds a `Block` and then the `Eof` token; `Block`; and `Error`, the tokens the
-parser skipped to recover. The parser itself lands in M1.4, which adds a kind for each statement,
-and in M1.5, which adds one for each expression. `Error(Diagnostic)` joins `Event` with the first
-syntax error the parser reports, in M1.4, and carries the `Diagnostic` of M1.6.
+The parser follows PUC-Rio Lua 5.5.1's `lparser.c` rule by rule, so it accepts the same statements
+and reports each mistake in the same words, on the same line. It also makes the checks that
+`lparser.c` makes while it parses and that need nothing but the statement and the constructs
+around it: `break outside loop`, `cannot use '...' outside a vararg function`, an unknown
+attribute, a second `<close>` variable in one `local` statement, and a `<close>` attribute in a
+`global` declaration. The checks that need names resolved are the compiler's (M2.5, M2.7): a
+label defined twice, a `goto` with no visible label, and an assignment to a `<const>` variable.
+PUC-Rio's `variable 'x' not declared`, which Lua 5.5's implicit `global *` gives after a `global`
+declaration, has no place in Lunaferra, which drops that rule (ADR-0026). Lunaferra reserves
+`global`, so its messages for a broken `global` statement are those of PUC-Rio built with
+`LUA_COMPAT_GLOBAL` set to 0, such as `<name> expected near <eof>` for `global` alone.
 
-List and tuple literals, and the fields of f-strings, parse as
+`nonlocal` is a name everywhere but at the start of a statement before a name, so the parser looks
+one token ahead to read it as a keyword ([`language.md`](language.md#scoping-adr-0025)).
+
+Until M1.5, an expression is a literal (`nil`, `true`, `false`, a numeral, or a string), `...`, or a
+name or a parenthesized expression followed by fields, indexes, calls with `(...)` or a string,
+and method calls. A token that only the other expressions start, such as `{` or `-`, is an
+`unexpected symbol` where an expression must come, and an operator after an expression ends it,
+so `x = 1 + 2` reports `unexpected symbol near '+'`.
+
+### Markers
+
+A node's `Start` must come before its first token, but the parser often learns what a node is only
+after reading part of it: `t.x` is a field only once the `.` follows `t`, and `f(x)` is a call
+statement only once no `=` follows it. So the parser writes its events to a list of its own first.
+Starting a node writes a placeholder, and completing it gives the placeholder a kind. A node can
+also start before a node the parser has already completed, which links the completed node to the
+new one, and an abandoned node, such as the name list that a numeric `for` turns out not to have,
+adds nothing. When the parse is done, each placeholder becomes the `Start` events of its own node
+and of every node linked to it, outermost first. That is how the parser wraps a field, an index, a
+call, or a method call around the expression before it, a call statement or an assignment around
+its first expression, and, in M1.5, a binary, chained, or conditional node around its left
+operand, including the condition after an `if` that follows an expression, before it knows
+whether the `if` starts a conditional expression or an `if` statement
+([`language.md`](language.md#conditional-expressions)). Each step takes constant time, so a chain
+of 100,000 fields parses in time proportional to its length.
+
+After `(` and an expression, a comma makes a tuple and `)` makes a parenthesized expression, and
+`()` is the empty tuple (M1.5); the parser decides after that expression in the same way. List and
+tuple literals, and the fields of f-strings, parse as
 [`language.md`](language.md#lists-tuples-and-sets-adr-0025) and
-[`language.md`](language.md#formatted-string-literals-adr-0025) define them. After `(` and an
-expression, a comma makes a tuple and `)` makes a parenthesized expression, and `()` is the empty
-tuple. The parser decides after that expression, as the next paragraph describes.
+[`language.md`](language.md#formatted-string-literals-adr-0025) define them.
 
-A node can start before a part the parser has already read, so the parser can wrap a left
-operand in a binary, chained, or conditional node once it sees the operator. That is how it reads
-the condition after an `if` that follows an expression before it knows whether the `if` starts a
-conditional expression or an `if` statement
-([`language.md`](language.md#conditional-expressions)).
+### Stopping at the first error
 
-When the parser meets a token it doesn't expect, it emits an error, then skips to a token that can
-start or end a statement, such as `end`, `local`, or a newline before a name, so the rest of the
-file still parses. A depth counter stops nesting at PUC-Rio Lua 5.5.1's limit, with its message;
-M1.8 records both here.
+Until M1.6, the parser stops at the first error, as PUC-Rio does, and still makes a tree over every
+token. A syntax error comes as an `Error` event, followed by an `Error` node that holds every token
+from the one the parser stopped at to the end of the source, apart from `Eof`, inside the node it
+was reading. Each node it had started is finished as far as it got, and a node it starts after
+stopping, which would hold nothing, is left out, so a part that a broken statement lacks is
+missing, not empty. An expression that starts a statement but is neither a call nor assigned to,
+and a `for` whose first name is followed by neither `=` nor `,` or `in`, leave their statement
+without a kind, so it becomes an `Error` node too.
+
+PUC-Rio's lexer reads one token at a time, as the parser asks for it, so a lexical error comes
+first when the parser reaches the token that holds it before it finds a syntax error. Lunaferra's
+lexer has already read the whole source, so the parser finds the first token that ends after the
+source's first lexical error starts, and reports no syntax error at or past it: there, it stops
+without an `Error` event, and the lexical error in `Lexed::errors` is the source's first. So
+`x = 1 0x` reports `malformed number near '0x'`, while `@ 0x` reports `unexpected symbol near
+'@'`.
+
+From M1.6, when the parser meets a token it doesn't expect, it emits an error, then skips to a
+token that can start or end a statement, such as `end`, `local`, or a newline before a name, so the
+rest of the file still parses. A depth counter stops nesting at PUC-Rio Lua 5.5.1's limit, with its
+message; M1.8 records both here. Until then, the parser calls itself once for each level of a
+nested block or expression, with no limit.
 
 ## Lossless tree
 
@@ -241,14 +306,21 @@ pub trait AstNode<'t>: Sized {
     fn syntax(&self) -> SyntaxNode<'t>;
 }
 pub struct Chunk<'t>;       // block() and eof()
-pub struct Block<'t>;
+pub struct Block<'t>;       // statements()
 pub struct ErrorNode<'t>;
+pub enum Stat<'t> { /* one variant for each statement's view, such as If(IfStat) */ }
+pub enum Expr<'t> { /* one variant for each expression's view, such as Call(CallExpr) */ }
 ```
+
+M1.4 added a view for each node kind that it added, with `Stat` and `Expr` over the views of every
+statement and of every expression. [Statement nodes](#statement-nodes) lists the kinds and what
+each holds.
 
 `build` accepts a list of events only when it makes one tree over every token of the source: the
 first event opens the root, every later one falls inside the root, each `Finish` closes the node
 opened last that is still open, and the `Token` events name each token of the `Lexed` once, in
-order, by kind and span, up to and including `Eof`. Otherwise it returns
+order, by kind and span, up to and including `Eof`. An `Error` event adds nothing to the tree,
+whose error node marks the place, but it too must fall inside the root. Otherwise it returns
 `Error::EventOutsideRoot` or `Error::TokenOutOfOrder`, with the position of the event at fault,
 or `Error::EventsEndEarly`. So every tree that `build` returns holds every token of its source,
 and gives back the source byte for byte. Because a `Token` event must match its token exactly,
@@ -266,6 +338,60 @@ A view's accessors look among its node's children for each part, and give `None`
 isn't there, which is how the tools read a source with syntax errors. Each task that teaches the
 parser a statement or an expression adds its node kind and its view (M1.4, M1.5).
 
+### Statement nodes
+
+Each node holds its parts in source order, with every keyword and symbol as a token. `Name`,
+`String`, and `Eof` are tokens; the rest are nodes.
+
+```text
+Chunk          ::= Block Eof
+Block          ::= {statement}
+EmptyStat      ::= ';'
+AssignStat     ::= ExprList '=' ExprList
+CallStat       ::= CallExpr | MethodCallExpr
+LabelStat      ::= '::' Name '::'
+BreakStat      ::= 'break'
+GotoStat       ::= 'goto' Name
+DoStat         ::= 'do' Block 'end'
+WhileStat      ::= 'while' expression 'do' Block 'end'
+RepeatStat     ::= 'repeat' Block 'until' expression
+IfStat         ::= 'if' expression 'then' Block {ElseifClause} [ElseClause] 'end'
+ElseifClause   ::= 'elseif' expression 'then' Block
+ElseClause     ::= 'else' Block
+NumericForStat ::= 'for' Name '=' expression ',' expression [',' expression] 'do' Block 'end'
+GenericForStat ::= 'for' NameList 'in' ExprList 'do' Block 'end'
+FunctionStat   ::= 'function' FuncName FuncBody
+FuncName       ::= Name {'.' Name} [':' Name]
+LocalFunctionStat  ::= 'local' 'function' Name FuncBody
+GlobalFunctionStat ::= 'global' 'function' Name FuncBody
+LocalStat      ::= 'local' AttNameList ['=' ExprList]
+GlobalStat     ::= 'global' AttNameList ['=' ExprList] | 'global' [Attrib] '*'
+NonlocalStat   ::= Name NameList            -- the first Name is `nonlocal`
+ReturnStat     ::= 'return' [ExprList] [';']
+AttNameList    ::= [Attrib] AttName {',' AttName}
+AttName        ::= Name [Attrib]
+Attrib         ::= '<' Name '>'
+NameList       ::= Name {',' Name}
+FuncBody       ::= ParamList Block 'end'
+ParamList      ::= '(' [Param {',' Param} [',' VarargParam] | VarargParam] ')'
+Param          ::= Name
+VarargParam    ::= '...' [Name]
+ExprList       ::= expression {',' expression}
+NameExpr       ::= Name
+ParenExpr      ::= '(' expression ')'
+FieldExpr      ::= expression '.' Name
+IndexExpr      ::= expression '[' expression ']'
+CallExpr       ::= expression Args
+MethodCallExpr ::= expression ':' Name Args
+Args           ::= '(' [ExprList] ')' | String
+LiteralExpr    ::= 'nil' | 'true' | 'false' | Integer | Float | String
+VarargExpr     ::= '...'
+```
+
+The targets of an assignment are an `ExprList` of names, fields, and indexes, as Lua's `varlist`
+is. `Param` and `AttName` are nodes, though each holds one name so far, because the type
+annotations of M4.3 join them there.
+
 ## Compact tree
 
 The compact tree is built from the same events, holds only what the compiler needs, and is built
@@ -280,7 +406,27 @@ For `load` and the compiler, a syntax error produces PUC-Rio's format,
 error in syntax that Lunaferra shares with Lua 5.5 has the same message and token text as on PUC-Rio
 Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own syntax are recorded in
 `language.md`. For the tools, each error is a
-`P` diagnostic with a span and, where certain, a fix.
+`P` diagnostic with a span and, where certain, a fix (M1.6).
+
+`ParseError::message` gives the message after the chunk name and the line, as `LexError::message`
+does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `llex.c` give them:
+
+- The line is the one where the token the parser stopped at ends, which is the line PUC-Rio's
+  lexer is on once it has read that token: for a long string over three lines, the third.
+- The checks of attributes and of `<close>` variables write no `near`, as PUC-Rio's
+  `luaK_semerror` doesn't, and name the line where the last token read ends, such as the `>` of
+  the attribute.
+- After `near` comes the token's text as PUC-Rio's lexer keeps it: a short string's quotes around
+  the bytes its characters and escapes stand for, so `"a\65"` is written `'"aA"'`; a long string's
+  brackets around its text, with each line break as `\n` and none right after the opening bracket;
+  `<eof>` for the end of the source; a byte that isn't printable ASCII as `<\N>`, with `N` in
+  decimal, such as `'<\200>'`; and any other token's own bytes. As in PUC-Rio, the text stops at
+  its first zero byte, and an unexpected zero byte, which PUC-Rio reads as the token 0, gives
+  `unexpected symbol` with no `near` at all.
+- `X expected` names a reserved word or a symbol in quotes, such as `'end'`, and the other kinds as
+  `luaX_token2str` does, such as `<name>` and `<eof>`. With `(to close Y at line N)`, it names the
+  construct a missing `end`, `until`, or `)` closes, when that construct opened on an earlier
+  line.
 
 ## Invariants
 
@@ -298,7 +444,10 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
 8. `numeral_value` gives every numeral the value PUC-Rio Lua 5.5.1 gives it, with each float
    rounded to the nearest float and a tie to even.
 9. `SyntaxTree::build` accepts exactly the lists of events that make one tree over every token of
-   the source, and walking the tree it builds gives back those events.
+   the source, and walking the tree it builds gives back those events, apart from the `Error`
+   events, which add nothing to the tree.
+10. The parser's events make a tree for every input, with at most one `Error` event, which comes
+    before the source's first lexical error.
 
 ## Tests
 
@@ -311,12 +460,21 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
   100,000 nested f-strings. `crates/syntax/tests/tree.rs` checks the tree's half: a property test
   builds trees of random shape over the tokens of 2,000 generated sources and compares each root's
   text with its source, and other tests do the same for every conformance script and for a tree
-  nested 100,000 levels deep.
+  nested 100,000 levels deep. `crates/syntax/tests/parser.rs` checks the parser's half on 5,000
+  generated sources of statement keywords, names, symbols, and broken tokens, and on every
+  conformance script and its twin, and parses a chain of 100,000 fields and one of 100,000 calls.
 - Invariant 3: a property test on generated valid programs.
 - Invariant 4: `tests/conformance/syntax_errors.lua` loads broken chunks with `load` and prints each
   message, recorded from its Lua 5.5 twin on PUC-Rio Lua 5.5.1. For the lexer's errors,
   `crates/syntax/tests/lexer.rs` compares the first error of each of 54 broken chunks with the
-  message that `load` gave for it on PUC-Rio Lua 5.5.1 on 2026-11-25.
+  message that `load` gave for it on PUC-Rio Lua 5.5.1 on 2026-11-25. For the parser's errors,
+  `crates/syntax/tests/parser.rs` compares the first error of each of 188 broken chunks, with
+  every kind of `ParseError` and each statement's nearby mistakes, with the message and line that
+  `load` gave on PUC-Rio Lua 5.5.1 on 2026-11-25, from a build with `LUA_COMPAT_GLOBAL` set to 0 for
+  the `global` statements, and checks that a lexical error comes first where PUC-Rio's does. A
+  property test parses 2,000 generated programs of every statement and of the expressions M1.4
+  reads, and checks that none has an error, and other tests check that each form PUC-Rio accepts
+  parses, and to which nodes.
 - Invariant 5: hostile-input tests at the limit and one level past it, for blocks, parentheses,
   tables, and function bodies.
 - Invariant 6: the precedence property test (M1.5).
@@ -336,4 +494,8 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
   lists of events, many of them changed by one edit that may break the tree, such as an event
   removed or two swapped, and compares its answer with a second working-out of the rule. For each
   tree it builds, the test walks the tree and compares the events it gives with the list. Other
-  tests in the file check each error on a list of its own.
+  tests in the file check each error on a list of its own, and that an `Error` event outside the
+  root is refused.
+- Invariant 10: the property test of the parser's events in `crates/syntax/tests/parser.rs`
+  checks each tree, the number of `Error` events, and that a syntax error ends before the first
+  lexical error starts.

@@ -36,15 +36,7 @@ impl LexError {
     #[must_use]
     pub fn message(&self) -> Vec<u8> {
         let mut message = self.kind.to_string().into_bytes();
-        message.extend_from_slice(b" near ");
-        match &self.near {
-            Near::Text(text) => {
-                message.push(b'\'');
-                message.extend(text.iter().copied().take_while(|&byte| byte != 0));
-                message.push(b'\'');
-            }
-            Near::Eof => message.extend_from_slice(b"<eof>"),
-        }
+        self.near.append_to(&mut message);
         message
     }
 }
@@ -69,6 +61,22 @@ pub enum Near {
     Text(Vec<u8>),
     /// The end of the source, written `<eof>`.
     Eof,
+}
+
+impl Near {
+    /// Appends ` near ` and this text to `message`, as PUC-Rio's `lexerror` writes them: the text
+    /// in quotes, up to its first zero byte, or `<eof>`.
+    pub(crate) fn append_to(&self, message: &mut Vec<u8>) {
+        message.extend_from_slice(b" near ");
+        match self {
+            Self::Text(text) => {
+                message.push(b'\'');
+                message.extend(text.iter().copied().take_while(|&byte| byte != 0));
+                message.push(b'\'');
+            }
+            Self::Eof => message.extend_from_slice(b"<eof>"),
+        }
+    }
 }
 
 /// The kinds of [`LexError`], each with the words of its message.

@@ -15,8 +15,8 @@ pub enum Error {
         len: usize,
     },
     /// An event falls outside the root node: a [`Start`](crate::Event::Start) after the root
-    /// is finished, a [`Token`](crate::Event::Token) with no node open, or a
-    /// [`Finish`](crate::Event::Finish) with no node open.
+    /// is finished, or a [`Token`](crate::Event::Token), a [`Finish`](crate::Event::Finish), or
+    /// an [`Error`](crate::Event::Error) with no node open.
     EventOutsideRoot {
         /// The event's position in the list, counted from 0.
         event: usize,

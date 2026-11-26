@@ -171,6 +171,54 @@ fn file_prefix(source: &[u8]) -> (usize, usize) {
     (mark, mark.saturating_add(line))
 }
 
+/// Returns the text of a [`TokenKind::String`] token as PUC-Rio Lua 5.5.1's lexer keeps it in its
+/// buffer, which a syntax error's message quotes after `near`.
+///
+/// For a short string, that is its quotes around the bytes that its characters and escapes stand
+/// for, as `read_string` saves them, so `"a\65"` gives `"aA"`. For a long string, it is its
+/// brackets around its text, with each line break written as `\n` and without the line break
+/// right after the opening bracket, as `read_long_string` saves them. `text` must be a string
+/// token's bytes, which the lexer has checked.
+pub(crate) fn string_as_read(text: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(text.len());
+    if let Some(&quote @ (b'"' | b'\'')) = text.first() {
+        // Every escape in a checked string is whole and ends before the closing quote.
+        let end = text.len().saturating_sub(1);
+        out.push(quote);
+        let mut at = 1;
+        while let Some(&byte) = text.get(at).filter(|_| at < end) {
+            if byte == b'\\' {
+                at = read_escape(text, at, &mut out).unwrap_or(end);
+            } else {
+                out.push(byte);
+                at = at.saturating_add(1);
+            }
+        }
+        out.push(quote);
+        return out;
+    }
+    let level = text
+        .iter()
+        .skip(1)
+        .take_while(|&&byte| byte == b'=')
+        .count();
+    let bracket = level.saturating_add(2);
+    let close = text.len().saturating_sub(bracket);
+    out.extend_from_slice(text.get(..bracket).unwrap_or(&[]));
+    let mut at = long_body_start(text, 0, level);
+    while let Some(&byte) = text.get(at).filter(|_| at < close) {
+        if byte == b'\n' || byte == b'\r' {
+            out.push(b'\n');
+            at = line_break_end(text, at);
+        } else {
+            out.push(byte);
+            at = at.saturating_add(1);
+        }
+    }
+    out.extend_from_slice(text.get(close..).unwrap_or(&[]));
+    out
+}
+
 /// Converts an offset or a count to a `u32`. Every offset and count fits, because [`lex`]
 /// refuses a source longer than [`MAX_SOURCE_LEN`](crate::MAX_SOURCE_LEN) bytes.
 fn offset(value: usize) -> u32 {

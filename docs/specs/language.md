@@ -341,7 +341,9 @@ the innermost scope out, to:
 - `global x` declares that `x` names a global, so assignments to it write the global. Lua 5.5's
   forms `global x <const> = 1`, `global function f`, `global *`, and `global <const> *` stay.
 - `nonlocal x` declares that `x` names the variable `x` of the nearest enclosing function that has
-  one, so assignments write that variable instead of making a local.
+  one, so assignments write that variable instead of making a local. One declaration may list
+  several names, as `global` and Python's `nonlocal` may: `nonlocal a, b`. The owner chose the list
+  form on 2026-11-25.
 - A `global` or `nonlocal` declaration covers the whole function it is in and the functions nested
   in it, and comes before the function's first use of the name. `global *` makes every name that
   the function assigns, and nothing else declares, a global, which restores Lua's rule for code
@@ -352,6 +354,10 @@ the innermost scope out, to:
 - Reading a name that no scope declares reads a global, as in Lua and Python. Lua 5.5's implicit
   `global *` at the start of every chunk is gone (ADR-0026), and strict mode's
   [undeclared-variable errors](#undeclared-variable-errors) are the way to forbid such reads.
+
+```text
+stat ::= 'nonlocal' Name {',' Name}   -- `nonlocal` is a name, a keyword only here, before a name
+```
 
 ```lua
 count = 0                   -- a local of the chunk

@@ -194,7 +194,7 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
   - Verify: `cargo xtask record tests/conformance/reference/hello.lua`;
     `cargo test -p xtask --locked`
 
-- [ ] **M0.6 — ci: the CI workflow**
+- [x] **M0.6 — ci: the CI workflow**
   - Note: Written on 2026-11-25. `.github/workflows/ci.yml` runs seven jobs on `ubuntu-latest`, one
     for each automated check of [`04-quality.md`](04-quality.md#automated-checks) and one that
     fuzzes: Format, Clippy, Test, Documentation, Coverage, Dependencies, and Fuzz. Each job checks
@@ -216,14 +216,19 @@ fuzzer, and the conformance recorder, on an empty workspace, locally and in CI.
     crate named `lunaferra`, `lunaferra-<part>`, or `xtask` with a path under `$GITHUB_WORKSPACE`.
     Run on this workspace, its script passed. On a made-up list with a crates.io package and a Git
     package, it printed those two lines and stopped with status 1.
+  - Note: Checked on GitHub on 2026-11-25, in pull request #2. On `d64cbbf`, CI run 45705186779
+    passed all seven jobs with `rustc 1.100.0`: Test ran 268 tests with none failed or ignored,
+    Coverage reported all 3,573 lines and 4,187 regions covered, and Fuzz printed
+    `No fuzz target checks Lunaferra's code yet.` Commit `7cbc896` removed the spaces in one closure
+    in `fuzz/src/target.rs`, and run 45736347594 failed the Format job with that diff while the
+    other six passed. Its revert, `6c94d5d`, passed run 45736497912. The owner then made the seven
+    jobs required checks from GitHub Actions in the `BestBranch` ruleset, which GitHub's rules
+    API listed for `main`.
   - Note (from M0.4): The fuzzer stops after `--runs` runs, and has no option for a length of time,
     so the run of 60 s per target needs one, such as `--seconds`, or a number of runs measured to
     take about 60 s. `cargo xtask fuzz` exits with status 1 when a run fails, which fails the job.
     The two fixture targets fail on purpose, so CI fuzzes only the others, and there are none
     until M1.9.
-  - ⏳ needs GitHub: open a pull request to `main` and observe that all seven jobs run and pass,
-    then push a formatting error to it and observe that the Format job fails; then the owner makes
-    each job required for `main`.
   - Depends: M0.3, M0.4
   - Do:
     - Write `.github/workflows/ci.yml`, running the automated checks of

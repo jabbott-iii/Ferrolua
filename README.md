@@ -16,8 +16,9 @@ run, whose `cargo xtask fuzz` runs the fuzzer, and whose `cargo xtask record` sa
 Lua 5.5.1 prints for the Lua 5.5 twin of each conformance script. The fuzzer has only the two
 targets that test it so far. The one conformance script, `hello.lua`, has its twin's output
 recorded, and waits for the conformance runner that M2.14 builds. The continuous integration (CI)
-workflow is written, and task M0.6 in the [roadmap](docs/roadmap.md) finishes once a pull request
-shows its jobs passing on GitHub.
+workflow runs every check on each pull request, and each of its jobs must pass before a merge. The
+next task is M1.1 in the [roadmap](docs/roadmap.md), which starts the parser with source text,
+spans, and line maps.
 
 ## What is planned
 

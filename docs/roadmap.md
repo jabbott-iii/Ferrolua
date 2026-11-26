@@ -337,7 +337,27 @@ builds on.
       and `f "x"` as a name and a string.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.3 — syntax: parser events and the lossless tree**
+- [x] **M1.3 — syntax: parser events and the lossless tree**
+  - Note: Built on 2026-11-25. `crates/syntax/src/event.rs` holds `Event` and `NodeKind`,
+    `crates/syntax/src/tree.rs` holds `SyntaxTree`, `SyntaxNode`, `SyntaxToken`, `SyntaxElement`,
+    and `Children`, and `crates/syntax/src/ast.rs` holds the `AstNode` trait and the views `Chunk`,
+    `Block`, and `ErrorNode`. `SyntaxTree::build` refuses a list of events that makes no tree with
+    one of three new `Error` variants, as [`specs/syntax.md`](specs/syntax.md#lossless-tree)
+    describes, so every tree it returns gives back its source.
+  - Note: 2026-11-25, the owner accepted ADR-0009 (one parser for the compiler and the tools).
+  - Note: 2026-11-25, the owner's choice: this task builds the tree first, with only the node kinds
+    that frame a source, `Chunk`, `Block`, and `Error`. The parser that emits the events, with its
+    markers and its `parse` function, moves to M1.4, and each statement and expression gets its
+    node kind and view in M1.4 and M1.5, with its grammar.
+  - Note: `Event` has no `Error` variant yet, because nothing reports a syntax error before M1.4.
+    Nodes don't link to their parents yet; the first task that needs to walk up the tree adds the
+    link.
+  - Note: The project has no mutation tool, so the tests were checked by hand: each of 15 edits to
+    `tree.rs` and `ast.rs`, such as dropping the check of a token's kind or span, stepping into a
+    child node's descendants, or comparing nodes of different trees as equal, failed at least one
+    test of `crates/syntax/tests/tree.rs`. The walks in that file stop at a bound, because one such
+    edit made the walk of the 100,000-level tree grow quadratically and run out of memory instead
+    of failing.
   - Note (from M1.2): ADR-0009 (one parser for the compiler and the tools), which this task builds,
     is still `Proposed`. `Lexed::leading` and `Lexed::trailing` give each token's trivia, and
     `round_trip` in `crates/syntax/tests/lexer.rs` writes a source back out from them.
@@ -349,6 +369,19 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.4 — syntax: statements**
+  - Note (from M1.3): 2026-11-25, the owner's choice: this task also builds the parser that emits
+    events, moved here from M1.3: its cursor over the tokens, the markers that open and close
+    nodes, a way to start a node before a part already read, which an assignment or a call
+    statement needs, since its first expression is read before its kind is known, and the public
+    `parse` function. It adds a `NodeKind` and a view in `crates/syntax/src/ast.rs` for each
+    statement, and `Event::Error` with the first syntax error it reports, whose payload M1.6 makes
+    the `Diagnostic`.
+  - Note (from M1.3): `SyntaxTree::build(source, &lexed, &events)` builds the lossless tree, and
+    refuses events whose `Token`s don't name every lexed token once, in order, by kind and span,
+    `Eof` included. The views read children through the crate-private `SyntaxNode::child` and
+    `SyntaxNode::child_token`, which return `None` for a missing part. `flat_events` and
+    `events_of` in `crates/syntax/tests/tree.rs` make events from tokens and walk a tree back to
+    its events.
   - Note (from M1.2): A byte that starts no token is a `TokenKind::Unknown` token, which PUC-Rio's
     parser reports as `unexpected symbol near '@'`, writing a byte that isn't printable as
     `'<\N>'` with `N` in decimal, as `luaX_token2str` does.
@@ -365,6 +398,9 @@ builds on.
     precedence, with chained comparisons, conditional expressions, `in`, and `is`.
   - Note: 2026-11-24, the owner accepted ADR-0024 (the details Python's operators and 0-based
     indexes leave open), which makes `is` a reserved word.
+  - Note (from M1.3): 2026-11-25, the owner's choice: this task adds a `NodeKind` and a view in
+    `crates/syntax/src/ast.rs` for each expression, with its grammar, and wraps a left operand with
+    the parser's way, from M1.4, to start a node before a part already read.
   - Note (from M1.2): The lexer reads `..` as `TokenKind::DotDot` and `~=` as
     `TokenKind::TildeEqual`, so the parser can name their replacements. A field's `=` is an
     ordinary `Equal` token at the field's top level, before a conversion, a spec, or its end. A
@@ -1353,6 +1389,9 @@ with a message that names the manifest.
   - Verify: `cargo test -p lunaferra-vm --locked`
 
 - [ ] **M4.3 — syntax: type annotations**
+  - Note (from M1.3): `SyntaxTree::build` requires each `Token` event to name one lexed token
+    exactly, by kind and span, so splitting `>>` into two `>` needs `build` to accept a token named
+    in parts, and the spec to say how its trivia divides.
   - Note (from M1.2): The lexer takes the longest token, so `list<list<T>>` ends with one `>>`
     token, and `>>=` is one token too. The parser of type arguments splits them.
   - Depends: M4.1

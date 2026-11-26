@@ -2,7 +2,7 @@
 
 `lunaferra-syntax` turns Lunaferra source into tokens and trees. It has one parser that emits
 events, and two builders that consume them: a lossless syntax tree for the tools and a compact tree
-for the compiler (ADR-0009, proposed: one parser for the compiler and the tools). It also defines
+for the compiler (ADR-0009: one parser for the compiler and the tools). It also defines
 spans, line maps, and the `Diagnostic` type every tool reports ([`diagnostics.md`](diagnostics.md)).
 It accepts the language of [`language.md`](language.md), Lua 5.5's syntax with Python's operators
 (ADR-0023: a language of its own, with Python's operators and 0-based indexes), never panics on any
@@ -165,7 +165,9 @@ sets none; M1.8, the task that enforces the source limit, decides how to handle 
 
 The parser is hand-written, with recursive descent for statements and precedence climbing for
 expressions, using the precedence table of [`language.md`](language.md#precedence). It emits
-events:
+events, which list the tree in the order a reader meets its parts: `Start` opens a node inside the
+node that is open, `Token` adds the source's next token to the node that is open, and `Finish`
+closes it.
 
 ```rust
 pub enum Event {
@@ -174,7 +176,15 @@ pub enum Event {
     Finish,
     Error(Diagnostic),
 }
+
+pub enum NodeKind { Chunk, Block, Error, /* one for each statement and expression */ }
 ```
+
+`Event` and `NodeKind` were built in M1.3, with only the three kinds that frame a source: `Chunk`,
+the root, which holds a `Block` and then the `Eof` token; `Block`; and `Error`, the tokens the
+parser skipped to recover. The parser itself lands in M1.4, which adds a kind for each statement,
+and in M1.5, which adds one for each expression. `Error(Diagnostic)` joins `Event` with the first
+syntax error the parser reports, in M1.4, and carries the `Diagnostic` of M1.6.
 
 List and tuple literals, and the fields of f-strings, parse as
 [`language.md`](language.md#lists-tuples-and-sets-adr-0025) and
@@ -199,6 +209,62 @@ The lossless tree is built from the events. Every byte of the source belongs to 
 and an error node marks each place the parser recovered. Typed views over the generic nodes give
 the tools named accessors, such as `IfStat::condition()`. The formatter, the analysis crates, and
 the language server use it.
+
+Built in M1.3 as described here:
+
+```rust
+impl SyntaxTree {
+    pub fn build(source: &[u8], lexed: &Lexed, events: &[Event]) -> Result<SyntaxTree, Error>;
+    pub fn root(&self) -> SyntaxNode<'_>;
+    pub fn source(&self) -> &[u8];
+}
+
+impl<'t> SyntaxNode<'t> {     // a handle that borrows its tree, cheap to copy
+    pub fn kind(&self) -> NodeKind;
+    pub fn children(&self) -> Children<'t>;   // an iterator of SyntaxElement, in source order
+    pub fn text(&self) -> Vec<u8>;            // its tokens, each with its trivia
+}
+
+impl<'t> SyntaxToken<'t> {
+    pub fn kind(&self) -> TokenKind;
+    pub fn span(&self) -> Span;
+    pub fn text(&self) -> &'t [u8];
+    pub fn leading(&self) -> &'t [Trivia];
+    pub fn trailing(&self) -> &'t [Trivia];
+}
+
+pub enum SyntaxElement<'t> { Node(SyntaxNode<'t>), Token(SyntaxToken<'t>) }
+
+// The typed views, in the module `ast`:
+pub trait AstNode<'t>: Sized {
+    fn cast(node: SyntaxNode<'t>) -> Option<Self>;   // None for a node of another kind
+    fn syntax(&self) -> SyntaxNode<'t>;
+}
+pub struct Chunk<'t>;       // block() and eof()
+pub struct Block<'t>;
+pub struct ErrorNode<'t>;
+```
+
+`build` accepts a list of events only when it makes one tree over every token of the source: the
+first event opens the root, every later one falls inside the root, each `Finish` closes the node
+opened last that is still open, and the `Token` events name each token of the `Lexed` once, in
+order, by kind and span, up to and including `Eof`. Otherwise it returns
+`Error::EventOutsideRoot` or `Error::TokenOutOfOrder`, with the position of the event at fault,
+or `Error::EventsEndEarly`. So every tree that `build` returns holds every token of its source,
+and gives back the source byte for byte. Because a `Token` event must match its token exactly,
+the parser can't yet split one token in two; the parser of type annotations will need that to
+read the `>>` that ends `list<list<T>>` as two `>` (M4.3).
+
+A node's text is the bytes of the tokens inside it, each with its leading and trailing trivia, so
+the root's text is the whole source. The tree keeps its own copy of the source and the trivia, so
+it outlives the buffers it was built from. It is stored as one flat list in which each node comes
+first, then everything inside it, and records where its descendants end. Building, walking,
+printing, and dropping a tree therefore never recurse, so 100,000 nested parentheses can't
+overflow the call stack, and `children` steps over a child node's descendants in one step.
+
+A view's accessors look among its node's children for each part, and give `None` for a part that
+isn't there, which is how the tools read a source with syntax errors. Each task that teaches the
+parser a statement or an expression adds its node kind and its view (M1.4, M1.5).
 
 ## Compact tree
 
@@ -231,6 +297,8 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
    any bytes, valid UTF-8 or not, and a source longer than `MAX_SOURCE_LEN` bytes is rejected.
 8. `numeral_value` gives every numeral the value PUC-Rio Lua 5.5.1 gives it, with each float
    rounded to the nearest float and a tie to even.
+9. `SyntaxTree::build` accepts exactly the lists of events that make one tree over every token of
+   the source, and walking the tree it builds gives back those events.
 
 ## Tests
 
@@ -240,7 +308,10 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
   `crates/syntax/tests/lexer.rs` checks the lexer's half of invariant 1: a property test writes
   out the tokens and trivia of 5,000 generated sources, lexed both as a string and as a file, and
   compares them with the source, and other tests do the same for every conformance script and for
-  100,000 nested f-strings.
+  100,000 nested f-strings. `crates/syntax/tests/tree.rs` checks the tree's half: a property test
+  builds trees of random shape over the tokens of 2,000 generated sources and compares each root's
+  text with its source, and other tests do the same for every conformance script and for a tree
+  nested 100,000 levels deep.
 - Invariant 3: a property test on generated valid programs.
 - Invariant 4: `tests/conformance/syntax_errors.lua` loads broken chunks with `load` and prints each
   message, recorded from its Lua 5.5 twin on PUC-Rio Lua 5.5.1. For the lexer's errors,
@@ -261,3 +332,8 @@ Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own synt
   ties, with a model that rounds in a `u128`. `tests/conformance/lexer.lua` prints numerals of each
   form, recorded from its twin on PUC-Rio Lua 5.5.1, and runs once the conformance runner does
   (M2.14).
+- Invariant 9: a property test in `crates/syntax/tests/tree.rs` gives `SyntaxTree::build` 3,000
+  lists of events, many of them changed by one edit that may break the tree, such as an event
+  removed or two swapped, and compares its answer with a second working-out of the rule. For each
+  tree it builds, the test walks the tree and compares the events it gives with the list. Other
+  tests in the file check each error on a list of its own.

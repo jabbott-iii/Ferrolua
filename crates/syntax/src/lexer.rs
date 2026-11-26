@@ -177,8 +177,8 @@ fn offset(value: usize) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
 
-/// Converts a `u32` offset or count back to a `usize`.
-fn index(value: u32) -> usize {
+/// Converts a `u32` offset or count back to a `usize`, for the lexer and the trees alike.
+pub(crate) fn index(value: u32) -> usize {
     usize::try_from(value).unwrap_or(usize::MAX)
 }
 

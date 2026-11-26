@@ -267,7 +267,7 @@ it is `Proposed`, and no code may depend on it.
 
 ## ADR-0009 — Use one parser for the compiler and the tools
 
-- **Status:** Proposed
+- **Status:** Accepted; the owner accepted it on 2026-11-25
 - **Date:** 2026-11-24
 - **Context:** The compiler needs a fast parse of valid code. The formatter, linter, type checker,
   and language server need every comment and space, and a useful tree even for code that is still

@@ -34,9 +34,8 @@ pub enum Event {
     Token(TokenKind, Span),
     /// Closes the node that is open.
     Finish,
-    /// Reports a syntax error found at this point. The parser reports only the source's first
-    /// error, and puts the tokens from where it stopped to the end of the source in an
-    /// [`NodeKind::Error`] node, which follows this event.
+    /// Reports a syntax error found at this point. The parser goes on after it, and puts the
+    /// tokens it skips, if any, in a [`NodeKind::Error`] node, which follows this event.
     Error(ParseError),
 }
 

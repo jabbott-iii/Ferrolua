@@ -10,7 +10,7 @@
 use lunaferra_syntax::ast::{AstNode, Chunk, CompareOp, Expr, FStringPart, Stat, TableField};
 use lunaferra_syntax::{
     Event, Lexed, NodeKind, Origin, ParseError, ParseErrorKind, SourceId, Span, SyntaxElement,
-    SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse,
+    SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse, source_errors,
 };
 use lunaferra_testkit::{Config, Source};
 
@@ -37,18 +37,15 @@ fn parsed(source: &[u8]) -> (SyntaxTree, Lexed, Vec<ParseError>) {
     (tree, lexed, errors)
 }
 
-/// Returns the source's first error as PUC-Rio's `load` writes it for the chunk name `=input`:
-/// `input:`, the line, `: `, and the message; or nothing, if the source has no error.
+/// Returns the source's first error, the one PUC-Rio reports, as its `load` writes it for the
+/// chunk name `=input`: `input:`, the line, `: `, and the message; or nothing, if the source has
+/// no error.
 fn first_error(source: &[u8]) -> String {
-    let (_, lexed, errors) = parsed(source);
-    assert!(errors.len() <= 1, "the parser reports only the first error");
-    if let Some(error) = errors.first() {
-        return format!("input:{}: {error}", error.line);
-    }
-    lexed
-        .errors()
+    let lexed = lexed(source);
+    let events = parse(source, &lexed);
+    source_errors(&lexed, &events)
         .first()
-        .map(|error| format!("input:{}: {error}", error.line))
+        .map(|error| format!("input:{}: {error}", error.line()))
         .unwrap_or_default()
 }
 
@@ -1073,7 +1070,7 @@ fn gives_no_part_that_a_broken_expression_lacks() {
 }
 
 #[test]
-fn puts_the_tokens_after_an_error_where_the_parser_stopped() {
+fn puts_the_tokens_it_skips_after_an_error_where_the_parser_recovers() {
     let block_shape = |source: &str| {
         let (tree, _, _) = parsed(source.as_bytes());
         let block = tree
@@ -1105,12 +1102,12 @@ fn puts_the_tokens_after_an_error_where_the_parser_stopped() {
         (
             "x = {[1 = 2}",
             "(AssignStat (ExprList (NameExpr x)) = (ExprList (TableExpr { (IndexField [ \
-             (LiteralExpr 1) (Error = 2 })))))",
+             (LiteralExpr 1) (Error = 2)) })))",
         ),
         (
             "f(a if b)",
             "(CallStat (CallExpr (NameExpr f) (Args ( (ExprList (ConditionalExpr (NameExpr a) \
-             if (NameExpr b) (Error )))))))",
+             if (NameExpr b) (Error))) ))))",
         ),
     ];
     for (source, expected) in cases {

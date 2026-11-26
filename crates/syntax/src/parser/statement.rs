@@ -3,7 +3,7 @@
 //! function bodies.
 
 use super::expression::IfAfter;
-use super::{Done, Function, Marker, ParseErrorKind, Parser, PendingIf};
+use super::{Done, Function, Lacking, Marker, ParseErrorKind, Parser, PendingIf, Skip};
 use crate::{NodeKind, Span, TokenKind};
 
 use NodeKind as N;
@@ -31,17 +31,31 @@ struct ReadAttrib {
 
 impl Parser<'_> {
     /// Reads a block: statements up to a token that ends one.
+    ///
+    /// A block started while the parser is unwinding is a part that the broken statement lacks
+    /// if no statement fills it, as in `if x` at the end of the source, so it is left out then.
     pub(super) fn block(&mut self) {
+        let lacking = if self.unwinding {
+            Lacking::IfEmpty
+        } else {
+            Lacking::IfUnwinding
+        };
         let block = self.start();
+        let outer = std::mem::replace(&mut self.in_brackets, false);
         self.statements();
-        self.complete(block, N::Block);
+        self.in_brackets = outer;
+        self.complete_as(block, N::Block, lacking);
     }
 
     /// Reads statements up to a token that ends a block, as PUC-Rio's `statlist` does: a
     /// `return` is always the last. An `if` statement that a statement's last expression left
     /// pending comes right after that statement.
+    ///
+    /// Each statement starts with the parser's cursor at the real token, so an unwinding after an
+    /// error ends here, at the stop where the recovery left the cursor.
     pub(super) fn statements(&mut self) {
         loop {
+            self.unwinding = false;
             if let Some(pending) = self.pending_if.take() {
                 self.pending_if_stat(pending);
                 continue;
@@ -98,8 +112,7 @@ impl Parser<'_> {
             }
             T::Break => {
                 if self.function().loops == 0 {
-                    self.error(ParseErrorKind::BreakOutsideLoop);
-                    return;
+                    self.report(ParseErrorKind::BreakOutsideLoop);
                 }
                 let stat = self.start();
                 self.bump();
@@ -433,8 +446,11 @@ impl Parser<'_> {
     /// Reads a statement that starts with an expression: an assignment or a call, as PUC-Rio's
     /// `exprstat` and `restassign` read them. The first expression comes before the parser knows
     /// which, so the statement's node, and the list of targets, start before it.
+    ///
+    /// Only a name or `(` starts such an expression. Any other token here starts no statement,
+    /// so it is an `unexpected symbol`, and the recovery skips at least that token.
     fn expr_stat(&mut self) {
-        let Some(first) = self.suffixed_expr() else {
+        let Some(first) = self.suffixed_expr_or_skip(Skip::AtLeastOne) else {
             return;
         };
         if !self.at(T::Equal) && !self.at(T::Comma) {

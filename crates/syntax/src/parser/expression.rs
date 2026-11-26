@@ -8,7 +8,7 @@
 //! After an operand, Lua's `..`, `~=`, and binary `~` get a message that names the operator to
 //! write instead.
 
-use super::{Done, Marker, ParseErrorKind, Parser, PendingIf};
+use super::{Done, Marker, ParseErrorKind, Parser, PendingIf, Skip};
 use crate::{NodeKind, TokenKind};
 
 use NodeKind as N;
@@ -100,7 +100,9 @@ impl Parser<'_> {
         let line = self.line();
         self.bump();
         let condition = self.sub_expr(level::NONE);
-        if !self.at(T::Else) && if_after == IfAfter::ConditionalOrStatement {
+        // The real token decides, so that after an error in the condition, an `else` at the stop
+        // still makes the expression conditional, and its `expect` ends the unwinding.
+        if self.token().kind != T::Else && if_after == IfAfter::ConditionalOrStatement {
             let events = self.events.split_off(mark);
             self.pending_if = Some(PendingIf {
                 events,
@@ -217,7 +219,8 @@ impl Parser<'_> {
     }
 
     /// Reads an operand that no unary operator starts: a literal, `...`, an f-string, a function
-    /// expression, a table constructor, a list, or an expression that starts with a name or `(`.
+    /// expression, a table constructor, a list, an expression that starts with a name or `(`, or
+    /// a token the lexer couldn't read.
     fn simple_expr(&mut self) -> Option<Done> {
         match self.current() {
             T::Nil | T::True | T::False | T::Integer | T::Float | T::String => {
@@ -227,12 +230,19 @@ impl Parser<'_> {
             }
             T::DotDotDot => {
                 if !self.function().vararg {
-                    self.error(ParseErrorKind::VarargOutsideVarargFunction);
-                    return None;
+                    self.report(ParseErrorKind::VarargOutsideVarargFunction);
                 }
                 let vararg = self.start();
                 self.bump();
                 Some(self.complete(vararg, N::VarargExpr))
+            }
+            // A token the lexer couldn't read, such as a malformed number or a string with a bad
+            // escape, stands where it is as an operand, in an error node. The lexer has reported
+            // it, so the parser reports nothing and goes on.
+            T::Error => {
+                let error = self.start();
+                self.bump();
+                Some(self.complete(error, N::Error))
             }
             T::FStringStart => Some(self.fstring()),
             T::Function => {
@@ -252,7 +262,13 @@ impl Parser<'_> {
     /// after it. Each of those holds the expression before it, so its node starts before that
     /// expression's. A tuple takes none of them, because it isn't a prefix expression.
     pub(super) fn suffixed_expr(&mut self) -> Option<Done> {
-        let mut done = self.primary_expr()?;
+        self.suffixed_expr_or_skip(Skip::ToStop)
+    }
+
+    /// Reads what [`Parser::suffixed_expr`] reads, after which recovery from a token that starts
+    /// no such expression skips as `skip` says.
+    pub(super) fn suffixed_expr_or_skip(&mut self, skip: Skip) -> Option<Done> {
+        let mut done = self.primary_expr(skip)?;
         if done.kind == N::TupleExpr {
             return Some(done);
         }
@@ -267,7 +283,7 @@ impl Parser<'_> {
                 T::LeftBracket => {
                     let index = self.precede(done);
                     self.bump();
-                    self.expr();
+                    self.bracketed(Self::expr);
                     self.expect(T::RightBracket);
                     (index, N::IndexExpr)
                 }
@@ -291,8 +307,9 @@ impl Parser<'_> {
 
     /// Reads a name, or what starts with `(`: a parenthesized expression, `(`, an expression,
     /// and `)`, or a tuple, which a `,` after the first expression or a `)` right after the `(`
-    /// makes.
-    fn primary_expr(&mut self) -> Option<Done> {
+    /// makes. After any other token, which is an `unexpected symbol`, recovery skips as `skip`
+    /// says.
+    fn primary_expr(&mut self, skip: Skip) -> Option<Done> {
         match self.current() {
             T::Name => {
                 let name = self.start();
@@ -306,19 +323,22 @@ impl Parser<'_> {
                 let kind = if self.at(T::RightParen) {
                     N::TupleExpr
                 } else {
-                    self.expr();
-                    if self.at(T::Comma) {
-                        self.more_elements(T::RightParen);
-                        N::TupleExpr
-                    } else {
-                        N::ParenExpr
-                    }
+                    self.bracketed(|parser| {
+                        parser.expr();
+                        if parser.at(T::Comma) {
+                            parser.more_elements(T::RightParen);
+                            N::TupleExpr
+                        } else {
+                            N::ParenExpr
+                        }
+                    })
                 };
                 self.expect_closing(T::RightParen, T::LeftParen, line);
                 Some(self.complete(paren, kind))
             }
             _ => {
-                self.error(ParseErrorKind::UnexpectedSymbol);
+                let near = self.near(self.token());
+                self.error_with(ParseErrorKind::UnexpectedSymbol, near, skip);
                 None
             }
         }
@@ -341,8 +361,10 @@ impl Parser<'_> {
         let list = self.start();
         self.bump();
         if !self.at(T::RightBracket) {
-            self.expr();
-            self.more_elements(T::RightBracket);
+            self.bracketed(|parser| {
+                parser.expr();
+                parser.more_elements(T::RightBracket);
+            });
         }
         self.expect_closing(T::RightBracket, T::LeftBracket, line);
         self.complete(list, N::ListExpr)
@@ -354,12 +376,14 @@ impl Parser<'_> {
         let line = self.line();
         let table = self.start();
         self.bump();
-        while !self.at(T::RightBrace) {
-            self.field();
-            if !self.eat(T::Comma) && !self.eat(T::Semicolon) {
-                break;
+        self.bracketed(|parser| {
+            while !parser.at(T::RightBrace) {
+                parser.field();
+                if !parser.eat(T::Comma) && !parser.eat(T::Semicolon) {
+                    break;
+                }
             }
-        }
+        });
         self.expect_closing(T::RightBrace, T::LeftBrace, line);
         self.complete(table, N::TableExpr)
     }
@@ -436,11 +460,12 @@ impl Parser<'_> {
         self.complete(fstring, N::FStringExpr)
     }
 
-    /// Reads the text and the fields of an f-string or of a format spec, up to what ends them.
+    /// Reads the text and the fields of an f-string or of a format spec, up to what ends them. A
+    /// stretch of text with a lexical error, which the lexer made an error token, is text too.
     fn fstring_parts(&mut self) {
         loop {
             match self.current() {
-                T::FStringText => self.bump(),
+                T::FStringText | T::Error => self.bump(),
                 T::FStringFieldStart => self.fstring_field(),
                 _ => return,
             }
@@ -452,7 +477,7 @@ impl Parser<'_> {
     fn fstring_field(&mut self) {
         let field = self.start();
         self.bump();
-        self.expr();
+        self.bracketed(Self::expr);
         self.eat(T::Equal);
         self.eat(T::FStringConversion);
         if self.at(T::FStringSpec) {
@@ -474,7 +499,7 @@ impl Parser<'_> {
                 let args = self.start();
                 self.bump();
                 if !self.at(T::RightParen) {
-                    self.expr_list();
+                    self.bracketed(Self::expr_list);
                 }
                 self.expect_closing(T::RightParen, T::LeftParen, line);
                 self.complete(args, N::Args);

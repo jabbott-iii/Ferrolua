@@ -487,7 +487,46 @@ builds on.
       of lists, and `f"{p:length()}"` as a method call where `f"{x:>8}"` has a spec.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
-- [ ] **M1.6 — syntax: error recovery and the diagnostic type**
+- [x] **M1.6 — syntax: error recovery and the diagnostic type**
+  - Note: Built on 2026-11-26. `crates/syntax/src/diagnostic.rs` holds `Diagnostic`, `Code`, `Tool`,
+    `Severity`, `Label`, `Fix`, and `Edit`, as
+    [`specs/diagnostics.md`](specs/diagnostics.md#the-diagnostic) describes, and
+    `crates/syntax/src/source_error.rs` holds `SourceError`, `source_errors`, `diagnostics`, and the
+    `diagnostic` methods of `LexError` and `ParseError`. The parser goes on after each error as
+    [`specs/syntax.md`](specs/syntax.md#recovery) describes: it skips to the next token that can
+    start or end a statement, or close what is open, unwinds what it had started, and goes on at a
+    block's statements or at the token it next asks for.
+  - Note: 2026-11-26, the owner's choice: `Event::Error` keeps the `ParseError`, which the
+    `Diagnostic` doesn't replace, because `load` needs PUC-Rio's message as bytes and its line,
+    which a `Diagnostic`'s `String` and span can't give exactly. `source_errors` puts the lexical
+    and syntax errors in the order PUC-Rio meets them, so its first is the one `load` reports.
+  - Note: 2026-11-26, the owner's choice: each kind of lexical and syntax error has a `P` code of
+    its own, `P0001` to `P0027`, which the registry in `specs/diagnostics.md` lists and a unit test
+    in `source_error.rs` compares with the codes. The diagnostics of Lua's `~=` and binary `~` carry
+    a fix that writes `!=` or `^`; the one for `..` has none, because `+` binds more tightly than
+    `..` did and joins only strings.
+  - Note: `tests/conformance/syntax_errors.lua` loads 43 broken chunks, each a long string, and its
+    twin is the same script. `cargo xtask record`, with `LUNAFERRA_PUC_LUA` set to the `lua` built
+    in `~/.local/share/lua/src/lua-5.5.1`, saved the twin's output, 43 lines, and a second run
+    reported it `unchanged`. Until the conformance runner (M2.14), `crates/syntax/tests/recovery.rs`
+    takes each chunk from the script and checks that the first of `source_errors` is the recorded
+    line.
+  - Note: Every message test of M1.2, M1.4, and M1.5 still passes with recovery. Their helper
+    `first_error`, in `tests/parser.rs` and `tests/expression.rs`, now takes the first of
+    `source_errors` instead of asserting that the parser reports at most one error. The tests of
+    the tree after an error, `puts_the_tokens_it_skips_after_an_error_in_an_error_node_and_goes_on`
+    and `puts_the_tokens_it_skips_after_an_error_where_the_parser_recovers`, now expect the trees
+    recovery makes, and the property test of invariant 10 checks the new invariant; a run of
+    300,000 cases of it passed. The project has no mutation tool, so the tests were checked by hand:
+    each of 24 edits to recovery and to `source_errors`, such as letting a name at the start of a
+    line stop the skipping inside brackets or putting a syntax error before a lexical error at the
+    same token, failed a test or made one hang, once tests were added for the two that didn't:
+    letting a `,` stop the skipping in a block, and not adding the token at the stop after a failed
+    `expect`.
+  - Note: Recovery is a heuristic. When a missing token, such as the `(` of `local function f`,
+    leaves a block to read, the statements after it become that block, and a missing `end` is a
+    second error. The same rule keeps the block of an `if` that lacks only its `then` whole, when
+    the `end` follows.
   - Note (from M1.5): `Parser::error_with`, in `crates/syntax/src/parser.rs`, is the one place a
     syntax error is reported. When the parser stops inside the condition of an `if` after a value,
     as in `x = f if @`, the condition's events and the error node move into the `if` statement
@@ -515,6 +554,10 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.7 — syntax: compact tree for the compiler**
+  - Note (from M1.6): The parser goes on after each error, so an `Error` node can be anywhere a node
+    can, including as an operand: a token the lexer couldn't read, such as `0x`, is an `Error` node
+    in an expression's place. The compact tree is built only when `source_errors` gives nothing, so
+    its builder never meets one.
   - Note (from M1.5): The events stay in source order when a pending `if` moves, so a builder
     that reads them in order meets each `if` statement after the statement before it. Every
     comparison is a `CompareExpr`, with `not in` and `is not` as two tokens each, and a positional
@@ -534,6 +577,12 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --locked`
 
 - [ ] **M1.8 — syntax: size and nesting limits**
+  - Note (from M1.6): After an error, the parser unwinds through every level it is in, and goes on
+    at the next block's statements, so the error for one level past the limit can recover like any
+    other: its tokens up to the next stop go in an `Error` node. Recovery calls
+    `Parser::starts_line` for each token it skips that may stop it, a binary search in the line map
+    each time, so the hostile-input test of time should include a source of many errors, such as
+    16 MB of `x = = 1` lines.
   - Note (from M1.5): The parser also calls itself for each unary operator, the right operand of
     each binary operator, each `**` in a chain, each conditional expression's `else` value, and each
     nested table, list, tuple, function, f-string, and field, so a chain of 100,000 `**`, `-`, or
@@ -560,6 +609,11 @@ builds on.
   - Verify: `cargo test -p lunaferra-syntax --test hostile_syntax --locked`
 
 - [ ] **M1.9 — fuzz: lexer and parser targets**
+  - Note (from M1.6): The parser goes on after each error, so a loop in recovery is a hang the
+    `parser` target must catch. `makes_a_tree_of_every_generated_source_that_gives_it_back` in
+    `crates/syntax/tests/parser.rs` checks 5,000 generated sources, and a run of 300,000 on
+    2026-11-26 found no failure. The target can also call `source_errors` and `diagnostics`, which
+    read the events.
   - Note (from M1.5): `generate_program` in `crates/syntax/tests/parser.rs` writes every expression
     too, with each operator's operands simple or in parentheses, so every program it writes is
     valid. `generate_expression` in `crates/syntax/tests/expression.rs` writes expressions from the
@@ -596,6 +650,9 @@ builds on.
   - Verify: `cargo xtask fuzz parser --seed 0 --runs 1000000` (expect no new saved input)
 
 - [ ] **M1.10 — cli: `lunaferra parse`**
+  - Note (from M1.6): `diagnostics(&lexed, &events)` gives every lexical and syntax error of a file
+    as a `Diagnostic`, in the order PUC-Rio meets them, with a `Code` that displays as `P0013`, the
+    message, and the span, which `LineMap::line_col` turns into a line and a column.
   - Note (from M0.1): Naming the binary `lunaferra` makes `cargo doc --workspace` warn of an output
     filename collision with the `lunaferra` library
     ([Cargo issue 6313](https://github.com/rust-lang/cargo/issues/6313)). Setting `doc = false` on

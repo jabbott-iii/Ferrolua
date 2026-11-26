@@ -9,18 +9,19 @@ use crate::{Near, Span, TokenKind};
 /// A syntax error: a token the parser doesn't expect where it is, or a statement that breaks a
 /// rule PUC-Rio's parser checks, such as two `<close>` variables in one `local` statement.
 ///
-/// The parser reports only the first syntax error of a source, as PUC-Rio Lua does, and only when
-/// it comes before the source's first lexical error.
+/// The parser reports every syntax error of a source and goes on after each, while PUC-Rio Lua
+/// stops at the first. [`source_errors`](crate::source_errors) gives the one PUC-Rio reports, and
+/// [`ParseError::diagnostic`] gives this error as a diagnostic for the tools.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseError {
     /// What the mistake is.
     pub kind: ParseErrorKind,
-    /// The token the parser stopped at, or, for an error that PUC-Rio writes without `near`, the
-    /// name at fault: the attribute's name, or the second `<close>` variable's.
+    /// The token where the parser found the error, or, for an attribute's error, which PUC-Rio
+    /// writes without `near`, the name at fault: the attribute's name, or the second `<close>`
+    /// variable's.
     pub span: Span,
-    /// The line that PUC-Rio's message names: the line where the token the parser stopped at
-    /// ends, or, for an error that PUC-Rio writes without `near`, where the last token it read
-    /// ends.
+    /// The line that PUC-Rio's message names: the line where the token at which the parser found
+    /// the error ends, or, for an attribute's error, where the last token it read ends.
     pub line: u32,
     /// What the message says the error is near, or `None` for an error written without it: an
     /// attribute error and an unexpected zero byte, which PUC-Rio writes so, and Lua's

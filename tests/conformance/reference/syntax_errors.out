@@ -1,0 +1,43 @@
+input:1: malformed number near '0x'
+input:1: unfinished string near <eof>
+input:1: unfinished long string (starting at line 1) near <eof>
+input:1: unfinished long comment (starting at line 1) near <eof>
+input:1: invalid long string delimiter near '[='
+input:1: invalid escape sequence near '"\q'
+input:1: hexadecimal digit expected near '"\xZ'
+input:1: missing '{' near '"\u1'
+input:1: missing '}' near '"\u{12"'
+input:1: UTF-8 value too large near '"\u{110000000'
+input:1: decimal escape too large near '"\300"'
+input:1: unexpected symbol near '='
+input:1: unexpected symbol near '@'
+input:1: unexpected symbol near '*'
+input:1: unexpected symbol near <eof>
+input:1: syntax error near '.1'
+input:1: function arguments expected near '='
+input:1: unexpected symbol near ')'
+input:1: <eof> expected near 'end'
+input:1: <eof> expected near 'end'
+input:1: unexpected symbol near 'return'
+input:1: <name> expected near '1'
+input:1: '::' expected near <eof>
+input:1: <name> expected near '1'
+input:1: '=' or 'in' expected near 'do'
+input:1: <name> or '...' expected near '1'
+input:1: ')' expected near ','
+input:1: unexpected symbol near 'then'
+input:1: 'end' expected near <eof>
+input:2: 'end' expected (to close 'if' at line 1) near <eof>
+input:3: 'end' expected (to close 'while' at line 1) near <eof>
+input:1: 'until' expected near <eof>
+input:1: '}' expected near <eof>
+input:2: ')' expected (to close '(' at line 1) near '2'
+input:1: break outside loop near 'break'
+input:1: cannot use '...' outside a vararg function near '...'
+input:1: unknown attribute 'foo'
+input:1: multiple to-be-closed variables in local list
+input:1: unexpected symbol near '='
+input:3: unexpected symbol near '='
+input:2: unexpected symbol near '='
+input:1: malformed number near '0x'
+input:1: unexpected symbol near '@'

@@ -13,7 +13,7 @@ use lunaferra_syntax::ast::{
 };
 use lunaferra_syntax::{
     Error, Event, Lexed, NodeKind, Origin, ParseError, ParseErrorKind, SourceId, Span,
-    SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse,
+    SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree, TokenKind, lex, parse, source_errors,
 };
 use lunaferra_testkit::{Config, Source};
 
@@ -40,18 +40,15 @@ fn parsed(source: &[u8]) -> (SyntaxTree, Lexed, Vec<ParseError>) {
     (tree, lexed, errors)
 }
 
-/// Returns the source's first error as PUC-Rio's `load` writes it for the chunk name `=input`:
-/// `input:`, the line, `: `, and the message; or nothing, if the source has no error.
+/// Returns the source's first error, the one PUC-Rio reports, as its `load` writes it for the
+/// chunk name `=input`: `input:`, the line, `: `, and the message; or nothing, if the source has
+/// no error.
 fn first_error(source: &[u8]) -> String {
-    let (_, lexed, errors) = parsed(source);
-    assert!(errors.len() <= 1, "the parser reports only the first error");
-    if let Some(error) = errors.first() {
-        return format!("input:{}: {error}", error.line);
-    }
-    lexed
-        .errors()
+    let lexed = lexed(source);
+    let events = parse(source, &lexed);
+    source_errors(&lexed, &events)
         .first()
-        .map(|error| format!("input:{}: {error}", error.line))
+        .map(|error| format!("input:{}: {error}", error.line()))
         .unwrap_or_default()
 }
 
@@ -967,7 +964,7 @@ fn counts_lines_after_a_files_skipped_first_line() {
 }
 
 #[test]
-fn puts_the_tokens_after_an_error_in_an_error_node_where_it_stopped() {
+fn puts_the_tokens_it_skips_after_an_error_in_an_error_node_and_goes_on() {
     let cases = [
         ("x", "(Error (NameExpr x) (Error))"),
         (
@@ -978,15 +975,21 @@ fn puts_the_tokens_after_an_error_in_an_error_node_where_it_stopped() {
         ("if x", "(IfStat if (NameExpr x) (Error))"),
         (
             "if x then @ end y = 1",
-            "(IfStat if (NameExpr x) then (Block (Error @ end y = 1)))",
+            "(IfStat if (NameExpr x) then (Block (Error @)) end) \
+             (AssignStat (ExprList (NameExpr y)) = (ExprList (LiteralExpr 1)))",
         ),
         ("a.", "(Error (FieldExpr (NameExpr a) . (Error)))"),
         ("for x", "(Error for x (Error))"),
-        ("for 1 do end", "(Error for (Error 1 do end))"),
-        ("break x", "(Error break x)"),
+        (
+            "for 1 do end",
+            "(Error for (Error 1)) (DoStat do (Block) end)",
+        ),
+        // A rule that a statement breaks skips nothing.
+        ("break x", "(BreakStat break) (Error (NameExpr x) (Error))"),
         (
             "local x <foo> y",
-            "(LocalStat local (AttNameList (AttName x (Attrib < foo >) (Error y))))",
+            "(LocalStat local (AttNameList (AttName x (Attrib < foo >)))) \
+             (Error (NameExpr y) (Error))",
         ),
         (
             "x = 1 0x",
@@ -1531,13 +1534,42 @@ fn makes_a_tree_of_every_generated_source_that_gives_it_back() {
                     _ => None,
                 })
                 .collect();
-            // At most one syntax error, and only before the first lexical error.
-            let before_lexical = match (errors.first(), lexed.errors().first()) {
-                (Some(error), Some(lexical)) => error.span.end <= lexical.span.start,
-                _ => true,
-            };
-            tree.root().text() == *source && errors.len() <= 1 && before_lexical
+            // The errors come in source order, each at a place of its own.
+            let in_order = errors
+                .windows(2)
+                .all(|pair| pair[0].span.start < pair[1].span.start);
+            // None of the errors for a token the parser didn't expect is at a token that holds a
+            // lexical error: the first token that ends after the lexical error starts.
+            let tokens = lexed.tokens();
+            let holding: Vec<Span> = lexed
+                .errors()
+                .iter()
+                .filter_map(|error| {
+                    tokens
+                        .iter()
+                        .find(|token| token.span.end > error.span.start)
+                        .map(|token| token.span)
+                })
+                .collect();
+            let clear = errors
+                .iter()
+                .filter(|error| is_unexpected_token(&error.kind))
+                .all(|error| !holding.contains(&error.span));
+            tree.root().text() == *source && in_order && clear
         });
+}
+
+/// Returns whether an error of `kind` is for a token the parser didn't expect, after which it
+/// recovers, rather than for a rule that a statement breaks while its tokens are all in place.
+fn is_unexpected_token(kind: &ParseErrorKind) -> bool {
+    !matches!(
+        kind,
+        ParseErrorKind::BreakOutsideLoop
+            | ParseErrorKind::VarargOutsideVarargFunction
+            | ParseErrorKind::UnknownAttribute { .. }
+            | ParseErrorKind::MultipleToBeClosed
+            | ParseErrorKind::GlobalToBeClosed
+    )
 }
 
 /// The names that generated programs use. `nonlocal` is a name everywhere but at the start of a

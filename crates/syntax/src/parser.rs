@@ -6,7 +6,8 @@
 //! rule, so it accepts the same statements and reports each mistake with the same message and
 //! line; its expressions have Python's operators and precedence, as the language spec defines
 //! them. The statements and the expressions are modules of their own, and this module holds what
-//! both use: the cursor over the tokens, the markers that open and close nodes, and the errors.
+//! both use: the cursor over the tokens, the markers that open and close nodes, the errors, and
+//! the recovery after each error.
 //!
 //! # Markers
 //!
@@ -30,6 +31,22 @@
 //! expression, it moves their events aside, out of the statement's nodes. The statement finishes
 //! without them, and the `if` statement then starts with them, and goes on from the condition.
 //! Each event moves once, so the parser never reads a token twice.
+//!
+//! # Recovery
+//!
+//! PUC-Rio stops at a source's first error, but the tools need the whole file, so the parser goes
+//! on after each one. When it meets a token it doesn't expect, it reports the error, then puts
+//! the tokens up to a *stop*, a token that can start or end a statement or close what is open,
+//! in an error node. Then it *unwinds*: the cursor shows the end of the source, so each construct
+//! that is open finishes as far as it got, without reporting more, until the parser reaches a
+//! block's list of statements or an `expect` of the token at the stop. There it goes on as
+//! before. The checks of a rule that a statement breaks, such as `break` outside a loop, report
+//! their error and go on without skipping anything, because the tokens are all in place.
+//!
+//! Two rules keep one mistake from giving several errors. An error found where the last
+//! recovery stopped, before any token is read, isn't reported, and neither is an error at a
+//! token that holds a lexical error, which the lexer has reported already. A token the lexer
+//! couldn't read, such as a malformed number, stands where it is as an operand.
 
 mod error;
 mod expression;
@@ -38,21 +55,26 @@ mod statement;
 pub use error::{ParseError, ParseErrorKind};
 
 use crate::lexer::string_as_read;
-use crate::{Event, Lexed, Near, NodeKind, Span, Token, TokenKind};
+use crate::source_error::token_of;
+use crate::{Event, LexErrorKind, Lexed, Near, NodeKind, Span, Token, TokenKind};
 
 /// Reads the tokens of `source`, which `lexed` holds, and returns the events of its tree.
 ///
 /// `lexed` must be what [`lex`](crate::lex) gave for `source`. With any other source, the error
 /// messages quote the wrong text, though nothing panics.
 ///
-/// The parser stops at the source's first error, as PUC-Rio Lua does. A syntax error comes as an
-/// [`Event::Error`] when it comes before the token where PUC-Rio's lexer would find the source's
-/// first lexical error, which [`Lexed::errors`] holds; at or past that token, the parser stops
-/// without one, because PUC-Rio reports the lexical error first. Either way, the tokens from
-/// where it stopped to the end of the source, apart from the `Eof` token, go in a
-/// [`NodeKind::Error`] node in the node it was reading, and each node it had started is
-/// finished as far as it got. So the events always make a tree over every token, which
+/// Each syntax error comes as an [`Event::Error`], and the parser goes on after it, so the rest
+/// of the source still parses. After a token it doesn't expect, it puts the tokens it skips in a
+/// [`NodeKind::Error`] node, finishes each node it had started as far as it got, and goes on at
+/// the next token that can start or end a statement, such as `end`, `local`, or a name at the
+/// start of a line, or that closes a bracket opened before the error. It reports no error at a
+/// token that holds a lexical error, which [`Lexed::errors`] holds, and none at the same token
+/// twice. The events always make a tree over every token, which
 /// [`SyntaxTree::build`](crate::SyntaxTree::build) accepts.
+///
+/// PUC-Rio Lua stops at a source's first error, so only the first error of a source, lexical or
+/// syntactic, is the one it reports. [`source_errors`](crate::source_errors) puts the two kinds
+/// in the order PUC-Rio would meet them.
 ///
 /// # Examples
 ///
@@ -66,7 +88,7 @@ use crate::{Event, Lexed, Near, NodeKind, Span, Token, TokenKind};
 /// let tree = SyntaxTree::build(source, &lexed, &events)?;
 /// assert_eq!(tree.root().text(), source);
 ///
-/// let broken = b"if x then\nprint(x)\n";
+/// let broken = b"if x then\nprint(x\nend\ny = = 1\n";
 /// let lexed = lex(broken, SourceId::new(1), Origin::String)?;
 /// let errors: Vec<String> = parse(broken, &lexed)
 ///     .iter()
@@ -75,7 +97,13 @@ use crate::{Event, Lexed, Near, NodeKind, Span, Token, TokenKind};
 ///         _ => None,
 ///     })
 ///     .collect();
-/// assert_eq!(errors, ["3: 'end' expected (to close 'if' at line 1) near <eof>"]);
+/// assert_eq!(
+///     errors,
+///     [
+///         "3: ')' expected (to close '(' at line 2) near 'end'",
+///         "4: unexpected symbol near '='",
+///     ]
+/// );
 /// # Ok(())
 /// # }
 /// ```
@@ -97,12 +125,19 @@ struct Parser<'s> {
     pos: usize,
     /// The position of the last token, which is always [`TokenKind::Eof`].
     eof: usize,
-    /// The position of the token where PUC-Rio's lexer would find the source's first lexical
-    /// error, if it has one: the first token that ends after the error starts. The parser
-    /// reports no syntax error at or past it.
-    lex_stop: Option<usize>,
-    /// Whether the parser has stopped at an error.
-    stopped: bool,
+    /// The positions of the tokens that hold a lexical error, in order: the first token that ends
+    /// after each error starts, and the `Eof` token after an unfinished string or comment that
+    /// reaches the end of the source. The parser reports no error at them.
+    lexical: Vec<usize>,
+    /// Whether the parser is unwinding after an error: the cursor shows the end of the source
+    /// until a block's statements, or an `expect` of the token at the stop, go on.
+    unwinding: bool,
+    /// The position where the last recovery stopped, at which no error is reported again.
+    recovered_at: Option<usize>,
+    /// Whether the innermost construct the parser is in is a list between brackets, such as a
+    /// table's fields or a call's arguments, rather than a block, which changes where recovery
+    /// stops.
+    in_brackets: bool,
     /// The events so far, in the parser's own form.
     events: Vec<Raw>,
     /// One entry for each node started, in the order started.
@@ -177,23 +212,102 @@ struct Done {
     kind: NodeKind,
 }
 
+/// When a node that holds nothing is a part that a broken statement lacks, and is left out of
+/// the tree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Lacking {
+    /// While the parser is unwinding.
+    IfUnwinding,
+    /// Always: for a node started while the parser was unwinding, such as the block of an `if`
+    /// whose `then` is missing, which the unwinding ended in.
+    IfEmpty,
+}
+
+/// How far recovery skips before it looks for a stop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Skip {
+    /// To the first stop, which may be the current token.
+    ToStop,
+    /// Past the current token at least, because nothing open can go on from it, such as a
+    /// token that starts no statement where one must start.
+    AtLeastOne,
+}
+
+/// Returns whether `kind` ends a part of a construct, so that an `expect` of it ends the
+/// unwinding after an error, when recovery stopped at a token of that kind.
+const fn ends_unwinding(kind: TokenKind) -> bool {
+    use TokenKind as T;
+    matches!(
+        kind,
+        T::End
+            | T::Until
+            | T::Then
+            | T::Do
+            | T::Else
+            | T::Semicolon
+            | T::Comma
+            | T::RightParen
+            | T::RightBracket
+            | T::RightBrace
+            | T::FStringFieldEnd
+            | T::FStringEnd
+    )
+}
+
+/// Returns whether `kind` opens a bracket that a token of a kind that [`closes`] accepts
+/// closes.
+const fn opens(kind: TokenKind) -> bool {
+    use TokenKind as T;
+    matches!(
+        kind,
+        T::LeftParen | T::LeftBracket | T::LeftBrace | T::FStringStart | T::FStringFieldStart
+    )
+}
+
+/// Returns whether `kind` closes a bracket that a token of a kind that [`opens`] accepts
+/// opened.
+const fn closes(kind: TokenKind) -> bool {
+    use TokenKind as T;
+    matches!(
+        kind,
+        T::RightParen | T::RightBracket | T::RightBrace | T::FStringEnd | T::FStringFieldEnd
+    )
+}
+
 impl<'s> Parser<'s> {
     fn new(source: &'s [u8], lexed: &'s Lexed) -> Self {
         let tokens = lexed.tokens();
         let eof = tokens.len().saturating_sub(1);
-        let lex_stop = lexed.errors().first().map(|error| {
-            tokens
-                .iter()
-                .position(|token| token.span.end > error.span.start)
-                .unwrap_or(eof)
+        let mut lexical: Vec<usize> = lexed
+            .errors()
+            .iter()
+            .map(|error| token_of(tokens, error))
+            .collect();
+        // What an unfinished string or comment at the end swallowed can't be found missing.
+        let end = tokens.get(eof).map_or(0, |token| token.span.start);
+        let swallows_rest = lexed.errors().iter().any(|error| {
+            let unfinished = matches!(
+                error.kind,
+                LexErrorKind::UnfinishedString
+                    | LexErrorKind::UnfinishedLongString { .. }
+                    | LexErrorKind::UnfinishedLongComment { .. }
+            );
+            unfinished && error.span.end >= end
         });
+        if swallows_rest {
+            lexical.push(eof);
+        }
+        lexical.sort_unstable();
+        lexical.dedup();
         Self {
             source,
             lexed,
             pos: 0,
             eof,
-            lex_stop,
-            stopped: false,
+            lexical,
+            unwinding: false,
+            recovered_at: None,
+            in_brackets: false,
             events: Vec::with_capacity(tokens.len().saturating_mul(2)),
             nodes: Vec::with_capacity(tokens.len()),
             functions: vec![Function {
@@ -205,14 +319,24 @@ impl<'s> Parser<'s> {
     }
 
     /// Reads the whole source: a chunk, which holds a block and the end of the source.
+    ///
+    /// The block's statements end at a token that ends a block, or after a `return`, as in
+    /// PUC-Rio's `statlist`. Anywhere but at the end of the source, that is the error
+    /// `<eof> expected`, after which the block goes on past the token.
     fn chunk(&mut self) {
         let chunk = self.start();
         let block = self.start();
-        self.statements();
-        self.complete(block, NodeKind::Block);
-        if !self.at(TokenKind::Eof) {
-            self.error(ParseErrorKind::Expected(TokenKind::Eof));
+        loop {
+            self.statements();
+            // `statements` returns after a `return` even while unwinding, and nothing encloses
+            // the chunk to go on from.
+            self.unwinding = false;
+            if self.at(TokenKind::Eof) {
+                break;
+            }
+            self.error_skipping(ParseErrorKind::Expected(TokenKind::Eof));
         }
+        self.complete(block, NodeKind::Block);
         self.events.push(Raw::Token(self.eof));
         self.complete(chunk, NodeKind::Chunk);
     }
@@ -231,9 +355,14 @@ impl<'s> Parser<'s> {
         tokens[pos.min(self.eof)]
     }
 
-    /// Returns the current token's kind.
+    /// Returns the current token's kind, or [`TokenKind::Eof`] while the parser is unwinding,
+    /// so that each construct that is open finishes as it would at the end of the source.
     fn current(&self) -> TokenKind {
-        self.token().kind
+        if self.unwinding {
+            TokenKind::Eof
+        } else {
+            self.token().kind
+        }
     }
 
     /// Returns the kind of the token after the current one.
@@ -274,25 +403,37 @@ impl<'s> Parser<'s> {
     }
 
     /// Adds the current token and moves on if it is of `kind`, and returns whether it was.
+    ///
+    /// While the parser is unwinding, a token that ends a part of a construct, such as `then`,
+    /// `end`, or `)`, ends the unwinding when it is the token at the stop and the one asked for
+    /// here, so the construct goes on from it.
     fn eat(&mut self, kind: TokenKind) -> bool {
-        let found = self.at(kind);
-        if found {
-            self.bump();
+        if self.unwinding {
+            if !ends_unwinding(kind) || self.token().kind != kind {
+                return false;
+            }
+            self.unwinding = false;
+        } else if self.current() != kind {
+            return false;
         }
-        found
+        self.bump();
+        true
     }
 
     /// Adds the current token and moves on if it is of `kind`, and otherwise reports that a
-    /// token of `kind` was expected, as PUC-Rio's `checknext` does.
+    /// token of `kind` was expected, as PUC-Rio's `checknext` does. After the error, it adds the
+    /// token where the recovery stopped if that token is of `kind`.
     fn expect(&mut self, kind: TokenKind) {
         if !self.eat(kind) {
             self.error(ParseErrorKind::Expected(kind));
+            self.eat(kind);
         }
     }
 
     /// Adds the current token and moves on if it is of `kind`, which closes the construct that
     /// `opener` opened on `line`, and otherwise reports it missing, as PUC-Rio's `check_match`
-    /// does: naming the opener only when it is on another line.
+    /// does: naming the opener only when it is on another line. After the error, it adds the
+    /// token where the recovery stopped if that token is of `kind`.
     fn expect_closing(&mut self, kind: TokenKind, opener: TokenKind, line: u32) {
         if self.eat(kind) {
             return;
@@ -306,6 +447,7 @@ impl<'s> Parser<'s> {
                 line,
             });
         }
+        self.eat(kind);
     }
 
     // The functions the parser is inside.
@@ -339,17 +481,27 @@ impl<'s> Parser<'s> {
 
     /// Completes the node `marker` started, as a node of `kind`.
     ///
-    /// Once the parser has stopped, a node that holds nothing is left out of the tree, so that
+    /// While the parser is unwinding, a node that holds nothing is left out of the tree, so that
     /// the parts a broken statement lacks are missing, not empty.
     fn complete(&mut self, marker: Marker, kind: NodeKind) -> Done {
+        self.complete_as(marker, kind, Lacking::IfUnwinding)
+    }
+
+    /// Completes the node `marker` started, as a node of `kind`, leaving it out of the tree if
+    /// it holds nothing and `lacking` says the statement lacks it then.
+    fn complete_as(&mut self, marker: Marker, kind: NodeKind, lacking: Lacking) -> Done {
         let done = Done {
             node: marker.0,
             kind,
         };
+        let lacking = match lacking {
+            Lacking::IfUnwinding => self.unwinding,
+            Lacking::IfEmpty => true,
+        };
         // Every marker comes from `start`, which pushed its node.
         let node = &mut self.nodes[marker.0];
         let empty = matches!(self.events.last(), Some(&Raw::Start(last)) if last == marker.0);
-        if self.stopped && empty && !node.wraps {
+        if lacking && empty && !node.wraps {
             self.events.pop();
             return done;
         }
@@ -377,64 +529,85 @@ impl<'s> Parser<'s> {
     // Errors.
 
     /// Reports `kind` near the current token, on the line where it ends, as PUC-Rio's
-    /// `luaX_syntaxerror` does, and stops.
+    /// `luaX_syntaxerror` does, and recovers.
     fn error(&mut self, kind: ParseErrorKind) {
         let near = self.near(self.token());
-        self.error_with(kind, near);
+        self.error_with(kind, near, Skip::ToStop);
     }
 
     /// Reports `kind` at the current token, without `near`, on the line where the token ends, and
-    /// stops. The messages for Lua's operators take this form, because each names its token.
+    /// recovers. The messages for Lua's operators take this form, because each names its token.
     fn error_without_near(&mut self, kind: ParseErrorKind) {
-        self.error_with(kind, None);
+        self.error_with(kind, None, Skip::ToStop);
+    }
+
+    /// Reports `kind` near the current token, as [`Parser::error`] does, at a token that nothing
+    /// open can go on from, so the recovery skips at least that token.
+    fn error_skipping(&mut self, kind: ParseErrorKind) {
+        let near = self.near(self.token());
+        self.error_with(kind, near, Skip::AtLeastOne);
     }
 
     /// Reports `kind` at the current token, on the line where it ends, with `near` after the
-    /// message, and stops.
-    fn error_with(&mut self, kind: ParseErrorKind, near: Option<Near>) {
-        if self.stops_quietly() {
+    /// message, then recovers, skipping as `skip` says.
+    ///
+    /// Nothing is reported while the parser is unwinding, where the last recovery stopped, or at
+    /// a token that holds a lexical error. The parser still recovers from the last two, because
+    /// the token it found there is still wrong.
+    fn error_with(&mut self, kind: ParseErrorKind, near: Option<Near>, skip: Skip) {
+        if self.unwinding {
+            return;
+        }
+        let quiet = self.recovered_at == Some(self.pos) || self.holds_lexical_error(self.pos);
+        if !quiet {
+            let token = self.token();
+            self.events.push(Raw::Error(ParseError {
+                kind,
+                span: token.span,
+                line: self.end_line(token),
+                near,
+            }));
+        }
+        self.recover(skip, !quiet);
+    }
+
+    /// Reports `kind` near the current token, on the line where it ends, without recovering:
+    /// for a rule that a statement breaks while its tokens are all in place, such as `break`
+    /// outside a loop. Where the last recovery stopped, that token has an error already, so
+    /// nothing is reported.
+    fn report(&mut self, kind: ParseErrorKind) {
+        if self.unwinding || self.recovered_at == Some(self.pos) {
             return;
         }
         let token = self.token();
-        let error = ParseError {
+        let near = self.near(token);
+        self.events.push(Raw::Error(ParseError {
             kind,
             span: token.span,
             line: self.end_line(token),
             near,
-        };
-        self.events.push(Raw::Error(error));
-        self.skip_rest();
+        }));
     }
 
     /// Reports `kind` at `span`, without `near`, on the line where the last token read ends, as
-    /// PUC-Rio's `luaK_semerror` does, and stops.
+    /// PUC-Rio's `luaK_semerror` does, without recovering: the checks of attributes and of
+    /// `<close>` variables come after their tokens are read.
     fn error_at(&mut self, kind: ParseErrorKind, span: Span) {
-        if self.stops_quietly() {
+        if self.unwinding {
             return;
         }
         let last = self.token_at(self.pos.saturating_sub(1));
-        let error = ParseError {
+        self.events.push(Raw::Error(ParseError {
             kind,
             span,
             line: self.end_line(last),
             near: None,
-        };
-        self.events.push(Raw::Error(error));
-        self.skip_rest();
+        }));
     }
 
-    /// Returns whether an error found here goes unreported: once the parser has stopped, and
-    /// when the current token is at or past the one where PUC-Rio's lexer would find the
-    /// source's first lexical error, which it reports first. In that case it stops here.
-    fn stops_quietly(&mut self) -> bool {
-        if self.stopped {
-            return true;
-        }
-        let past_lex_error = self.lex_stop.is_some_and(|stop| self.pos >= stop);
-        if past_lex_error {
-            self.skip_rest();
-        }
-        past_lex_error
+    /// Returns whether the token at `pos` holds a lexical error, which the lexer has reported.
+    fn holds_lexical_error(&self, pos: usize) -> bool {
+        self.lexical.binary_search(&pos).is_ok()
     }
 
     /// Returns what a message says an error at `token` is near, as PUC-Rio's `txtToken` writes
@@ -457,19 +630,103 @@ impl<'s> Parser<'s> {
         }
     }
 
-    /// Puts every token from the current one to the end of the source, apart from `Eof`, in an
-    /// error node, and stops: from here on, the parser is at the end of the source and reports
-    /// nothing more.
-    fn skip_rest(&mut self) {
-        let skipped = self.start();
-        while self.pos < self.eof {
-            self.events.push(Raw::Token(self.pos));
-            self.pos = self.pos.saturating_add(1);
+    // Recovery.
+
+    /// Puts the tokens from the current one up to the next stop in an error node, then unwinds.
+    ///
+    /// After a reported error, the node marks the place even when it holds nothing; after one
+    /// that wasn't reported, it is left out unless it holds a token.
+    fn recover(&mut self, skip: Skip, reported: bool) {
+        let stop = self.next_stop(skip);
+        if reported || stop > self.pos {
+            let skipped = self.start();
+            while self.pos < stop {
+                self.events.push(Raw::Token(self.pos));
+                self.pos = self.pos.saturating_add(1);
+            }
+            self.complete(skipped, NodeKind::Error);
         }
-        // The node is complete before the parser stops, so it marks the place even when it is
-        // empty, at the end of the source.
-        self.complete(skipped, NodeKind::Error);
-        self.stopped = true;
+        self.recovered_at = Some(self.pos);
+        self.unwinding = true;
+    }
+
+    /// Returns the position of the first stop from the current token on, or from the token after
+    /// it if `skip` says to skip at least one: a token that can start or end a statement, or a
+    /// closing bracket whose opening one isn't among the skipped tokens. Inside a bracket that
+    /// the skipped tokens open, only the tokens that close it count. The `Eof` token always
+    /// stops.
+    fn next_stop(&self, skip: Skip) -> usize {
+        let mut at = self.pos;
+        let mut depth = 0_u32;
+        if skip == Skip::AtLeastOne && at < self.eof {
+            if opens(self.token_at(at).kind) {
+                depth = 1;
+            }
+            at = at.saturating_add(1);
+        }
+        while at < self.eof {
+            let kind = self.token_at(at).kind;
+            if opens(kind) {
+                depth = depth.saturating_add(1);
+            } else if closes(kind) {
+                if depth == 0 {
+                    break;
+                }
+                depth = depth.saturating_sub(1);
+            } else if depth == 0 && self.stops_at(at) {
+                break;
+            }
+            at = at.saturating_add(1);
+        }
+        at
+    }
+
+    /// Returns whether the token at `pos` can start or end a statement or an element, so
+    /// recovery stops at it: a reserved word that only a statement or a block's end holds,
+    /// `then`, `do`, `;`, or `::`, anywhere. In a block, a name, `function`, or `if` at the start
+    /// of a line stops it too, while each of those also appears inside expressions. In a list
+    /// between brackets, where such a name may start the next line's element, a `,` stops it
+    /// instead.
+    fn stops_at(&self, pos: usize) -> bool {
+        use TokenKind as T;
+        match self.token_at(pos).kind {
+            T::End
+            | T::Else
+            | T::Elseif
+            | T::Until
+            | T::Then
+            | T::Do
+            | T::Semicolon
+            | T::ColonColon
+            | T::Local
+            | T::Global
+            | T::Return
+            | T::Break
+            | T::Goto
+            | T::While
+            | T::For
+            | T::Repeat => true,
+            T::Comma => self.in_brackets,
+            T::Name | T::Function | T::If => !self.in_brackets && self.starts_line(pos),
+            _ => false,
+        }
+    }
+
+    /// Calls `read` to read the elements of a list between brackets, where recovery stops at a
+    /// `,`, and returns what it returns.
+    fn bracketed<R>(&mut self, read: impl FnOnce(&mut Self) -> R) -> R {
+        let outer = std::mem::replace(&mut self.in_brackets, true);
+        let result = read(self);
+        self.in_brackets = outer;
+        result
+    }
+
+    /// Returns whether the token at `pos` starts a line: it is the source's first token, or it
+    /// starts on a later line than the line where the token before it ends.
+    fn starts_line(&self, pos: usize) -> bool {
+        let line = self.lexed.lines().line_col(self.token_at(pos).span.start).0;
+        pos.checked_sub(1)
+            .is_none_or(|before| line > self.end_line(self.token_at(before)))
     }
 
     // The events.

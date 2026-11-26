@@ -1,10 +1,10 @@
 //! `lunaferra-syntax` reads Lunaferra source. Today it holds the positions that every part of
 //! Lunaferra uses to point into source text, source IDs, byte spans, and line maps; the lexer,
 //! which splits a source into tokens; the parser, which reads every statement and expression,
-//! with Python's operators and their precedence, and emits the events of a tree; and the lossless
-//! syntax tree, which keeps every byte of the source and is built from those events. Error
-//! recovery, the compact tree for the compiler, and the diagnostic type that every tool shares
-//! join it in milestone M1 of the [roadmap], as the [syntax spec] describes.
+//! with Python's operators and their precedence, goes on after each syntax error, and emits the
+//! events of a tree; the lossless syntax tree, which keeps every byte of the source and is built
+//! from those events; and the diagnostic type that every tool reports. The compact tree for the
+//! compiler joins it in milestone M1 of the [roadmap], as the [syntax spec] describes.
 //!
 //! It depends on nothing but the standard library. The compiler and the analysis tools will read
 //! the trees it builds.
@@ -26,6 +26,11 @@
 //!   its events, and [`SyntaxNode`], [`SyntaxToken`], and [`SyntaxElement`] read it. The typed
 //!   views in [`ast`], such as [`ast::IfStat`], give each kind of node named accessors, and
 //!   [`ast::Stat`] and [`ast::Expr`] view every statement and every expression.
+//! - A source's errors: [`source_errors`] gives every lexical and syntax error as a
+//!   [`SourceError`], in the order PUC-Rio Lua's parser meets them, and [`diagnostics`] gives each
+//!   as a [`Diagnostic`], the shape every tool reports a problem in, with its [`Code`],
+//!   [`Severity`], [`Label`]s, and [`Fix`]es, each made of [`Edit`]s. A code's [`Tool`] gives its
+//!   letter.
 //! - [`Error`] is the error the crate's functions return, and [`MAX_SOURCE_LEN`] is the length of
 //!   the longest source they accept.
 //!
@@ -62,13 +67,14 @@
 //! error's message is the one PUC-Rio Lua 5.5.1 gives for the same source, where the syntax is
 //! Lua's.
 //!
-//! # The first error
+//! # Recovery, and the first error
 //!
-//! The parser stops at a source's first error, as PUC-Rio Lua does, and still emits the events
-//! of a tree over every token, with the rest of the source in a [`NodeKind::Error`] node. Its
-//! error is an [`Event::Error`] when it comes before the source's first lexical error, and
-//! otherwise the first of [`Lexed::errors`] is the source's first error. Recovery, which goes on
-//! after each error, joins it in M1.6.
+//! The parser goes on after each syntax error, which comes as an [`Event::Error`]: it puts the
+//! tokens it skips in a [`NodeKind::Error`] node, and goes on at the next token that can start or
+//! end a statement. So the tools see every error of a file, and its events always make a tree
+//! over every token. PUC-Rio Lua stops at a source's first error, so only the first error, lexical
+//! or syntactic, is the one it reports; the first that [`source_errors`] gives is that one, with
+//! the message and line PUC-Rio Lua 5.5.1 gives where the syntax is Lua's.
 //!
 //! # The lossless tree
 //!
@@ -81,18 +87,22 @@
 //! [roadmap]: https://github.com/jabbott-iii/Lunaferra/blob/main/docs/roadmap.md
 
 pub mod ast;
+mod diagnostic;
 mod error;
 mod event;
 mod lexer;
 mod parser;
 mod source;
+mod source_error;
 mod token;
 mod tree;
 
+pub use diagnostic::{Code, Diagnostic, Edit, Fix, Label, Severity, Tool};
 pub use error::Error;
 pub use event::{Event, NodeKind};
 pub use lexer::{LexError, LexErrorKind, Lexed, Near, Number, Origin, lex, numeral_value};
 pub use parser::{ParseError, ParseErrorKind, parse};
 pub use source::{LineMap, MAX_SOURCE_LEN, SourceId, Span};
+pub use source_error::{SourceError, diagnostics, source_errors};
 pub use token::{Token, TokenKind, Trivia, TriviaKind};
 pub use tree::{Children, SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree};

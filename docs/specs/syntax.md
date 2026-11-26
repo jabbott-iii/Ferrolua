@@ -179,7 +179,7 @@ pub enum Event {
     Start(NodeKind),
     Token(TokenKind, Span),
     Finish,
-    Error(ParseError),   // the Diagnostic of M1.6 replaces ParseError
+    Error(ParseError),   // a syntax error, with PUC-Rio's message and line
 }
 
 pub struct ParseError {
@@ -266,30 +266,71 @@ tuple literals, and the fields of f-strings, parse as
 [`language.md`](language.md#lists-tuples-and-sets-adr-0025) and
 [`language.md`](language.md#formatted-string-literals-adr-0025) define them.
 
-### Stopping at the first error
+<a id="stopping-at-the-first-error"></a>
 
-Until M1.6, the parser stops at the first error, as PUC-Rio does, and still makes a tree over every
-token. A syntax error comes as an `Error` event, followed by an `Error` node that holds every token
-from the one the parser stopped at to the end of the source, apart from `Eof`, inside the node it
-was reading. Each node it had started is finished as far as it got, and a node it starts after
-stopping, which would hold nothing, is left out, so a part that a broken statement lacks is
-missing, not empty. An expression that starts a statement but is neither a call nor assigned to,
-and a `for` whose first name is followed by neither `=` nor `,` or `in`, leave their statement
-without a kind, so it becomes an `Error` node too.
+### Recovery
+
+PUC-Rio stops at a source's first error, but an editor needs the whole file, so from M1.6 the
+parser goes on after each error, and the events still make a tree over every token. Built in M1.6
+as described here.
+
+When the parser meets a token it doesn't expect, it emits an `Error` event, then puts the tokens
+from that one up to the next *stop* in an `Error` node, inside the node it was reading. A stop is
+a token that can start or end a statement, or close what is open:
+
+- anywhere, `end`, `else`, `elseif`, `until`, `then`, `do`, `;`, `::`, and the reserved words
+  that start only a statement: `local`, `global`, `return`, `break`, `goto`, `while`, `for`, and
+  `repeat`;
+- in a block, a name, `function`, or `if` at the start of a line, which may start the next
+  statement; inside the brackets of a table, a list, a tuple, a call's arguments, an index, or an
+  f-string's field, where such a name may start the next element instead, a `,`;
+- a `)`, `]`, `}`, or end of an f-string or of a field, unless the skipped tokens opened it, so a
+  call skipped whole, `f(function() ... end)` included, doesn't stop the skipping inside it;
+- the end of the source.
+
+Then the parser *unwinds*: its cursor shows the end of the source, so each node it had started
+finishes as far as it got, and a node started while unwinding, which holds nothing, is left out, so
+a part that a broken statement lacks is missing, not empty. The unwinding ends at a block's list of
+statements, which goes on from the stop, or where the parser next asks for the token at the stop,
+when that token ends a part of a construct, such as `then`, `do`, `end`, `,`, or `)`. So
+`if x + then y() end` keeps its block, and `f(1 2)` puts `2` in an error node and keeps its `)`. A
+block that unwinding reaches before any statement fills it, as in `if x` alone, is a part the `if`
+lacks, and is left out. An expression that starts a statement but is neither a call nor assigned
+to, and a `for` whose first name is followed by neither `=` nor `,` or `in`, leave their statement
+without a kind, so it becomes an `Error` node.
+
+The checks of a rule that a statement breaks while its tokens are all in place, such as `break`
+outside a loop or an unknown attribute, report their error and skip nothing. A token that can
+start no statement where one must start, such as `)` or `then`, is skipped, and so is a token that
+ends a block where the main chunk must end, which gives `<eof> expected`.
+
+Two rules keep one mistake from giving several errors, so each token gets at most one error:
+
+- An error at the token where the last recovery stopped, before the parser has read another, isn't
+  reported. So `while x do until` reports only `'end' expected near 'until'`, not also the
+  `<eof> expected` of the main chunk at the same `until`.
+- A token the parser doesn't expect isn't reported when it holds a lexical error, which the lexer
+  has reported, and neither is the end of the source after an unfinished string or comment that
+  reaches it, because what that swallowed can't be found missing. A token the lexer couldn't read,
+  such as `0x` or a string with a bad escape, stands where it is as an operand, in an `Error` node,
+  so `print("\q")` has one error, and an f-string's text with an error is text.
+
+The recovery is a heuristic. When a missing token, such as the `(` of `local function f`, leaves a
+block to be read, the statements that follow become that block, so if no `end` closes it, its
+missing `end` is a second error. Recovery skips each token at most once, and looks at each token it
+skips once more, to find the stop.
 
 PUC-Rio's lexer reads one token at a time, as the parser asks for it, so a lexical error comes
-first when the parser reaches the token that holds it before it finds a syntax error. Lunaferra's
-lexer has already read the whole source, so the parser finds the first token that ends after the
-source's first lexical error starts, and reports no syntax error at or past it: there, it stops
-without an `Error` event, and the lexical error in `Lexed::errors` is the source's first. So
-`x = 1 0x` reports `malformed number near '0x'`, while `@ 0x` reports `unexpected symbol near
-'@'`.
+before a syntax error when the parser reaches the token that holds it first. Lunaferra's lexer has
+already read the whole source, so `source_errors` puts the two lists together in that order: a
+syntax error comes where the parser was when it found it, a lexical error at the first token that
+ends after the error starts, and a lexical error before a syntax error at the same token. The first
+error it gives is the one PUC-Rio reports, so `x = 1 0x` gives `malformed number near '0x'`, while
+`@ 0x` gives `unexpected symbol near '@'`.
 
-From M1.6, when the parser meets a token it doesn't expect, it emits an error, then skips to a
-token that can start or end a statement, such as `end`, `local`, or a newline before a name, so the
-rest of the file still parses. A depth counter stops nesting at PUC-Rio Lua 5.5.1's limit, with its
-message; M1.8 records both here. Until then, the parser calls itself once for each level of a
-nested block or expression, with no limit.
+From M1.8, a depth counter will stop nesting at PUC-Rio Lua 5.5.1's limit, with its message,
+and M1.8 records both here. Until then, the parser calls itself once for each level of a nested
+block or expression, with no limit.
 
 ## Lossless tree
 
@@ -466,8 +507,38 @@ For `load` and the compiler, a syntax error produces PUC-Rio's format,
 `<chunkname>:<line>: <message> near '<token>'`, such as `input:3: 'end' expected near <eof>`. An
 error in syntax that Lunaferra shares with Lua 5.5 has the same message and token text as on PUC-Rio
 Lua 5.5.1; the messages for Lua's removed operators and for Lunaferra's own syntax are recorded in
-`language.md`. For the tools, each error is a
-`P` diagnostic with a span and, where certain, a fix (M1.6).
+`language.md`. For the tools, each error is a `P` diagnostic, with a code for its kind, its
+message, its span, and, where certain, a fix, as [`diagnostics.md`](diagnostics.md) defines.
+
+Built in M1.6 as described here:
+
+```rust
+pub enum SourceError<'a> { Lex(&'a LexError), Parse(&'a ParseError) }
+impl SourceError<'_> {
+    pub fn message(&self) -> Vec<u8>;       // PUC-Rio's message, as bytes
+    pub fn line(&self) -> u32;              // the line PUC-Rio's message names
+    pub fn span(&self) -> Span;
+    pub fn diagnostic(&self) -> Diagnostic;
+}
+
+// Every error, lexical and syntactic, in the order PUC-Rio's parser meets them.
+pub fn source_errors<'a>(lexed: &'a Lexed, events: &'a [Event]) -> Vec<SourceError<'a>>;
+// The same errors as diagnostics, for the tools.
+pub fn diagnostics(lexed: &Lexed, events: &[Event]) -> Vec<Diagnostic>;
+
+impl LexError { pub fn diagnostic(&self) -> Diagnostic; }
+impl ParseError { pub fn diagnostic(&self) -> Diagnostic; }
+```
+
+`Event::Error` keeps the `ParseError`, which the `Diagnostic` doesn't replace, because `load`
+needs what only it has: the message as bytes, since the text after `near` is a copy of the source
+and need not be valid UTF-8, and PUC-Rio's line, which for an attribute's error is the line of the
+`>`, not of the span (the owner's choice, 2026-11-26). A diagnostic's message is the same text,
+with each sequence of bytes that isn't valid UTF-8 replaced by U+FFFD, and its span is the error's.
+The diagnostics of Lua's `~=` and binary `~` have a fix that writes `!=` or `^` in their place,
+which parses wherever the old operator stopped the parse. The one for `..` has none, because `+`
+binds more tightly than `..` did and joins only strings, so the edit could change what the
+expression computes.
 
 `ParseError::message` gives the message after the chunk name and the line, as `LexError::message`
 does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `llex.c` give them:
@@ -508,8 +579,11 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
 9. `SyntaxTree::build` accepts exactly the lists of events that make one tree over every token of
    the source, and walking the tree it builds gives back those events, apart from the `Error`
    events, which add nothing to the tree.
-10. The parser's events make a tree for every input, with at most one `Error` event, which comes
-    before the source's first lexical error.
+10. The parser's events make a tree for every input. Its `Error` events come in source order, at
+    most one at each token, and none of the errors for a token it didn't expect is at a token that
+    holds a lexical error.
+11. The first error that `source_errors` gives is the one PUC-Rio Lua 5.5.1 reports for the same
+    source, wherever the syntax is Lua's.
 
 ## Tests
 
@@ -529,7 +603,8 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   a list, a tuple, a table, and an f-string of 100,000 elements each.
 - Invariant 3: a property test on generated valid programs.
 - Invariant 4: `tests/conformance/syntax_errors.lua` loads broken chunks with `load` and prints each
-  message, recorded from its Lua 5.5 twin on PUC-Rio Lua 5.5.1. For the lexer's errors,
+  message, recorded from its Lua 5.5 twin on PUC-Rio Lua 5.5.1; it runs once the conformance runner
+  does (M2.14), and invariant 11's test checks its messages until then. For the lexer's errors,
   `crates/syntax/tests/lexer.rs` compares the first error of each of 54 broken chunks with the
   message that `load` gave for it on PUC-Rio Lua 5.5.1 on 2026-11-25. For the parser's errors,
   `crates/syntax/tests/parser.rs` compares the first error of each of 188 broken chunks, with
@@ -570,5 +645,17 @@ does, and `ParseError::line` gives the line, both as PUC-Rio's `lparser.c` and `
   tests in the file check each error on a list of its own, and that an `Error` event outside the
   root is refused.
 - Invariant 10: the property test of the parser's events in `crates/syntax/tests/parser.rs`
-  checks each tree, the number of `Error` events, and that a syntax error ends before the first
-  lexical error starts.
+  checks the tree of each of 5,000 generated sources of statement keywords, operators, names,
+  symbols, and broken tokens, that their `Error` events come in source order at different spans,
+  and that none for a token the parser didn't expect is at a token that holds a lexical error.
+  `crates/syntax/tests/recovery.rs` checks where the parser goes on after each kind of stop,
+  inside brackets and out, that it reports no error twice at one token or at a token that holds a
+  lexical error, that a rule a statement breaks skips nothing, that a file with three separate
+  errors gets three diagnostics and keeps the statements between them, and that 100,000 broken
+  lines give 100,000 diagnostics.
+- Invariant 11: `crates/syntax/tests/recovery.rs` takes each of the 43 chunks that
+  `tests/conformance/syntax_errors.lua` loads, and compares its first error from `source_errors`
+  with the line PUC-Rio Lua 5.5.1 printed for its twin, recorded in
+  `tests/conformance/reference/syntax_errors.out`. `crates/syntax/tests/diagnostic.rs` checks that a
+  lexical error comes before a syntax error at the same token, and the code, message, span, and
+  fix of the diagnostic of each kind of error.
